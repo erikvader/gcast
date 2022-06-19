@@ -371,12 +371,12 @@ pub struct Searcher {
 }
 
 impl Searcher {
-    pub fn new(candidates: Vec<String>) -> Self {
+    pub fn new<T: Into<String>>(candidates: Vec<T>) -> Self {
         Self {
             active: candidates
                 .into_iter()
                 .enumerate()
-                .map(|(i, c)| TaggedLCS::new(c, i))
+                .map(|(i, c)| TaggedLCS::new(c.into(), i))
                 .collect(),
             inactive: Vec::new(),
             search: String::new(),
@@ -424,4 +424,31 @@ impl Searcher {
     pub fn get_search(&self) -> &str {
         self.search.as_str()
     }
+}
+
+#[test]
+fn test_lcs_searcher() {
+    let mut searcher = Searcher::new(vec!["aaa", "aab", "aa", "abab", "bbbb"]);
+    assert_eq!(searcher.get_sorted().count(), 5);
+    assert_eq!(searcher.get_search(), "");
+
+    searcher.push('a');
+    assert_eq!(searcher.get_sorted().count(), 4);
+    assert_eq!(searcher.get_search(), "a");
+
+    searcher.pop();
+    assert_eq!(searcher.get_sorted().count(), 5);
+    assert_eq!(searcher.get_search(), "");
+
+    searcher.push_str("aab");
+    assert_eq!(searcher.get_sorted().count(), 2);
+
+    searcher.pop();
+    assert_eq!(searcher.get_sorted().count(), 4);
+
+    searcher.pop();
+    assert_eq!(searcher.get_sorted().count(), 4);
+
+    searcher.pop();
+    assert_eq!(searcher.get_sorted().count(), 5);
 }
