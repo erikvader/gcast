@@ -1,3 +1,4 @@
+use delegate::delegate;
 use std::{cmp::max, num::NonZeroUsize};
 
 trait Recurrence: FnMut(Element, Element, Element) -> Element {}
@@ -223,18 +224,22 @@ impl LCS {
         let (mut row, mut col) = self.dp.bottom_right();
 
         while row > 0 && col > 0 {
-            let ele = self.dp.get(row, col).expect("should be in bounds");
+            let cur = self.dp.get(row, col).expect("should be in bounds");
             let left = self.dp.get(row, col - 1).expect("should be in bounds");
             let up = self.dp.get(row - 1, col).expect("should be in bounds");
 
-            if ele.matched() {
+            if cur.length() == up.length() {
+                row -= 1;
+            } else if cur.length() == left.length() {
+                col -= 1;
+            } else {
+                assert!(
+                    cur.matched(),
+                    "cur must be matched here, else the algorithm is not correct"
+                );
                 lcs.push(row - 1);
                 row -= 1;
                 col -= 1;
-            } else if left.length() > up.length() {
-                col -= 1;
-            } else {
-                row -= 1;
             }
         }
 
@@ -247,11 +252,31 @@ impl LCS {
         self.get_indices().into_iter().map(|i| chars[i]).collect()
     }
 
-    pub fn get_grouped(&self) -> Vec<&str> {
-        let mut groups: Vec<&str> = Vec::new();
-        groups.push("");
-        todo!();
-        groups
+    pub fn get_interspersed(&self, left: &str, right: &str) -> String {
+        let mut res = String::new();
+        let lcs = self.get_indices();
+        for (i, c) in self.compare.chars().enumerate() {
+            if lcs.binary_search(&i).is_ok() {
+                res.push_str(left);
+                res.push(c);
+                res.push_str(right);
+            } else {
+                res.push(c);
+            }
+        }
+        res
+    }
+
+    pub fn spread(&self) -> usize {
+        let ind = self.get_indices();
+        if ind.len() <= 1 {
+            return 0;
+        }
+        ind.windows(2).map(|x| x[1] - x[0] - 1).sum()
+    }
+
+    pub fn first_pos(&self) -> Option<usize> {
+        self.get_indices().first().copied()
     }
 }
 
@@ -263,45 +288,137 @@ fn test_lcs() {
     assert!(vec!["AC", "GC", "GA"].contains(&lcs.get_string().as_str()));
 }
 
+#[test]
+fn test_empty_lcs() {
+    let lcs = LCS::new("asd".into());
+    assert!(lcs.get_indices().is_empty());
+    assert!(lcs.get_string().is_empty());
+}
+
+#[test]
+fn test_lcs_intersperse() {
+    let mut lcs = LCS::new("asd".into());
+    lcs.push('s');
+    assert_eq!(lcs.get_interspersed("1", "2"), "a1s2d");
+}
+
+#[test]
+fn test_lcs_tightness() {
+    let mut lcs = LCS::new("src/lc".into());
+    lcs.push_str("src");
+    assert_eq!(lcs.length(), 3);
+    assert_eq!(lcs.get_string(), "src");
+    assert_eq!(lcs.first_pos(), Some(0));
+    assert_eq!(lcs.spread(), 0);
+}
+
 // searcher ///////////////////////////////////////////////////////////////////
+struct TaggedLCS {
+    lcs: LCS,
+    index: usize,
+}
+
+impl TaggedLCS {
+    fn new(string: String, index: usize) -> Self {
+        Self {
+            lcs: LCS::new(string),
+            index,
+        }
+    }
+
+    delegate! {
+        to self.lcs {
+            fn length(&self) -> usize;
+            fn spread(&self) -> usize;
+            fn first_pos(&self) -> Option<usize>;
+            fn push(&mut self, c: char);
+            fn pop(&mut self);
+        }
+    }
+}
+
+impl Ord for TaggedLCS {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let a = self;
+        let b = other;
+        b.length()
+            .cmp(&a.length())
+            .then_with(|| a.spread().cmp(&b.spread()))
+            .then_with(|| a.first_pos().cmp(&b.first_pos()))
+            .then_with(|| a.index.cmp(&b.index))
+    }
+}
+
+impl PartialOrd for TaggedLCS {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for TaggedLCS {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other).is_eq()
+    }
+}
+
+impl Eq for TaggedLCS {}
+
 pub struct Searcher {
-    cands: Vec<LCS>,
+    active: Vec<TaggedLCS>,
+    inactive: Vec<TaggedLCS>,
     search: String,
+    num_chars: usize,
 }
 
 impl Searcher {
     pub fn new(candidates: Vec<String>) -> Self {
         Self {
-            cands: candidates.into_iter().map(|c| LCS::new(c)).collect(),
+            active: candidates
+                .into_iter()
+                .enumerate()
+                .map(|(i, c)| TaggedLCS::new(c, i))
+                .collect(),
+            inactive: Vec::new(),
             search: String::new(),
+            num_chars: 0,
         }
     }
 
-    fn sort(&mut self) {
-        self.cands
-            .sort_by_key(|lcs| usize::max_value() - lcs.length());
-    }
-
     pub fn push_str(&mut self, s: &str) {
-        self.search.push_str(s);
-        self.cands.iter_mut().for_each(|lcs| lcs.push_str(s));
-        self.sort();
+        s.chars().for_each(|c| self.push(c));
     }
 
     pub fn push(&mut self, c: char) {
         self.search.push(c);
-        self.cands.iter_mut().for_each(|lcs| lcs.push(c));
-        self.sort();
+        self.active.iter_mut().for_each(|lcs| lcs.push(c));
+        self.num_chars += 1;
+
+        self.active
+            .sort_unstable_by_key(|lcs| lcs.length() != self.num_chars);
+        while let Some(last) = self.active.last() {
+            if last.length() == self.num_chars {
+                break;
+            }
+            self.inactive.push(self.active.pop().expect("last != None"));
+        }
     }
 
     pub fn pop(&mut self) {
         self.search.pop();
-        self.cands.iter_mut().for_each(|lcs| lcs.pop());
-        self.sort();
+        self.active.iter_mut().for_each(|lcs| lcs.pop());
+        self.num_chars -= 1;
+
+        while let Some(last) = self.inactive.last() {
+            if last.length() != self.num_chars {
+                break;
+            }
+            self.active.push(self.inactive.pop().expect("last != None"));
+        }
     }
 
-    pub fn get_sorted(&self) -> &[LCS] {
-        &self.cands
+    pub fn get_sorted(&mut self) -> impl Iterator<Item = &LCS> {
+        self.active.sort_unstable();
+        self.active.iter().map(|lcs| &lcs.lcs)
     }
 
     pub fn get_search(&self) -> &str {
