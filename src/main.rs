@@ -1,4 +1,3 @@
-mod ansistring;
 mod lcs;
 
 use std::{
@@ -6,7 +5,7 @@ use std::{
     io::{self, BufRead},
 };
 
-use ansistring::{AnsiString, Color};
+use colored::*;
 use lcs::Searcher;
 
 fn main() {
@@ -18,9 +17,7 @@ fn main() {
     let mut searcher = Searcher::new(input.expect("no stdin"));
     searcher.push_str(query);
 
-    let left = AnsiString::empty().push_fg_bright(Color::Red).to_string();
-    let right = AnsiString::empty().push_reset().to_string();
     for x in searcher.get_sorted() {
-        println!("{}", x.get_interspersed(&left, &right));
+        println!("{}", x.get_interspersed(|c| c.to_string().red(), |c| c));
     }
 }

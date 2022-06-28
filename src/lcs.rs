@@ -252,16 +252,20 @@ impl LCS {
         self.get_indices().into_iter().map(|i| chars[i]).collect()
     }
 
-    pub fn get_interspersed(&self, left: &str, right: &str) -> String {
+    pub fn get_interspersed<T1, T2, ON, OFF>(&self, on_lcs: ON, off_lcs: OFF) -> String
+    where
+        T1: std::fmt::Display,
+        T2: std::fmt::Display,
+        ON: Fn(char) -> T1,
+        OFF: Fn(char) -> T2,
+    {
         let mut res = String::new();
         let lcs = self.get_indices();
         for (i, c) in self.compare.chars().enumerate() {
             if lcs.binary_search(&i).is_ok() {
-                res.push_str(left);
-                res.push(c);
-                res.push_str(right);
+                res.push_str(&on_lcs(c).to_string());
             } else {
-                res.push(c);
+                res.push_str(&off_lcs(c).to_string());
             }
         }
         res
@@ -299,7 +303,7 @@ fn test_empty_lcs() {
 fn test_lcs_intersperse() {
     let mut lcs = LCS::new("asd".into());
     lcs.push('s');
-    assert_eq!(lcs.get_interspersed("1", "2"), "a1s2d");
+    assert_eq!(lcs.get_interspersed(|c| format!("1{}2", c), |c| c), "a1s2d");
 }
 
 #[test]
