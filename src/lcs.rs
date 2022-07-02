@@ -252,8 +252,7 @@ impl LCS {
     }
 
     pub fn get_ranges(&self) -> Vec<Range<usize>> {
-        // TODO:
-        todo!("ge tillbaka en kompaktare representation av get_indices")
+        compact_to_ranges(self.get_indices(), 1)
     }
 
     pub fn get_string(&self) -> String {
@@ -310,6 +309,7 @@ fn test_empty_lcs() {
     let lcs = LCS::new("asd".into());
     assert!(lcs.get_indices().is_empty());
     assert!(lcs.get_string().is_empty());
+    assert!(lcs.get_ranges().is_empty());
 }
 
 #[test]
@@ -327,6 +327,8 @@ fn test_lcs_tightness() {
     assert_eq!(lcs.get_string(), "src");
     assert_eq!(lcs.first_pos(), Some(0));
     assert_eq!(lcs.spread(), 0);
+    assert_eq!(lcs.get_indices(), vec![0, 1, 2]);
+    assert_eq!(lcs.get_ranges(), vec![0..3]);
 }
 
 #[test]
@@ -525,4 +527,53 @@ fn test_lcs_searcher() {
     assert_eq!(searcher.get_sorted().count(), 5);
     assert_eq!(searcher.get_search(), "");
     assert_eq!(searcher.size_indication(), 0, "all grids should be empty");
+}
+
+// util ///////////////////////////////////////////////////////////////////////
+fn compact_to_ranges<T, It>(verbose: It, one: T) -> Vec<Range<T>>
+where
+    T: PartialOrd<T> + Copy + std::ops::Add<Output = T>,
+    It: IntoIterator<Item = T>,
+{
+    assert!(one + one > one, "unexpected behaviour of 'one'");
+    let mut iter = verbose.into_iter();
+    if let Some(first) = iter.next() {
+        let mut res = vec![Range {
+            start: first,
+            end: first + one,
+        }];
+
+        iter.for_each(|x| {
+            let end = &mut res.last_mut().unwrap().end;
+            assert!(x >= *end, "must be strictly increasing");
+            if *end == x {
+                *end = x + one;
+            } else {
+                res.push(Range {
+                    start: x,
+                    end: x + one,
+                });
+            }
+        });
+        res
+    } else {
+        Vec::new()
+    }
+}
+
+#[test]
+fn test_compact_ranges() {
+    assert_eq!(compact_to_ranges(vec![], 1), vec![]);
+    assert_eq!(compact_to_ranges(vec![1, 2, 3], 1), vec![1..4]);
+    assert_eq!(compact_to_ranges(vec![1, 3, 4], 1), vec![1..2, 3..5]);
+    assert_eq!(
+        compact_to_ranges(vec![1, 3, 7, 9], 1),
+        vec![1..2, 3..4, 7..8, 9..10]
+    );
+}
+
+#[test]
+#[should_panic(expected = "must be strictly increasing")]
+fn test_compact_invalid_input() {
+    compact_to_ranges(vec![1, 1], 1);
 }
