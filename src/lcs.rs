@@ -1,5 +1,5 @@
 use delegate::delegate;
-use std::{cmp::max, num::NonZeroUsize};
+use std::{cmp::max, num::NonZeroUsize, ops::Range};
 
 trait Recurrence: FnMut(Element, Element, Element) -> Element {}
 impl<T> Recurrence for T where T: FnMut(Element, Element, Element) -> Element {}
@@ -46,7 +46,7 @@ impl Element {
 }
 
 // Grid ///////////////////////////////////////////////////////////////////////
-
+#[derive(Debug)]
 struct Grid {
     grid: Vec<Element>,
     height: NonZeroUsize,
@@ -62,6 +62,10 @@ impl Grid {
             grid: Vec::new(),
             height,
         }
+    }
+
+    fn len(&self) -> usize {
+        self.grid.len()
     }
 
     fn is_empty(&self) -> bool {
@@ -137,7 +141,7 @@ fn test_one_column() {
         matched: false,
     };
     g.generate_col(|_a, _b, _c| ele);
-    assert_eq!(g.grid.len(), 3);
+    assert_eq!(g.len(), 3);
     assert_eq!(g.columns_non_zero(), 1);
     assert_eq!(g.get(4, 1), None);
     assert_eq!(g.get(3, 1), Some(ele));
@@ -155,7 +159,7 @@ fn test_pop_column() {
     };
     g.generate_col(|_a, _b, _c| ele);
     g.generate_col(|_a, _b, _c| ele);
-    assert_eq!(g.grid.len(), 6);
+    assert_eq!(g.len(), 6);
     assert_eq!(g.columns_non_zero(), 2);
     assert_eq!(g.get(4, 2), None);
     assert_eq!(g.get(3, 2), Some(ele));
@@ -163,12 +167,12 @@ fn test_pop_column() {
     assert_eq!(g.get(1, 3), None);
 
     g.pop_col();
-    assert_eq!(g.grid.len(), 3);
+    assert_eq!(g.len(), 3);
     assert_eq!(g.columns_non_zero(), 1);
 }
 
 // LCS ////////////////////////////////////////////////////////////////////////
-
+#[derive(Debug)]
 pub struct LCS {
     compare: String,
     dp: Grid,
@@ -247,6 +251,11 @@ impl LCS {
         lcs
     }
 
+    pub fn get_ranges(&self) -> Vec<Range<usize>> {
+        // TODO:
+        todo!("ge tillbaka en kompaktare representation av get_indices")
+    }
+
     pub fn get_string(&self) -> String {
         let chars: Vec<char> = self.compare.chars().collect();
         self.get_indices().into_iter().map(|i| chars[i]).collect()
@@ -282,6 +291,10 @@ impl LCS {
     pub fn first_pos(&self) -> Option<usize> {
         self.get_indices().first().copied()
     }
+
+    fn grid_len(&self) -> usize {
+        self.dp.len()
+    }
 }
 
 #[test]
@@ -316,7 +329,19 @@ fn test_lcs_tightness() {
     assert_eq!(lcs.spread(), 0);
 }
 
+#[test]
+fn test_lcs_pop() {
+    let mut lcs = LCS::new("asd".into());
+    lcs.push('s');
+    lcs.push('d');
+    assert_eq!(lcs.get_string(), "sd");
+
+    lcs.pop();
+    assert_eq!(lcs.get_string(), "s");
+}
+
 // searcher ///////////////////////////////////////////////////////////////////
+#[derive(Debug)]
 struct TaggedLCS {
     lcs: LCS,
     index: usize,
@@ -337,6 +362,7 @@ impl TaggedLCS {
             fn first_pos(&self) -> Option<usize>;
             fn push(&mut self, c: char);
             fn pop(&mut self);
+            fn grid_len(&self) -> usize;
         }
     }
 }
@@ -367,6 +393,7 @@ impl PartialEq for TaggedLCS {
 
 impl Eq for TaggedLCS {}
 
+#[derive(Debug)]
 pub struct Searcher {
     active: Vec<TaggedLCS>,
     inactive: Vec<TaggedLCS>,
@@ -408,6 +435,9 @@ impl Searcher {
     }
 
     pub fn pop(&mut self) {
+        if self.num_chars == 0 {
+            return;
+        }
         self.search.pop();
         self.active.iter_mut().for_each(|lcs| lcs.pop());
         self.num_chars -= 1;
@@ -416,7 +446,9 @@ impl Searcher {
             if last.length() != self.num_chars {
                 break;
             }
-            self.active.push(self.inactive.pop().expect("last != None"));
+            let mut popped = self.inactive.pop().expect("last != None");
+            popped.pop();
+            self.active.push(popped);
         }
     }
 
@@ -428,31 +460,69 @@ impl Searcher {
     pub fn get_search(&self) -> &str {
         self.search.as_str()
     }
+
+    pub fn size_indication(&self) -> usize {
+        self.active
+            .iter()
+            .chain(self.inactive.iter())
+            .map(|lcs| lcs.grid_len())
+            .sum::<usize>()
+            * std::mem::size_of::<Element>()
+    }
+
+    #[cfg(test)]
+    fn assert_invariants(&self) {
+        assert_eq!(self.num_chars, self.search.chars().count());
+        assert!(self
+            .active
+            .iter()
+            .all(|x| x.lcs.dp.columns_non_zero() == self.num_chars));
+        assert!(self.active.iter().all(|x| x.lcs.length() == self.num_chars));
+        assert!(!self
+            .inactive
+            .iter()
+            .any(|x| x.lcs.dp.columns_non_zero() > self.num_chars));
+        assert!(!self
+            .inactive
+            .iter()
+            .any(|x| x.lcs.length() >= self.num_chars));
+    }
 }
 
 #[test]
 fn test_lcs_searcher() {
     let mut searcher = Searcher::new(vec!["aaa", "aab", "aa", "abab", "bbbb"]);
     assert_eq!(searcher.get_sorted().count(), 5);
+    assert_eq!(searcher.size_indication(), 0, "all grids should be empty");
     assert_eq!(searcher.get_search(), "");
+    searcher.assert_invariants();
 
     searcher.push('a');
+    searcher.assert_invariants();
     assert_eq!(searcher.get_sorted().count(), 4);
     assert_eq!(searcher.get_search(), "a");
 
     searcher.pop();
+    searcher.assert_invariants();
     assert_eq!(searcher.get_sorted().count(), 5);
     assert_eq!(searcher.get_search(), "");
+    assert_eq!(searcher.size_indication(), 0, "all grids should be empty");
 
     searcher.push_str("aab");
+    searcher.assert_invariants();
     assert_eq!(searcher.get_sorted().count(), 2);
 
     searcher.pop();
+    searcher.assert_invariants();
     assert_eq!(searcher.get_sorted().count(), 4);
 
     searcher.pop();
+    searcher.assert_invariants();
     assert_eq!(searcher.get_sorted().count(), 4);
 
     searcher.pop();
+    searcher.assert_invariants();
     assert_eq!(searcher.get_sorted().count(), 5);
+    assert_eq!(searcher.get_search(), "");
+    assert_eq!(searcher.size_indication(), 0, "all grids should be empty");
 }

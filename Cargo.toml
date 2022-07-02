@@ -3,8 +3,15 @@ name = "gcast"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 delegate = "0.7"
-colored = "2"
+
+colored = {version="2", optional=true}
+bytesize = {version="1.1", optional=true}
+
+[features]
+fancy-terminal = ["dep:colored", "dep:bytesize"]
+
+[[bin]]
+name = "lcs-test"
+required-features = ["fancy-terminal"]

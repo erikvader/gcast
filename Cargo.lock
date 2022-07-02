@@ -14,6 +14,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bytesize"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c58ec36aac5066d5ca17df51b3e70279f5670a72102f5752cb7e7c856adfc70"
+
+[[package]]
 name = "colored"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -39,6 +45,7 @@ dependencies = [
 name = "gcast"
 version = "0.1.0"
 dependencies = [
+ "bytesize",
  "colored",
  "delegate",
 ]
