@@ -1,8 +1,8 @@
 use delegate::delegate;
 use std::{cmp::max, num::NonZeroUsize, ops::Range};
 
-trait Recurrence: FnMut(Element, Element, Element) -> Element {}
-impl<T> Recurrence for T where T: FnMut(Element, Element, Element) -> Element {}
+trait Recurrence: FnMut(Element, Element, Element) -> Result<Element, ()> {}
+impl<T> Recurrence for T where T: FnMut(Element, Element, Element) -> Result<Element, ()> {}
 
 // Element ////////////////////////////////////////////////////////////////////
 
@@ -13,7 +13,10 @@ struct Element {
 }
 
 impl Element {
+    #[cfg(not(test))]
     const MAX: u8 = u8::MAX;
+    #[cfg(test)]
+    const MAX: u8 = 10;
 
     fn empty() -> Self {
         Self {
@@ -30,10 +33,14 @@ impl Element {
         self.length
     }
 
-    fn new_matched(other: Self) -> Self {
-        Self {
-            length: other.length() + 1,
-            matched: true,
+    fn new_matched(other: Self) -> Result<Self, ()> {
+        if other.length() < Self::MAX {
+            Ok(Self {
+                length: other.length() + 1,
+                matched: true,
+            })
+        } else {
+            Err(())
         }
     }
 
@@ -102,7 +109,8 @@ impl Grid {
         }
     }
 
-    fn generate_col(&mut self, mut recur: impl Recurrence) {
+    fn generate_col(&mut self, mut recur: impl Recurrence) -> Result<(), ()> {
+        let org_len = self.grid.len();
         self.grid.reserve(self.height.get());
         let new_col = self.columns_non_zero() + 1;
 
@@ -113,10 +121,15 @@ impl Grid {
                 .get(row - 1, new_col - 1)
                 .expect("up left should exist");
 
-            let x = recur(left, up, upleft);
-            self.grid.push(x);
-            up = x;
+            if let Ok(x) = recur(left, up, upleft) {
+                self.grid.push(x);
+                up = x;
+            } else {
+                self.grid.truncate(org_len);
+                return Err(());
+            }
         }
+        Ok(())
     }
 }
 
@@ -140,7 +153,7 @@ fn test_one_column() {
         length: 42,
         matched: false,
     };
-    g.generate_col(|_a, _b, _c| ele);
+    assert!(g.generate_col(|_a, _b, _c| Ok(ele)).is_ok());
     assert_eq!(g.len(), 3);
     assert_eq!(g.columns_non_zero(), 1);
     assert_eq!(g.get(4, 1), None);
@@ -157,8 +170,8 @@ fn test_pop_column() {
         length: 42,
         matched: false,
     };
-    g.generate_col(|_a, _b, _c| ele);
-    g.generate_col(|_a, _b, _c| ele);
+    assert!(g.generate_col(|_a, _b, _c| Ok(ele)).is_ok());
+    assert!(g.generate_col(|_a, _b, _c| Ok(ele)).is_ok());
     assert_eq!(g.len(), 6);
     assert_eq!(g.columns_non_zero(), 2);
     assert_eq!(g.get(4, 2), None);
@@ -188,7 +201,7 @@ impl LCS {
         }
     }
 
-    pub fn push(&mut self, c: char) {
+    pub fn push(&mut self, c: char) -> Result<(), ()> {
         let mut cmp = self.compare.chars();
         self.dp.generate_col(|left, up, upleft| {
             let cur = cmp
@@ -198,13 +211,21 @@ impl LCS {
             if c == cur {
                 Element::new_matched(upleft)
             } else {
-                Element::new_not_matched(left, up)
+                Ok(Element::new_not_matched(left, up))
             }
-        });
+        })
     }
 
-    pub fn push_str(&mut self, s: &str) {
-        s.chars().for_each(|c| self.push(c));
+    pub fn push_str(&mut self, s: &str) -> Result<(), usize> {
+        let mut count = 0;
+        for c in s.chars() {
+            if self.push(c).is_ok() {
+                count += 1;
+            } else {
+                return Err(count);
+            }
+        }
+        Ok(())
     }
 
     pub fn pop(&mut self) {
@@ -299,7 +320,7 @@ impl LCS {
 #[test]
 fn test_lcs() {
     let mut lcs = LCS::new("GAC".into());
-    lcs.push_str("AGCAT");
+    assert!(lcs.push_str("AGCAT").is_ok());
     assert_eq!(lcs.length(), 2);
     assert!(vec!["AC", "GC", "GA"].contains(&lcs.get_string().as_str()));
 }
@@ -315,14 +336,14 @@ fn test_empty_lcs() {
 #[test]
 fn test_lcs_intersperse() {
     let mut lcs = LCS::new("asd".into());
-    lcs.push('s');
+    assert!(lcs.push('s').is_ok());
     assert_eq!(lcs.get_interspersed(|c| format!("1{}2", c), |c| c), "a1s2d");
 }
 
 #[test]
 fn test_lcs_tightness() {
     let mut lcs = LCS::new("src/lc".into());
-    lcs.push_str("src");
+    assert!(lcs.push_str("src").is_ok());
     assert_eq!(lcs.length(), 3);
     assert_eq!(lcs.get_string(), "src");
     assert_eq!(lcs.first_pos(), Some(0));
@@ -334,8 +355,8 @@ fn test_lcs_tightness() {
 #[test]
 fn test_lcs_pop() {
     let mut lcs = LCS::new("asd".into());
-    lcs.push('s');
-    lcs.push('d');
+    assert!(lcs.push('s').is_ok());
+    assert!(lcs.push('d').is_ok());
     assert_eq!(lcs.get_string(), "sd");
 
     lcs.pop();
@@ -362,7 +383,7 @@ impl TaggedLCS {
             fn length(&self) -> usize;
             fn spread(&self) -> usize;
             fn first_pos(&self) -> Option<usize>;
-            fn push(&mut self, c: char);
+            fn push(&mut self, c: char) -> Result<(), ()>;
             fn pop(&mut self);
             fn grid_len(&self) -> usize;
         }
@@ -417,14 +438,32 @@ impl Searcher {
         }
     }
 
-    pub fn push_str(&mut self, s: &str) {
-        s.chars().for_each(|c| self.push(c));
+    pub fn push_str(&mut self, s: &str) -> Result<(), usize> {
+        let mut count = 0;
+        for c in s.chars() {
+            if self.push(c).is_ok() {
+                count += 1;
+            } else {
+                return Err(count);
+            }
+        }
+        Ok(())
     }
 
-    pub fn push(&mut self, c: char) {
+    pub fn push(&mut self, c: char) -> Result<(), ()> {
         self.search.push(c);
-        self.active.iter_mut().for_each(|lcs| lcs.push(c));
         self.num_chars += 1;
+
+        for i in 0..self.active.len() {
+            if self.active[i].push(c).is_err() {
+                for j in 0..i {
+                    self.active[j].pop();
+                }
+                self.num_chars -= 1;
+                self.search.pop();
+                return Err(());
+            }
+        }
 
         self.active
             .sort_unstable_by_key(|lcs| lcs.length() != self.num_chars);
@@ -434,6 +473,7 @@ impl Searcher {
             }
             self.inactive.push(self.active.pop().expect("last != None"));
         }
+        Ok(())
     }
 
     pub fn pop(&mut self) {
@@ -457,6 +497,13 @@ impl Searcher {
     pub fn get_sorted(&mut self) -> impl Iterator<Item = &LCS> {
         self.active.sort_unstable();
         self.active.iter().map(|lcs| &lcs.lcs)
+    }
+
+    pub fn get_sorted_take(&mut self, len: usize) -> impl Iterator<Item = &LCS> {
+        assert!(len > 0);
+        let (beg, _, _) = self.active.select_nth_unstable(len - 1);
+        beg.sort_unstable();
+        self.active.iter().map(|lcs| &lcs.lcs).take(len)
     }
 
     pub fn get_search(&self) -> &str {
@@ -499,7 +546,7 @@ fn test_lcs_searcher() {
     assert_eq!(searcher.get_search(), "");
     searcher.assert_invariants();
 
-    searcher.push('a');
+    assert!(searcher.push('a').is_ok());
     searcher.assert_invariants();
     assert_eq!(searcher.get_sorted().count(), 4);
     assert_eq!(searcher.get_search(), "a");
@@ -510,7 +557,7 @@ fn test_lcs_searcher() {
     assert_eq!(searcher.get_search(), "");
     assert_eq!(searcher.size_indication(), 0, "all grids should be empty");
 
-    searcher.push_str("aab");
+    assert!(searcher.push_str("aab").is_ok());
     searcher.assert_invariants();
     assert_eq!(searcher.get_sorted().count(), 2);
 
@@ -527,6 +574,16 @@ fn test_lcs_searcher() {
     assert_eq!(searcher.get_sorted().count(), 5);
     assert_eq!(searcher.get_search(), "");
     assert_eq!(searcher.size_indication(), 0, "all grids should be empty");
+}
+
+#[test]
+fn test_lcs_searcher_too_long() {
+    let s = "aaaaaaaaaaa";
+    assert!(s.chars().count() > Element::MAX.into());
+    let mut searcher = Searcher::new(vec![s]);
+    assert_eq!(Err(10), searcher.push_str(s));
+    assert_eq!(&s[..10], searcher.get_search());
+    assert_eq!(10, searcher.num_chars);
 }
 
 // util ///////////////////////////////////////////////////////////////////////

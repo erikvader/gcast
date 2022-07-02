@@ -47,7 +47,7 @@ fn main() {
     let mut searcher = Searcher::new(file_lines);
     let mut search_time = Duration::from_millis(0);
     loop {
-        reset_term();
+        // reset_term();
         println!("{} {}", "search:".blue(), searcher.get_search());
         println!(
             "{} {}",
@@ -56,9 +56,11 @@ fn main() {
         );
         println!("{} {:?}", "time:".blue(), search_time);
         println!();
-        for x in searcher.get_sorted().take(10) {
+        let sort_prev = Instant::now();
+        for x in searcher.get_sorted_take(10) {
             println!("{}", x.get_interspersed(|c| c.to_string().red(), |c| c));
         }
+        println!("{} {:?}", "sort time:".blue(), sort_prev.elapsed());
 
         let mut line = String::new();
         let bytes_read = io::stdin().read_line(&mut line).expect("read stdin failed");
@@ -71,7 +73,7 @@ fn main() {
         if line.is_empty() {
             searcher.pop();
         } else {
-            searcher.push_str(&line);
+            searcher.push_str(&line).expect("too long");
         }
         search_time = prev.elapsed();
     }
