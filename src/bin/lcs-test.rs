@@ -58,7 +58,11 @@ fn main() {
         println!();
         let sort_prev = Instant::now();
         for x in searcher.get_sorted_take(10) {
-            println!("{}", x.get_interspersed(|c| c.to_string().red(), |c| c));
+            let indices = x.get_some_indices();
+            println!(
+                "{}",
+                x.get_interspersed(&indices, |c| c.to_string().red(), |c| c)
+            );
         }
         println!("{} {:?}", "sort time:".blue(), sort_prev.elapsed());
 

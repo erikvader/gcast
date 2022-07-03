@@ -1,5 +1,7 @@
 use delegate::delegate;
-use std::{cmp::max, num::NonZeroUsize, ops::Range};
+use itertools::Itertools;
+use std::{cmp::max, collections::HashSet, num::NonZeroUsize, ops::Range};
+use streaming_iterator::StreamingIterator;
 
 trait Recurrence: FnMut(Element, Element, Element) -> Result<Element, ()> {}
 impl<T> Recurrence for T where T: FnMut(Element, Element, Element) -> Result<Element, ()> {}
@@ -192,6 +194,9 @@ pub struct LCS {
 }
 
 impl LCS {
+    // TODO: quotes, reserved chars
+    const QUOTE: char = '\'';
+
     pub fn new(compare: String) -> Self {
         let len = compare.chars().count();
         assert!(len > 0, "can't do LCS on empty string");
@@ -202,12 +207,17 @@ impl LCS {
     }
 
     pub fn push(&mut self, c: char) -> Result<(), ()> {
+        // TODO: hantera QUOTE och UNQUOTE, eller ha två metoder som Searchern ansvarar
+        // att kalla på? och en assert här att c inte är QUOTE?
+
         let mut cmp = self.compare.chars();
         self.dp.generate_col(|left, up, upleft| {
             let cur = cmp
                 .next()
                 .expect("compare and grid height should be the same length");
 
+            // TODO: ha quote-logik som säger att denna matchar endast om den snett
+            // ovanför också matchade
             if c == cur {
                 Element::new_matched(upleft)
             } else {
@@ -244,44 +254,35 @@ impl LCS {
         self.dp.get_last().map_or(0, |x| x.length().into())
     }
 
-    pub fn get_indices(&self) -> Vec<usize> {
-        let mut lcs: Vec<usize> = Vec::new();
-        let (mut row, mut col) = self.dp.bottom_right();
-
-        while row > 0 && col > 0 {
-            let cur = self.dp.get(row, col).expect("should be in bounds");
-            let left = self.dp.get(row, col - 1).expect("should be in bounds");
-            let up = self.dp.get(row - 1, col).expect("should be in bounds");
-
-            if cur.length() == up.length() {
-                row -= 1;
-            } else if cur.length() == left.length() {
-                col -= 1;
-            } else {
-                assert!(
-                    cur.matched(),
-                    "cur must be matched here, else the algorithm is not correct"
-                );
-                lcs.push(row - 1);
-                row -= 1;
-                col -= 1;
-            }
-        }
-
-        lcs.reverse();
-        lcs
+    fn get_all_paths(&self) -> LCSIterator<'_> {
+        LCSIterator::new(&self)
     }
 
-    pub fn get_ranges(&self) -> Vec<Range<usize>> {
-        compact_to_ranges(self.get_indices(), 1)
+    pub fn get_all_indices(&self) -> impl Iterator<Item = Vec<usize>> + '_ {
+        self.get_all_paths()
+            .map_deref(|path| path_to_indices(path).collect())
     }
 
-    pub fn get_string(&self) -> String {
+    pub fn get_some_indices(&self) -> Vec<usize> {
+        // TODO: vad händer om self är tom? Kan man kanske garantera att next inte blir
+        // None? Kan man i så fall sätta returvärdet som en impl Iterator?
+        self.get_all_paths()
+            .next()
+            .map(|path| path_to_indices(path).collect())
+            .unwrap_or_else(|| Vec::new())
+    }
+
+    pub fn get_string<'a>(&self, indices: impl IntoIterator<Item = &'a usize>) -> String {
         let chars: Vec<char> = self.compare.chars().collect();
-        self.get_indices().into_iter().map(|i| chars[i]).collect()
+        indices.into_iter().map(|i| chars[*i]).collect()
     }
 
-    pub fn get_interspersed<T1, T2, ON, OFF>(&self, on_lcs: ON, off_lcs: OFF) -> String
+    pub fn get_interspersed<T1, T2, ON, OFF>(
+        &self,
+        indices: &[usize],
+        on_lcs: ON,
+        off_lcs: OFF,
+    ) -> String
     where
         T1: std::fmt::Display,
         T2: std::fmt::Display,
@@ -289,9 +290,8 @@ impl LCS {
         OFF: Fn(char) -> T2,
     {
         let mut res = String::new();
-        let lcs = self.get_indices();
         for (i, c) in self.compare.chars().enumerate() {
-            if lcs.binary_search(&i).is_ok() {
+            if indices.binary_search(&i).is_ok() {
                 res.push_str(&on_lcs(c).to_string());
             } else {
                 res.push_str(&off_lcs(c).to_string());
@@ -300,16 +300,19 @@ impl LCS {
         res
     }
 
-    pub fn spread(&self) -> usize {
-        let ind = self.get_indices();
-        if ind.len() <= 1 {
-            return 0;
-        }
-        ind.windows(2).map(|x| x[1] - x[0] - 1).sum()
+    pub fn spread<'a>(&self, indices: impl IntoIterator<Item = &'a usize>) -> usize {
+        indices
+            .into_iter()
+            .tuple_windows()
+            .map(|(a, b)| b - a - 1)
+            .sum()
     }
 
-    pub fn first_pos(&self) -> Option<usize> {
-        self.get_indices().first().copied()
+    pub fn first_pos<'a>(
+        &self,
+        indices: impl IntoIterator<Item = &'a usize>,
+    ) -> Option<usize> {
+        indices.into_iter().next().copied()
     }
 
     fn grid_len(&self) -> usize {
@@ -322,22 +325,27 @@ fn test_lcs() {
     let mut lcs = LCS::new("GAC".into());
     assert!(lcs.push_str("AGCAT").is_ok());
     assert_eq!(lcs.length(), 2);
-    assert!(vec!["AC", "GC", "GA"].contains(&lcs.get_string().as_str()));
+    let indices = lcs.get_some_indices();
+    assert!(vec!["AC", "GC", "GA"].contains(&lcs.get_string(&indices).as_str()));
 }
 
 #[test]
 fn test_empty_lcs() {
     let lcs = LCS::new("asd".into());
-    assert!(lcs.get_indices().is_empty());
-    assert!(lcs.get_string().is_empty());
-    assert!(lcs.get_ranges().is_empty());
+    let indices = lcs.get_some_indices();
+    assert!(indices.is_empty());
+    assert!(lcs.get_string(&indices).is_empty());
 }
 
 #[test]
 fn test_lcs_intersperse() {
     let mut lcs = LCS::new("asd".into());
     assert!(lcs.push('s').is_ok());
-    assert_eq!(lcs.get_interspersed(|c| format!("1{}2", c), |c| c), "a1s2d");
+    let indices = lcs.get_some_indices();
+    assert_eq!(
+        lcs.get_interspersed(&indices, |c| format!("1{}2", c), |c| c),
+        "a1s2d"
+    );
 }
 
 #[test]
@@ -345,11 +353,21 @@ fn test_lcs_tightness() {
     let mut lcs = LCS::new("src/lc".into());
     assert!(lcs.push_str("src").is_ok());
     assert_eq!(lcs.length(), 3);
-    assert_eq!(lcs.get_string(), "src");
-    assert_eq!(lcs.first_pos(), Some(0));
-    assert_eq!(lcs.spread(), 0);
-    assert_eq!(lcs.get_indices(), vec![0, 1, 2]);
-    assert_eq!(lcs.get_ranges(), vec![0..3]);
+
+    let all: Vec<Vec<usize>> = lcs.get_all_indices().sorted().dedup().collect();
+    assert_eq!(all, vec![vec![0, 1, 2], vec![0, 1, 5]]);
+    assert!(all.contains(&lcs.get_some_indices()));
+
+    let strings: Vec<String> =
+        all.iter().map(|indices| lcs.get_string(indices)).collect();
+    assert_eq!(strings, vec!["src", "src"]);
+
+    let first_poses: Vec<Option<usize>> =
+        all.iter().map(|indices| lcs.first_pos(indices)).collect();
+    assert_eq!(first_poses, vec![Some(0), Some(0)]);
+
+    let spreads: Vec<usize> = all.iter().map(|indices| lcs.spread(indices)).collect();
+    assert_eq!(spreads, vec![0, 3]);
 }
 
 #[test]
@@ -357,18 +375,120 @@ fn test_lcs_pop() {
     let mut lcs = LCS::new("asd".into());
     assert!(lcs.push('s').is_ok());
     assert!(lcs.push('d').is_ok());
-    assert_eq!(lcs.get_string(), "sd");
+    let indices = lcs.get_some_indices();
+    assert_eq!(lcs.get_string(&indices), "sd");
 
     lcs.pop();
-    assert_eq!(lcs.get_string(), "s");
+    let indices = lcs.get_some_indices();
+    assert_eq!(lcs.get_string(&indices), "s");
+}
+
+// LCS iterator ///////////////////////////////////////////////////////////////
+struct LCSIterator<'a> {
+    lcs: &'a LCS,
+    path: Vec<(usize, usize)>,
+    dfs: Vec<(usize, usize)>,
+}
+
+impl<'a> LCSIterator<'a> {
+    fn new(lcs: &'a LCS) -> Self {
+        let start = lcs.dp.bottom_right();
+        LCSIterator {
+            lcs,
+            path: vec![],
+            dfs: vec![start],
+        }
+    }
+}
+
+impl<'a> StreamingIterator for LCSIterator<'a> {
+    type Item = [(usize, usize)];
+
+    fn advance(&mut self) {
+        while let Some(curpos @ (row, col)) = self.dfs.pop() {
+            if let Some(&last) = self.path.last() {
+                if last == curpos {
+                    self.path.pop();
+                    continue;
+                }
+            }
+
+            if row == 0 || col == 0 {
+                self.path.push(curpos);
+                self.dfs.push(curpos);
+                return;
+            }
+
+            let cur = self.lcs.dp.get(row, col).expect("should be in bounds");
+            let left = self.lcs.dp.get(row, col - 1).expect("should be in bounds");
+            let up = self.lcs.dp.get(row - 1, col).expect("should be in bounds");
+
+            self.path.push(curpos);
+            self.dfs.push(curpos);
+            if cur.length() == up.length() {
+                self.dfs.push((row - 1, col));
+            }
+            if cur.length() == left.length() {
+                self.dfs.push((row, col - 1));
+            }
+            if cur.matched() {
+                self.dfs.push((row - 1, col - 1));
+            }
+        }
+    }
+
+    fn get(&self) -> Option<&Self::Item> {
+        if self.path.is_empty() {
+            assert!(self.dfs.is_empty());
+            None
+        } else {
+            Some(&self.path)
+        }
+    }
+}
+
+fn is_upleft(from: (usize, usize), to: (usize, usize)) -> bool {
+    from.0 == to.0 + 1 && from.1 == to.1 + 1
+}
+
+fn path_to_indices(path: &[(usize, usize)]) -> impl Iterator<Item = usize> + '_ {
+    path.windows(2)
+        .filter(|x| is_upleft(x[0], x[1]))
+        .map(|x| x[0].0 - 1)
+        .rev()
 }
 
 #[test]
-fn test_lcs_longer() {
-    let mut lcs = LCS::new("asd".into());
-    assert!(lcs.push_str("asdd").is_ok());
-    assert_eq!(lcs.get_string(), "asd");
-    assert_eq!(lcs.length(), 3);
+fn test_lcs_iterator() {
+    let mut lcs = LCS::new("GAC".into());
+    assert!(lcs.push_str("AGCAT").is_ok());
+    assert_eq!(lcs.length(), 2);
+
+    let mut paths: Vec<Vec<(usize, usize)>> = LCSIterator::new(&lcs).owned().collect();
+    paths.sort_unstable();
+    let org_len = paths.len();
+    paths.dedup();
+    assert_eq!(org_len, paths.len(), "should not have duplicates");
+
+    let indices: Vec<Vec<usize>> = paths
+        .iter()
+        .map(|x| path_to_indices(x).collect())
+        .dedup()
+        .collect();
+
+    let strings: Vec<String> = indices
+        .iter()
+        .map(|indices| lcs.get_string(indices))
+        .sorted()
+        .collect();
+
+    assert_eq!(strings, vec!["AC", "GA", "GC"]);
+}
+
+#[test]
+fn test_lcs_iterator_empty() {
+    // TODO: vad ska ens hända om det inte finns några lCS:er? Ge tillbaka en Some(&[]) en
+    // gång och sedan None? Eller None på en gång?
 }
 
 // searcher ///////////////////////////////////////////////////////////////////
@@ -376,6 +496,7 @@ fn test_lcs_longer() {
 struct TaggedLCS {
     lcs: LCS,
     index: usize,
+    // TODO: en cell som memoizar subsekvens med lägsta spread
 }
 
 impl TaggedLCS {
@@ -389,13 +510,21 @@ impl TaggedLCS {
     delegate! {
         to self.lcs {
             fn length(&self) -> usize;
-            fn spread(&self) -> usize;
-            fn first_pos(&self) -> Option<usize>;
             fn push(&mut self, c: char) -> Result<(), ()>;
             fn pop(&mut self);
             fn grid_len(&self) -> usize;
         }
     }
+
+    // TODO:
+    fn spread(&self) -> usize {
+        0
+    }
+    fn first_pos(&self) -> Option<usize> {
+        Some(0)
+    }
+
+    // TODO: spread-funktion som hittar den med lägst spread
 }
 
 impl Ord for TaggedLCS {

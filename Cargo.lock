@@ -42,12 +42,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "either"
+version = "1.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f107b87b6afc2a64fd13cac55fe06d6c8859f12d4b14cbcdd2c67d0976781be"
+
+[[package]]
 name = "gcast"
 version = "0.1.0"
 dependencies = [
  "bytesize",
  "colored",
  "delegate",
+ "itertools",
+ "streaming-iterator",
 ]
 
 [[package]]
@@ -57,6 +65,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62b467343b94ba476dcb2500d242dadbb39557df889310ac77c5d99100aaac33"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "itertools"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9a9d19fa1e79b6215ff29b9d6880b706147f16e9b1dbb1e4e5947b5b02bc5e3"
+dependencies = [
+ "either",
 ]
 
 [[package]]
@@ -88,6 +105,12 @@ checksum = "f53dc8cf16a769a6f677e09e7ff2cd4be1ea0f48754aac39520536962011de0d"
 dependencies = [
  "proc-macro2",
 ]
+
+[[package]]
+name = "streaming-iterator"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4817bfdf8f0b576330b83b55bed0ec89204aa7da62c2fa11fad2119f33a70014"
 
 [[package]]
 name = "syn"
