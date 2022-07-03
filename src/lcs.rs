@@ -195,6 +195,10 @@ pub struct LCS {
 
 impl LCS {
     // TODO: quotes, reserved chars
+    // TODO: quote togglar bara
+    // TODO: searchern håller koll på denna
+    // TODO: LCS har bool på sina pushes som bestämmer ifall den innan ska ha matchat för
+    // att den nya ska få matcha. LCS ska inte spara om den är i quite-läge eller inte.
     const QUOTE: char = '\'';
 
     pub fn new(compare: String) -> Self {
@@ -264,8 +268,6 @@ impl LCS {
     }
 
     pub fn get_some_indices(&self) -> Vec<usize> {
-        // TODO: vad händer om self är tom? Kan man kanske garantera att next inte blir
-        // None? Kan man i så fall sätta returvärdet som en impl Iterator?
         self.get_all_paths()
             .next()
             .map(|path| path_to_indices(path).collect())
@@ -392,11 +394,15 @@ struct LCSIterator<'a> {
 
 impl<'a> LCSIterator<'a> {
     fn new(lcs: &'a LCS) -> Self {
-        let start = lcs.dp.bottom_right();
         LCSIterator {
             lcs,
-            path: vec![],
-            dfs: vec![start],
+            path: Vec::new(),
+            dfs: if lcs.length() > 0 {
+                let start = lcs.dp.bottom_right();
+                vec![start]
+            } else {
+                Vec::new()
+            },
         }
     }
 }
@@ -487,8 +493,26 @@ fn test_lcs_iterator() {
 
 #[test]
 fn test_lcs_iterator_empty() {
-    // TODO: vad ska ens hända om det inte finns några lCS:er? Ge tillbaka en Some(&[]) en
-    // gång och sedan None? Eller None på en gång?
+    {
+        let lcs = LCS::new("asd".into());
+        assert_eq!(lcs.length(), 0);
+        let mut iter = LCSIterator::new(&lcs);
+        assert_eq!(iter.next(), None);
+        assert_eq!(iter.next(), None);
+        assert_eq!(iter.next(), None);
+        assert_eq!(iter.next(), None);
+    }
+
+    {
+        let mut lcs = LCS::new("asd".into());
+        assert!(lcs.push('x').is_ok());
+        assert_eq!(lcs.length(), 0);
+        let mut iter = LCSIterator::new(&lcs);
+        assert_eq!(iter.next(), None);
+        assert_eq!(iter.next(), None);
+        assert_eq!(iter.next(), None);
+        assert_eq!(iter.next(), None);
+    }
 }
 
 // searcher ///////////////////////////////////////////////////////////////////
