@@ -363,6 +363,14 @@ fn test_lcs_pop() {
     assert_eq!(lcs.get_string(), "s");
 }
 
+#[test]
+fn test_lcs_longer() {
+    let mut lcs = LCS::new("asd".into());
+    assert!(lcs.push_str("asdd").is_ok());
+    assert_eq!(lcs.get_string(), "asd");
+    assert_eq!(lcs.length(), 3);
+}
+
 // searcher ///////////////////////////////////////////////////////////////////
 #[derive(Debug)]
 struct TaggedLCS {
@@ -425,7 +433,11 @@ pub struct Searcher {
 }
 
 impl Searcher {
-    pub fn new<T: Into<String>>(candidates: Vec<T>) -> Self {
+    pub fn new<T, It>(candidates: It) -> Self
+    where
+        T: Into<String>,
+        It: IntoIterator<Item = T>,
+    {
         Self {
             active: candidates
                 .into_iter()
@@ -500,9 +512,14 @@ impl Searcher {
     }
 
     pub fn get_sorted_take(&mut self, len: usize) -> impl Iterator<Item = &LCS> {
-        assert!(len > 0);
-        let (beg, _, _) = self.active.select_nth_unstable(len - 1);
-        beg.sort_unstable();
+        if len > 0 {
+            if len <= self.active.len() {
+                let (beg, _, _) = self.active.select_nth_unstable(len - 1);
+                beg.sort_unstable();
+            } else {
+                self.active.sort_unstable();
+            }
+        }
         self.active.iter().map(|lcs| &lcs.lcs).take(len)
     }
 
@@ -584,6 +601,30 @@ fn test_lcs_searcher_too_long() {
     assert_eq!(Err(10), searcher.push_str(s));
     assert_eq!(&s[..10], searcher.get_search());
     assert_eq!(10, searcher.num_chars);
+}
+
+#[test]
+fn test_lcs_searcher_empty() {
+    let mut searcher = Searcher::new::<String, Vec<String>>(Vec::new());
+    assert!(searcher.push('a').is_ok());
+    searcher.assert_invariants();
+    assert_eq!(searcher.get_sorted().count(), 0);
+    assert_eq!(searcher.get_search(), "a");
+}
+
+#[test]
+fn test_lcs_searcher_longer() {
+    let mut searcher = Searcher::new(vec!["ab"]);
+    assert_eq!(searcher.push_str("abb"), Ok(()));
+    searcher.assert_invariants();
+    assert_eq!(searcher.get_search(), "abb");
+    assert_eq!(searcher.get_sorted().count(), 0);
+    assert_eq!(searcher.get_sorted_take(10).count(), 0);
+
+    searcher.pop();
+    searcher.assert_invariants();
+    assert_eq!(searcher.get_search(), "ab");
+    assert_eq!(searcher.get_sorted().count(), 1);
 }
 
 // util ///////////////////////////////////////////////////////////////////////
