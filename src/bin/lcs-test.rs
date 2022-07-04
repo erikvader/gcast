@@ -58,7 +58,7 @@ fn main() {
         println!();
         let sort_prev = Instant::now();
         for x in searcher.get_sorted_take(10) {
-            let indices = x.get_some_indices();
+            let indices = x.get_best_indices();
             println!(
                 "{}",
                 x.get_interspersed(&indices, |c| c.to_string().red(), |c| c)

@@ -1,6 +1,12 @@
 use delegate::delegate;
 use itertools::Itertools;
-use std::{cmp::max, collections::HashSet, num::NonZeroUsize, ops::Range};
+use std::{
+    cell::{Ref, RefCell},
+    cmp::max,
+    collections::HashSet,
+    num::NonZeroUsize,
+    ops::Range,
+};
 use streaming_iterator::StreamingIterator;
 
 trait Recurrence: FnMut(Element, Element, Element) -> Result<Element, ()> {}
@@ -222,7 +228,7 @@ impl LCS {
 
             // TODO: ha quote-logik som säger att denna matchar endast om den snett
             // ovanför också matchade
-            if c == cur {
+            if c.eq_ignore_ascii_case(&cur) {
                 Element::new_matched(upleft)
             } else {
                 Ok(Element::new_not_matched(left, up))
@@ -267,7 +273,7 @@ impl LCS {
             .map_deref(|path| path_to_indices(path).collect())
     }
 
-    pub fn get_some_indices(&self) -> Vec<usize> {
+    pub fn get_leftmost_indices(&self) -> Vec<usize> {
         self.get_all_paths()
             .next()
             .map(|path| path_to_indices(path).collect())
@@ -302,12 +308,16 @@ impl LCS {
         res
     }
 
-    pub fn spread<'a>(&self, indices: impl IntoIterator<Item = &'a usize>) -> usize {
+    pub fn spread(&self, indices: impl IntoIterator<Item = usize>) -> usize {
         indices
             .into_iter()
             .tuple_windows()
             .map(|(a, b)| b - a - 1)
             .sum()
+    }
+
+    pub fn spread_ref<'a>(&self, indices: impl IntoIterator<Item = &'a usize>) -> usize {
+        self.spread(indices.into_iter().copied())
     }
 
     pub fn first_pos<'a>(
@@ -327,14 +337,14 @@ fn test_lcs() {
     let mut lcs = LCS::new("GAC".into());
     assert!(lcs.push_str("AGCAT").is_ok());
     assert_eq!(lcs.length(), 2);
-    let indices = lcs.get_some_indices();
+    let indices = lcs.get_leftmost_indices();
     assert!(vec!["AC", "GC", "GA"].contains(&lcs.get_string(&indices).as_str()));
 }
 
 #[test]
 fn test_empty_lcs() {
     let lcs = LCS::new("asd".into());
-    let indices = lcs.get_some_indices();
+    let indices = lcs.get_leftmost_indices();
     assert!(indices.is_empty());
     assert!(lcs.get_string(&indices).is_empty());
 }
@@ -343,7 +353,7 @@ fn test_empty_lcs() {
 fn test_lcs_intersperse() {
     let mut lcs = LCS::new("asd".into());
     assert!(lcs.push('s').is_ok());
-    let indices = lcs.get_some_indices();
+    let indices = lcs.get_leftmost_indices();
     assert_eq!(
         lcs.get_interspersed(&indices, |c| format!("1{}2", c), |c| c),
         "a1s2d"
@@ -351,14 +361,14 @@ fn test_lcs_intersperse() {
 }
 
 #[test]
-fn test_lcs_tightness() {
+fn test_lcs_all_subsequences() {
     let mut lcs = LCS::new("src/lc".into());
     assert!(lcs.push_str("src").is_ok());
     assert_eq!(lcs.length(), 3);
 
     let all: Vec<Vec<usize>> = lcs.get_all_indices().sorted().dedup().collect();
     assert_eq!(all, vec![vec![0, 1, 2], vec![0, 1, 5]]);
-    assert!(all.contains(&lcs.get_some_indices()));
+    assert!(all.contains(&lcs.get_leftmost_indices()));
 
     let strings: Vec<String> =
         all.iter().map(|indices| lcs.get_string(indices)).collect();
@@ -368,8 +378,19 @@ fn test_lcs_tightness() {
         all.iter().map(|indices| lcs.first_pos(indices)).collect();
     assert_eq!(first_poses, vec![Some(0), Some(0)]);
 
-    let spreads: Vec<usize> = all.iter().map(|indices| lcs.spread(indices)).collect();
+    let spreads: Vec<usize> = all.iter().map(|indices| lcs.spread_ref(indices)).collect();
     assert_eq!(spreads, vec![0, 3]);
+}
+
+#[test]
+fn test_lcs_leftmost() {
+    let mut lcs = LCS::new("scsrrcc/src".into());
+    assert!(lcs.push_str("src").is_ok());
+    assert_eq!(lcs.length(), 3);
+
+    let left = lcs.get_leftmost_indices();
+    assert_eq!(left, vec![0, 3, 5]);
+    assert_eq!(lcs.spread(left), 3);
 }
 
 #[test]
@@ -377,15 +398,17 @@ fn test_lcs_pop() {
     let mut lcs = LCS::new("asd".into());
     assert!(lcs.push('s').is_ok());
     assert!(lcs.push('d').is_ok());
-    let indices = lcs.get_some_indices();
+    let indices = lcs.get_leftmost_indices();
     assert_eq!(lcs.get_string(&indices), "sd");
 
     lcs.pop();
-    let indices = lcs.get_some_indices();
+    let indices = lcs.get_leftmost_indices();
     assert_eq!(lcs.get_string(&indices), "s");
 }
 
-// LCS iterator ///////////////////////////////////////////////////////////////
+// LCS iterator /////////////////////////////////////////////////////////////// Finds all
+// subsequences. There is no guarantee on order, there can be duplicates and it can
+// produce exponentially many.
 struct LCSIterator<'a> {
     lcs: &'a LCS,
     path: Vec<(usize, usize)>,
@@ -431,14 +454,14 @@ impl<'a> StreamingIterator for LCSIterator<'a> {
 
             self.path.push(curpos);
             self.dfs.push(curpos);
-            if cur.length() == up.length() {
-                self.dfs.push((row - 1, col));
-            }
             if cur.length() == left.length() {
                 self.dfs.push((row, col - 1));
             }
             if cur.matched() {
                 self.dfs.push((row - 1, col - 1));
+            }
+            if cur.length() == up.length() {
+                self.dfs.push((row - 1, col));
             }
         }
     }
@@ -515,12 +538,12 @@ fn test_lcs_iterator_empty() {
     }
 }
 
-// searcher ///////////////////////////////////////////////////////////////////
+// tagged LCS ///////////////////////////////////////////////////////////////////
 #[derive(Debug)]
-struct TaggedLCS {
+pub struct TaggedLCS {
     lcs: LCS,
     index: usize,
-    // TODO: en cell som memoizar subsekvens med lägsta spread
+    best_indices: RefCell<Option<Vec<usize>>>,
 }
 
 impl TaggedLCS {
@@ -528,27 +551,91 @@ impl TaggedLCS {
         Self {
             lcs: LCS::new(string),
             index,
+            best_indices: RefCell::new(None),
         }
+    }
+
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    fn clear_best_spread(&self) {
+        self.best_indices.replace(None);
+    }
+
+    fn calc_best_indices(&self) -> Ref<Vec<usize>> {
+        if !self.has_best_indices() {
+            self.best_indices
+                .replace(Some(self.lcs.get_leftmost_indices()));
+        }
+
+        // TODO: really want to spend 10x more time to get the best one?
+        // if self.best_indices.borrow().is_none() {
+        //     let mut iter = self.lcs.get_all_paths().take(Self::MAX_PATHS);
+
+        //     let first: Option<Vec<_>> =
+        //         iter.next().map(|slice| path_to_indices(slice).collect());
+
+        //     if let Some(first_path) = first {
+        //         let first_spread = self.lcs.spread_ref(&first_path);
+        //         let (min_path, _) = iter.fold(
+        //             (first_path, first_spread),
+        //             |org @ (_, min_spread), new| {
+        //                 let new_spread = self.lcs.spread(path_to_indices(new));
+        // TODO: also compare first position to get the leftmost one
+        //                 if new_spread < min_spread {
+        //                     (path_to_indices(new).collect(), new_spread)
+        //                 } else {
+        //                     org
+        //                 }
+        //             },
+        //         );
+
+        //         self.best_indices.replace(Some(min_path));
+        //     } else {
+        //         self.best_indices.replace(Some(Vec::new()));
+        //     }
+        // }
+        let opt: Ref<Option<_>> = self.best_indices.borrow();
+        Ref::map(opt, |x| x.as_ref().expect("should have been calculated"))
+    }
+
+    fn has_best_indices(&self) -> bool {
+        self.best_indices.borrow().is_some()
     }
 
     delegate! {
         to self.lcs {
-            fn length(&self) -> usize;
-            fn push(&mut self, c: char) -> Result<(), ()>;
-            fn pop(&mut self);
+            pub fn length(&self) -> usize;
             fn grid_len(&self) -> usize;
+            pub fn get_interspersed<T1, T2, ON, OFF>(
+                &self, indices: &[usize], on_lcs: ON, off_lcs: OFF
+            ) -> String
+                where T1: std::fmt::Display,
+                      T2: std::fmt::Display,
+                      ON: Fn(char) -> T1,
+                      OFF: Fn(char) -> T2;
         }
     }
 
-    // TODO:
-    fn spread(&self) -> usize {
-        0
+    fn push(&mut self, c: char) -> Result<(), ()> {
+        self.clear_best_spread();
+        self.lcs.push(c)
     }
-    fn first_pos(&self) -> Option<usize> {
-        Some(0)
+    fn pop(&mut self) {
+        self.clear_best_spread();
+        self.lcs.pop()
     }
 
-    // TODO: spread-funktion som hittar den med lägst spread
+    pub fn spread(&self) -> usize {
+        self.lcs.spread_ref(self.calc_best_indices().iter())
+    }
+    pub fn first_pos(&self) -> Option<usize> {
+        self.lcs.first_pos(self.calc_best_indices().iter())
+    }
+    pub fn get_best_indices(&self) -> Vec<usize> {
+        self.calc_best_indices().to_vec()
+    }
 }
 
 impl Ord for TaggedLCS {
@@ -577,6 +664,21 @@ impl PartialEq for TaggedLCS {
 
 impl Eq for TaggedLCS {}
 
+#[test]
+fn test_lcs_tagged_lcs() {
+    let mut lcs = TaggedLCS::new("asd".into(), 5);
+    assert!(lcs.push('s').is_ok());
+    assert!(!lcs.has_best_indices());
+    assert_eq!(lcs.get_best_indices(), vec![1]);
+    assert!(lcs.has_best_indices());
+
+    assert!(lcs.push('d').is_ok());
+    assert!(!lcs.has_best_indices());
+    assert_eq!(lcs.get_best_indices(), vec![1, 2]);
+    assert!(lcs.has_best_indices());
+}
+
+// searcher ///////////////////////////////////////////////////////////////////
 #[derive(Debug)]
 pub struct Searcher {
     active: Vec<TaggedLCS>,
@@ -659,12 +761,12 @@ impl Searcher {
         }
     }
 
-    pub fn get_sorted(&mut self) -> impl Iterator<Item = &LCS> {
+    pub fn get_sorted(&mut self) -> impl Iterator<Item = &TaggedLCS> {
         self.active.sort_unstable();
-        self.active.iter().map(|lcs| &lcs.lcs)
+        self.active.iter()
     }
 
-    pub fn get_sorted_take(&mut self, len: usize) -> impl Iterator<Item = &LCS> {
+    pub fn get_sorted_take(&mut self, len: usize) -> impl Iterator<Item = &TaggedLCS> {
         if len > 0 {
             if len <= self.active.len() {
                 let (beg, _, _) = self.active.select_nth_unstable(len - 1);
@@ -673,7 +775,7 @@ impl Searcher {
                 self.active.sort_unstable();
             }
         }
-        self.active.iter().map(|lcs| &lcs.lcs).take(len)
+        self.active.iter().take(len)
     }
 
     pub fn get_search(&self) -> &str {
