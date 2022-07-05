@@ -1,1 +1,2 @@
-pub mod lcs;
+mod lcs;
+pub mod searcher;

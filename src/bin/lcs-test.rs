@@ -1,5 +1,5 @@
 use colored::*;
-use gcast::lcs::Searcher;
+use gcast::searcher::Searcher;
 use std::{
     env, fs,
     io::{self, BufRead, Write},
