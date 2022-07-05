@@ -1,7 +1,6 @@
 use std::ops::Range;
 
-// TODO: use this somewhere
-fn compact_to_ranges<T, It>(verbose: It, one: T) -> Vec<Range<T>>
+pub fn compact_to_ranges<T, It>(verbose: It, one: T) -> Vec<Range<T>>
 where
     T: PartialOrd<T> + Copy + std::ops::Add<Output = T>,
     It: IntoIterator<Item = T>,

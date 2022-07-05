@@ -6,9 +6,8 @@ use self::{
     iterator::{path_to_indices, LCSIterator},
 };
 
-pub mod dp;
 pub mod iterator;
-pub mod util;
+pub mod dp;
 
 #[derive(Debug)]
 pub struct LCS {

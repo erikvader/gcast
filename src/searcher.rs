@@ -1,7 +1,12 @@
+mod lcs;
+mod util;
+
 use delegate::delegate;
 use std::cell::{Ref, RefCell};
+use std::ops::Range;
 
-use crate::lcs::{dp::Element, LCS};
+use self::lcs::{dp::Element,LCS};
+use self::util::compact_to_ranges;
 
 #[derive(Debug)]
 pub struct TaggedLCS {
@@ -99,6 +104,9 @@ impl TaggedLCS {
     }
     pub fn get_best_indices(&self) -> Vec<usize> {
         self.calc_best_indices().to_vec()
+    }
+    pub fn get_best_indices_compact(&self) -> Vec<Range<usize>> {
+        compact_to_ranges(self.calc_best_indices().iter().copied(), 1)
     }
 }
 
