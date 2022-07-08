@@ -1,17 +1,21 @@
 use super::LCS;
+use crate::searcher::matcher::Matcher;
 use itertools::Itertools;
 use streaming_iterator::StreamingIterator;
 
 // subsequences. There is no guarantee on order, there can be duplicates and it can
 // produce exponentially many.
-pub struct LCSIterator<'a> {
-    lcs: &'a LCS,
+pub struct LCSIterator<'a, T> {
+    lcs: &'a LCS<T>,
     path: Vec<(usize, usize)>,
     dfs: Vec<(usize, usize)>,
 }
 
-impl<'a> LCSIterator<'a> {
-    pub fn new(lcs: &'a LCS) -> Self {
+impl<'a, T> LCSIterator<'a, T>
+where
+    T: AsRef<str>,
+{
+    pub fn new(lcs: &'a LCS<T>) -> Self {
         LCSIterator {
             lcs,
             path: Vec::new(),
@@ -25,7 +29,7 @@ impl<'a> LCSIterator<'a> {
     }
 }
 
-impl<'a> StreamingIterator for LCSIterator<'a> {
+impl<'a, T> StreamingIterator for LCSIterator<'a, T> {
     type Item = [(usize, usize)];
 
     fn advance(&mut self) {
@@ -84,7 +88,7 @@ pub fn path_to_indices(path: &[(usize, usize)]) -> impl Iterator<Item = usize> +
 
 #[test]
 fn test_lcs_iterator() {
-    let mut lcs = LCS::new("GAC".into());
+    let mut lcs = LCS::new("GAC");
     assert!(lcs.push_str("AGCAT").is_ok());
     assert_eq!(lcs.length(), 2);
 
@@ -102,7 +106,7 @@ fn test_lcs_iterator() {
 
     let strings: Vec<String> = indices
         .iter()
-        .map(|indices| lcs.get_string(indices))
+        .map(|indices| lcs.longest_seq_str(indices))
         .sorted()
         .collect();
 
@@ -112,7 +116,7 @@ fn test_lcs_iterator() {
 #[test]
 fn test_lcs_iterator_empty() {
     {
-        let lcs = LCS::new("asd".into());
+        let lcs = LCS::new("asd");
         assert_eq!(lcs.length(), 0);
         let mut iter = LCSIterator::new(&lcs);
         assert_eq!(iter.next(), None);
@@ -122,7 +126,7 @@ fn test_lcs_iterator_empty() {
     }
 
     {
-        let mut lcs = LCS::new("asd".into());
+        let mut lcs = LCS::new("asd");
         assert!(lcs.push('x').is_ok());
         assert_eq!(lcs.length(), 0);
         let mut iter = LCSIterator::new(&lcs);

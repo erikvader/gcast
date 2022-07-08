@@ -1,16 +1,20 @@
 mod lcs;
-mod util;
+mod matcher;
+mod substring;
+pub mod util;
 
 use delegate::delegate;
 use std::cell::{Ref, RefCell};
 use std::ops::Range;
 
-use self::lcs::{dp::Element,LCS};
+use self::lcs::{dp::Element, LCS};
+use self::matcher::{first_pos_ref, spread_ref};
 use self::util::compact_to_ranges;
+use crate::searcher::matcher::Matcher;
 
 #[derive(Debug)]
 pub struct TaggedLCS {
-    lcs: LCS,
+    lcs: LCS<String>,
     index: usize,
     best_indices: RefCell<Option<Vec<usize>>>,
 }
@@ -77,13 +81,7 @@ impl TaggedLCS {
         to self.lcs {
             pub fn length(&self) -> usize;
             fn grid_len(&self) -> usize;
-            pub fn get_interspersed<T1, T2, ON, OFF>(
-                &self, indices: &[usize], on_lcs: ON, off_lcs: OFF
-            ) -> String
-                where T1: std::fmt::Display,
-                      T2: std::fmt::Display,
-                      ON: Fn(char) -> T1,
-                      OFF: Fn(char) -> T2;
+            pub fn get_compare(&self) -> &str;
         }
     }
 
@@ -97,10 +95,10 @@ impl TaggedLCS {
     }
 
     pub fn spread(&self) -> usize {
-        self.lcs.spread_ref(self.calc_best_indices().iter())
+        spread_ref(self.calc_best_indices().iter())
     }
     pub fn first_pos(&self) -> Option<usize> {
-        self.lcs.first_pos(self.calc_best_indices().iter())
+        first_pos_ref(self.calc_best_indices().iter())
     }
     pub fn get_best_indices(&self) -> Vec<usize> {
         self.calc_best_indices().to_vec()

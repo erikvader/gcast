@@ -1,5 +1,5 @@
 use colored::*;
-use gcast::searcher::Searcher;
+use gcast::searcher::{util::get_interspersed, Searcher};
 use std::{
     env, fs,
     io::{self, BufRead, Write},
@@ -61,7 +61,12 @@ fn main() {
             let indices = x.get_best_indices();
             println!(
                 "{}",
-                x.get_interspersed(&indices, |c| c.to_string().red(), |c| c)
+                get_interspersed(
+                    x.get_compare(),
+                    &indices,
+                    |c| c.to_string().red(),
+                    |c| c
+                )
             );
         }
         println!("{} {:?}", "sort time:".blue(), sort_prev.elapsed());

@@ -47,3 +47,26 @@ fn test_compact_ranges() {
 fn test_compact_invalid_input() {
     compact_to_ranges(vec![1, 1], 1);
 }
+
+pub fn get_interspersed<T1, T2, ON, OFF>(
+    string: &str,
+    indices: &[usize],
+    on_lcs: ON,
+    off_lcs: OFF,
+) -> String
+where
+    T1: std::fmt::Display,
+    T2: std::fmt::Display,
+    ON: Fn(char) -> T1,
+    OFF: Fn(char) -> T2,
+{
+    let mut res = String::new();
+    for (i, c) in string.chars().enumerate() {
+        if indices.binary_search(&i).is_ok() {
+            res.push_str(&on_lcs(c).to_string());
+        } else {
+            res.push_str(&off_lcs(c).to_string());
+        }
+    }
+    res
+}
