@@ -1,359 +1,246 @@
-mod lcs;
-mod matcher;
-mod substring;
+use std::collections::HashSet;
+
+use regex::Regex;
+
+use self::{
+    compile::{compile_search_term_to_regex, Result},
+    r#match::Match,
+};
+
+mod compile;
+mod r#match;
 pub mod util;
 
-use delegate::delegate;
-use std::cell::{Ref, RefCell};
-use std::ops::Range;
-
-use self::lcs::{dp::Element, LCS};
-use self::matcher::{first_pos_ref, spread_ref};
-use self::util::compact_to_ranges;
-use crate::searcher::matcher::Matcher;
-
-#[derive(Debug)]
-pub struct TaggedLCS {
-    lcs: LCS<String>,
+pub struct SearchRes<'a> {
+    mat: Match,
     index: usize,
-    best_indices: RefCell<Option<Vec<usize>>>,
+    string: &'a str,
 }
 
-impl TaggedLCS {
-    fn new(string: String, index: usize) -> Self {
-        Self {
-            lcs: LCS::new(string),
-            index,
-            best_indices: RefCell::new(None),
-        }
-    }
-
-    pub fn index(&self) -> usize {
-        self.index
-    }
-
-    fn clear_best_spread(&self) {
-        self.best_indices.replace(None);
-    }
-
-    fn calc_best_indices(&self) -> Ref<Vec<usize>> {
-        if !self.has_best_indices() {
-            self.best_indices
-                .replace(Some(self.lcs.get_leftmost_indices()));
-        }
-
-        // TODO: really want to spend 10x more time to get the best one?
-        // if self.best_indices.borrow().is_none() {
-        //     let mut iter = self.lcs.get_all_paths().take(Self::MAX_PATHS);
-
-        //     let first: Option<Vec<_>> =
-        //         iter.next().map(|slice| path_to_indices(slice).collect());
-
-        //     if let Some(first_path) = first {
-        //         let first_spread = self.lcs.spread_ref(&first_path);
-        //         let (min_path, _) = iter.fold(
-        //             (first_path, first_spread),
-        //             |org @ (_, min_spread), new| {
-        //                 let new_spread = self.lcs.spread(path_to_indices(new));
-        // TODO: also compare first position to get the leftmost one
-        //                 if new_spread < min_spread {
-        //                     (path_to_indices(new).collect(), new_spread)
-        //                 } else {
-        //                     org
-        //                 }
-        //             },
-        //         );
-
-        //         self.best_indices.replace(Some(min_path));
-        //     } else {
-        //         self.best_indices.replace(Some(Vec::new()));
-        //     }
-        // }
-        let opt: Ref<Option<_>> = self.best_indices.borrow();
-        Ref::map(opt, |x| x.as_ref().expect("should have been calculated"))
-    }
-
-    fn has_best_indices(&self) -> bool {
-        self.best_indices.borrow().is_some()
-    }
-
-    delegate! {
-        to self.lcs {
-            pub fn length(&self) -> usize;
-            fn grid_len(&self) -> usize;
-            pub fn get_compare(&self) -> &str;
-        }
-    }
-
-    fn push(&mut self, c: char) -> Result<(), ()> {
-        self.clear_best_spread();
-        self.lcs.push(c)
-    }
-    fn pop(&mut self) {
-        self.clear_best_spread();
-        self.lcs.pop()
-    }
-
-    pub fn spread(&self) -> usize {
-        spread_ref(self.calc_best_indices().iter())
-    }
-    pub fn first_pos(&self) -> Option<usize> {
-        first_pos_ref(self.calc_best_indices().iter())
-    }
-    pub fn get_best_indices(&self) -> Vec<usize> {
-        self.calc_best_indices().to_vec()
-    }
-    pub fn get_best_indices_compact(&self) -> Vec<Range<usize>> {
-        compact_to_ranges(self.calc_best_indices().iter().copied(), 1)
-    }
-}
-
-impl Ord for TaggedLCS {
+impl Ord for SearchRes<'_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         let a = self;
         let b = other;
-        b.length()
-            .cmp(&a.length())
-            .then_with(|| a.spread().cmp(&b.spread()))
-            .then_with(|| a.first_pos().cmp(&b.first_pos()))
+        a.mat
+            .spread()
+            .cmp(&b.mat.spread())
+            .then_with(|| a.mat.first().cmp(&b.mat.first()))
             .then_with(|| a.index.cmp(&b.index))
     }
 }
 
-impl PartialOrd for TaggedLCS {
+impl PartialOrd for SearchRes<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl PartialEq for TaggedLCS {
+impl PartialEq for SearchRes<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.cmp(other).is_eq()
     }
 }
 
-impl Eq for TaggedLCS {}
+impl Eq for SearchRes<'_> {}
+
+impl SearchRes<'_> {
+    pub fn get_string(&self) -> &str {
+        self.string
+    }
+
+    pub fn get_index(&self) -> usize {
+        self.index
+    }
+
+    pub fn get_match(&self) -> &Match {
+        &self.mat
+    }
+}
+
+impl<'a> SearchRes<'a> {
+    fn from_bytes(bytes: &HashSet<usize>, index: usize, string: &'a str) -> Self {
+        SearchRes {
+            index,
+            string,
+            mat: Match::from_vec(
+                string
+                    .char_indices()
+                    .map(|(b, _)| b)
+                    .enumerate()
+                    .filter(|(_, b)| bytes.contains(b))
+                    .map(|(i, _)| i)
+                    .collect(),
+            ),
+        }
+    }
+
+    fn empty(index: usize, string: &'a str) -> Self {
+        SearchRes {
+            index,
+            string,
+            mat: Match::empty(),
+        }
+    }
+}
+
+fn run_regexes_get_bytes(regs: &Vec<Regex>, string: &str) -> Option<HashSet<usize>> {
+    assert!(!regs.is_empty());
+    let mut bytes = HashSet::new();
+    for reg in regs {
+        if let Some(caps) = reg.captures(string) {
+            caps.iter()
+                .skip(1)
+                .flat_map(|mat| mat.expect("all capture groups should exist").range())
+                .for_each(|s| {
+                    bytes.insert(s);
+                });
+        } else {
+            return None;
+        }
+    }
+    Some(bytes)
+}
+
+fn search_with_regex<'a, It, I>(regs: &Vec<Regex>, candidates: It) -> Vec<SearchRes<'a>>
+where
+    I: AsRef<str> + 'a,
+    It: IntoIterator<Item = &'a I>,
+{
+    let mut res = Vec::new();
+    for (i, cand) in candidates.into_iter().enumerate() {
+        if let Some(bytes) = run_regexes_get_bytes(regs, cand.as_ref()) {
+            res.push(SearchRes::from_bytes(&bytes, i, cand.as_ref()));
+        }
+    }
+    res
+}
+
+fn search_empty<'a, It, I>(candidates: It) -> Vec<SearchRes<'a>>
+where
+    I: AsRef<str> + 'a,
+    It: IntoIterator<Item = &'a I>,
+{
+    candidates
+        .into_iter()
+        .enumerate()
+        .map(|(i, cand)| SearchRes::empty(i, cand.as_ref()))
+        .collect()
+}
+
+pub fn search<'a, It, I>(search_term: &str, candidates: It) -> Result<Vec<SearchRes<'a>>>
+where
+    I: AsRef<str> + 'a,
+    It: IntoIterator<Item = &'a I>,
+{
+    if search_term.is_empty() {
+        Ok(search_empty(candidates))
+    } else {
+        Ok(search_with_regex(
+            &compile_search_term_to_regex(search_term)?,
+            candidates,
+        ))
+    }
+}
 
 #[test]
-fn test_lcs_tagged_lcs() {
-    let mut lcs = TaggedLCS::new("asd".into(), 5);
-    assert!(lcs.push('s').is_ok());
-    assert!(!lcs.has_best_indices());
-    assert_eq!(lcs.get_best_indices(), vec![1]);
-    assert!(lcs.has_best_indices());
-
-    assert!(lcs.push('d').is_ok());
-    assert!(!lcs.has_best_indices());
-    assert_eq!(lcs.get_best_indices(), vec![1, 2]);
-    assert!(lcs.has_best_indices());
+fn test_search() {
+    let cands: Vec<String> = vec!["hej".to_string()];
+    search("hej", &cands).unwrap();
 }
 
-// searcher ///////////////////////////////////////////////////////////////////
-#[derive(Debug)]
-pub struct Searcher {
-    active: Vec<TaggedLCS>,
-    inactive: Vec<TaggedLCS>,
-    search: String,
-    num_chars: usize,
-}
+// TODO: create tests from these
+//#[cfg(test)]
+//mod test {
+//     use super::*;
 
-impl Searcher {
-    pub fn new<T, It>(candidates: It) -> Self
-    where
-        T: Into<String>,
-        It: IntoIterator<Item = T>,
-    {
-        Self {
-            active: candidates
-                .into_iter()
-                .enumerate()
-                .map(|(i, c)| TaggedLCS::new(c.into(), i))
-                .collect(),
-            inactive: Vec::new(),
-            search: String::new(),
-            num_chars: 0,
-        }
-    }
+//     impl Searcher {
+//         fn assert_invariants(&self) {
+//             assert_eq!(self.num_chars, self.search.chars().count());
+//             assert!(self
+//                 .active
+//                 .iter()
+//                 .all(|x| x.lcs.grid_columns() == self.num_chars));
+//             assert!(self.active.iter().all(|x| x.lcs.length() == self.num_chars));
+//             assert!(!self
+//                 .inactive
+//                 .iter()
+//                 .any(|x| x.lcs.grid_columns() > self.num_chars));
+//             assert!(!self
+//                 .inactive
+//                 .iter()
+//                 .any(|x| x.lcs.length() >= self.num_chars));
+//         }
+//     }
 
-    pub fn push_str(&mut self, s: &str) -> Result<(), usize> {
-        let mut count = 0;
-        for c in s.chars() {
-            if self.push(c).is_ok() {
-                count += 1;
-            } else {
-                return Err(count);
-            }
-        }
-        Ok(())
-    }
+//     #[test]
+//     fn test_lcs_searcher() {
+//         let mut searcher = Searcher::new(vec!["aaa", "aab", "aa", "abab", "bbbb"]);
+//         assert_eq!(searcher.get_sorted().count(), 5);
+//         assert_eq!(searcher.size_indication(), 0, "all grids should be empty");
+//         assert_eq!(searcher.get_search(), "");
+//         searcher.assert_invariants();
 
-    pub fn push(&mut self, c: char) -> Result<(), ()> {
-        self.search.push(c);
-        self.num_chars += 1;
+//         assert!(searcher.push('a').is_ok());
+//         searcher.assert_invariants();
+//         assert_eq!(searcher.get_sorted().count(), 4);
+//         assert_eq!(searcher.get_search(), "a");
 
-        for i in 0..self.active.len() {
-            if self.active[i].push(c).is_err() {
-                for j in 0..i {
-                    self.active[j].pop();
-                }
-                self.num_chars -= 1;
-                self.search.pop();
-                return Err(());
-            }
-        }
+//         searcher.pop();
+//         searcher.assert_invariants();
+//         assert_eq!(searcher.get_sorted().count(), 5);
+//         assert_eq!(searcher.get_search(), "");
+//         assert_eq!(searcher.size_indication(), 0, "all grids should be empty");
 
-        self.active
-            .sort_unstable_by_key(|lcs| lcs.length() != self.num_chars);
-        while let Some(last) = self.active.last() {
-            if last.length() == self.num_chars {
-                break;
-            }
-            self.inactive.push(self.active.pop().expect("last != None"));
-        }
-        Ok(())
-    }
+//         assert!(searcher.push_str("aab").is_ok());
+//         searcher.assert_invariants();
+//         assert_eq!(searcher.get_sorted().count(), 2);
 
-    pub fn pop(&mut self) {
-        if self.num_chars == 0 {
-            return;
-        }
-        self.search.pop();
-        self.active.iter_mut().for_each(|lcs| lcs.pop());
-        self.num_chars -= 1;
+//         searcher.pop();
+//         searcher.assert_invariants();
+//         assert_eq!(searcher.get_sorted().count(), 4);
 
-        while let Some(last) = self.inactive.last() {
-            if last.length() != self.num_chars {
-                break;
-            }
-            let mut popped = self.inactive.pop().expect("last != None");
-            popped.pop();
-            self.active.push(popped);
-        }
-    }
+//         searcher.pop();
+//         searcher.assert_invariants();
+//         assert_eq!(searcher.get_sorted().count(), 4);
 
-    pub fn get_sorted(&mut self) -> impl Iterator<Item = &TaggedLCS> {
-        self.active.sort_unstable();
-        self.active.iter()
-    }
+//         searcher.pop();
+//         searcher.assert_invariants();
+//         assert_eq!(searcher.get_sorted().count(), 5);
+//         assert_eq!(searcher.get_search(), "");
+//         assert_eq!(searcher.size_indication(), 0, "all grids should be empty");
+//     }
 
-    pub fn get_sorted_take(&mut self, len: usize) -> impl Iterator<Item = &TaggedLCS> {
-        if len > 0 {
-            if len <= self.active.len() {
-                let (beg, _, _) = self.active.select_nth_unstable(len - 1);
-                beg.sort_unstable();
-            } else {
-                self.active.sort_unstable();
-            }
-        }
-        self.active.iter().take(len)
-    }
+//     #[test]
+//     fn test_lcs_searcher_too_long() {
+//         let s = "aaaaaaaaaaa";
+//         assert!(s.chars().count() > Element::MAX.into());
+//         let mut searcher = Searcher::new(vec![s]);
+//         assert_eq!(Err(10), searcher.push_str(s));
+//         assert_eq!(&s[..10], searcher.get_search());
+//         assert_eq!(10, searcher.num_chars);
+//     }
 
-    pub fn get_search(&self) -> &str {
-        self.search.as_str()
-    }
+//     #[test]
+//     fn test_lcs_searcher_empty() {
+//         let mut searcher = Searcher::new::<String, Vec<String>>(Vec::new());
+//         assert!(searcher.push('a').is_ok());
+//         searcher.assert_invariants();
+//         assert_eq!(searcher.get_sorted().count(), 0);
+//         assert_eq!(searcher.get_search(), "a");
+//     }
 
-    pub fn size_indication(&self) -> usize {
-        self.active
-            .iter()
-            .chain(self.inactive.iter())
-            .map(|lcs| lcs.grid_len())
-            .sum::<usize>()
-            * std::mem::size_of::<Element>()
-    }
-}
+//     #[test]
+//     fn test_lcs_searcher_longer() {
+//         let mut searcher = Searcher::new(vec!["ab"]);
+//         assert_eq!(searcher.push_str("abb"), Ok(()));
+//         searcher.assert_invariants();
+//         assert_eq!(searcher.get_search(), "abb");
+//         assert_eq!(searcher.get_sorted().count(), 0);
+//         assert_eq!(searcher.get_sorted_take(10).count(), 0);
 
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    impl Searcher {
-        fn assert_invariants(&self) {
-            assert_eq!(self.num_chars, self.search.chars().count());
-            assert!(self
-                .active
-                .iter()
-                .all(|x| x.lcs.grid_columns() == self.num_chars));
-            assert!(self.active.iter().all(|x| x.lcs.length() == self.num_chars));
-            assert!(!self
-                .inactive
-                .iter()
-                .any(|x| x.lcs.grid_columns() > self.num_chars));
-            assert!(!self
-                .inactive
-                .iter()
-                .any(|x| x.lcs.length() >= self.num_chars));
-        }
-    }
-
-    #[test]
-    fn test_lcs_searcher() {
-        let mut searcher = Searcher::new(vec!["aaa", "aab", "aa", "abab", "bbbb"]);
-        assert_eq!(searcher.get_sorted().count(), 5);
-        assert_eq!(searcher.size_indication(), 0, "all grids should be empty");
-        assert_eq!(searcher.get_search(), "");
-        searcher.assert_invariants();
-
-        assert!(searcher.push('a').is_ok());
-        searcher.assert_invariants();
-        assert_eq!(searcher.get_sorted().count(), 4);
-        assert_eq!(searcher.get_search(), "a");
-
-        searcher.pop();
-        searcher.assert_invariants();
-        assert_eq!(searcher.get_sorted().count(), 5);
-        assert_eq!(searcher.get_search(), "");
-        assert_eq!(searcher.size_indication(), 0, "all grids should be empty");
-
-        assert!(searcher.push_str("aab").is_ok());
-        searcher.assert_invariants();
-        assert_eq!(searcher.get_sorted().count(), 2);
-
-        searcher.pop();
-        searcher.assert_invariants();
-        assert_eq!(searcher.get_sorted().count(), 4);
-
-        searcher.pop();
-        searcher.assert_invariants();
-        assert_eq!(searcher.get_sorted().count(), 4);
-
-        searcher.pop();
-        searcher.assert_invariants();
-        assert_eq!(searcher.get_sorted().count(), 5);
-        assert_eq!(searcher.get_search(), "");
-        assert_eq!(searcher.size_indication(), 0, "all grids should be empty");
-    }
-
-    #[test]
-    fn test_lcs_searcher_too_long() {
-        let s = "aaaaaaaaaaa";
-        assert!(s.chars().count() > Element::MAX.into());
-        let mut searcher = Searcher::new(vec![s]);
-        assert_eq!(Err(10), searcher.push_str(s));
-        assert_eq!(&s[..10], searcher.get_search());
-        assert_eq!(10, searcher.num_chars);
-    }
-
-    #[test]
-    fn test_lcs_searcher_empty() {
-        let mut searcher = Searcher::new::<String, Vec<String>>(Vec::new());
-        assert!(searcher.push('a').is_ok());
-        searcher.assert_invariants();
-        assert_eq!(searcher.get_sorted().count(), 0);
-        assert_eq!(searcher.get_search(), "a");
-    }
-
-    #[test]
-    fn test_lcs_searcher_longer() {
-        let mut searcher = Searcher::new(vec!["ab"]);
-        assert_eq!(searcher.push_str("abb"), Ok(()));
-        searcher.assert_invariants();
-        assert_eq!(searcher.get_search(), "abb");
-        assert_eq!(searcher.get_sorted().count(), 0);
-        assert_eq!(searcher.get_sorted_take(10).count(), 0);
-
-        searcher.pop();
-        searcher.assert_invariants();
-        assert_eq!(searcher.get_search(), "ab");
-        assert_eq!(searcher.get_sorted().count(), 1);
-    }
-}
+//         searcher.pop();
+//         searcher.assert_invariants();
+//         assert_eq!(searcher.get_search(), "ab");
+//         assert_eq!(searcher.get_sorted().count(), 1);
+//     }
+// }

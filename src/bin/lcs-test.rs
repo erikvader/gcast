@@ -1,5 +1,8 @@
 use colored::*;
-use gcast::searcher::{util::get_interspersed, Searcher};
+use gcast::searcher::{
+    search,
+    util::{get_interspersed, sorted_take},
+};
 use std::{
     env, fs,
     io::{self, BufRead, Write},
@@ -44,32 +47,32 @@ fn main() {
 
     // let _cookie = TermSaver::new();
 
-    let mut searcher = Searcher::new(file_lines);
-    let mut search_time = Duration::from_millis(0);
+    let mut search_term = String::new();
     loop {
         // reset_term();
-        println!("{} {}", "search:".blue(), searcher.get_search());
-        println!(
-            "{} {}",
-            "size:".blue(),
-            bytesize::to_string(searcher.size_indication() as u64, false)
-        );
-        println!("{} {:?}", "time:".blue(), search_time);
-        println!();
-        let sort_prev = Instant::now();
-        for x in searcher.get_sorted_take(10) {
-            let indices = x.get_best_indices();
-            println!(
-                "{}",
-                get_interspersed(
-                    x.get_compare(),
-                    &indices,
-                    |c| c.to_string().red(),
-                    |c| c
-                )
-            );
+        println!("{} {}", "search:".blue(), search_term);
+        let search_prev = Instant::now();
+        if let Ok(mut search_res) = search(&search_term, &file_lines) {
+            println!("{} {:?}", "search time:".blue(), search_prev.elapsed());
+
+            let sort_prev = Instant::now();
+            let first_ten = sorted_take(&mut search_res, 10);
+            println!("{} {:?}", "sort time:".blue(), sort_prev.elapsed());
+
+            for x in first_ten.into_iter() {
+                println!(
+                    "{}",
+                    get_interspersed(
+                        x.get_string(),
+                        x.get_match().indices(),
+                        |c| c.to_string().red(),
+                        |c| c
+                    )
+                );
+            }
+        } else {
+            println!("{}", "invalid search term".red());
         }
-        println!("{} {:?}", "sort time:".blue(), sort_prev.elapsed());
 
         let mut line = String::new();
         let bytes_read = io::stdin().read_line(&mut line).expect("read stdin failed");
@@ -77,13 +80,11 @@ fn main() {
             break;
         }
 
-        line = line.trim().into();
-        let prev = Instant::now();
+        line = line.trim_end().into();
         if line.is_empty() {
-            searcher.pop();
+            search_term.pop();
         } else {
-            searcher.push_str(&line).expect("too long");
+            search_term += &line;
         }
-        search_time = prev.elapsed();
     }
 }

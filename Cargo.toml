@@ -4,15 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-delegate = "0.7"
-streaming-iterator = {version="0.1",features=["std"]}
+# delegate = "0.7"
+# streaming-iterator = {version="0.1",features=["std"]}
 itertools = "0.10"
+regex = "1"
+regex-syntax = "0.6"
 
 colored = {version="2", optional=true}
-bytesize = {version="1.1", optional=true}
+# bytesize = {version="1.1", optional=true}
 
 [features]
-fancy-terminal = ["dep:colored", "dep:bytesize"]
+fancy-terminal = ["dep:colored"]
 
 [[bin]]
 name = "lcs-test"

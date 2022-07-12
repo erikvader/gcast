@@ -70,3 +70,20 @@ where
     }
     res
 }
+
+pub fn sorted_take<T>(items: &mut [T], len: usize) -> &mut [T]
+where
+    T: Ord,
+{
+    if len == 0 {
+        return &mut items[0..0];
+    }
+    if len <= items.len() {
+        let (beg, _, _) = items.select_nth_unstable(len - 1);
+        beg.sort_unstable();
+        beg
+    } else {
+        items.sort_unstable();
+        items
+    }
+}
