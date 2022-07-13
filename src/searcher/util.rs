@@ -76,7 +76,7 @@ where
     T: Ord,
 {
     if len == 0 {
-        return &mut items[0..0];
+        return &mut [][..];
     }
     if len <= items.len() {
         let (beg, _, _) = items.select_nth_unstable(len - 1);

@@ -7,8 +7,11 @@ edition = "2021"
 # delegate = "0.7"
 # streaming-iterator = {version="0.1",features=["std"]}
 itertools = "0.10"
-regex = "1"
+regex = "1" # scale down on features
 regex-syntax = "0.6"
+rayon = "1"
+
+# tokio = {version="1", features=["full"]}
 
 colored = {version="2", optional=true}
 # bytesize = {version="1.1", optional=true}

@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use rayon::prelude::*;
 use regex::Regex;
 
 use self::{
@@ -104,24 +105,27 @@ fn run_regexes_get_bytes(regs: &Vec<Regex>, string: &str) -> Option<HashSet<usiz
 fn search_with_regex<'a, It, I>(regs: &Vec<Regex>, candidates: It) -> Vec<SearchRes<'a>>
 where
     I: AsRef<str> + 'a,
-    It: IntoIterator<Item = &'a I>,
+    It: IntoParallelIterator<Item = &'a I>,
+    <It as IntoParallelIterator>::Iter: IndexedParallelIterator,
 {
-    let mut res = Vec::new();
-    for (i, cand) in candidates.into_iter().enumerate() {
-        if let Some(bytes) = run_regexes_get_bytes(regs, cand.as_ref()) {
-            res.push(SearchRes::from_bytes(&bytes, i, cand.as_ref()));
-        }
-    }
-    res
+    candidates
+        .into_par_iter()
+        .enumerate()
+        .filter_map(|(i, cand)| {
+            run_regexes_get_bytes(regs, cand.as_ref())
+                .map(|bytes| SearchRes::from_bytes(&bytes, i, cand.as_ref()))
+        })
+        .collect()
 }
 
 fn search_empty<'a, It, I>(candidates: It) -> Vec<SearchRes<'a>>
 where
     I: AsRef<str> + 'a,
-    It: IntoIterator<Item = &'a I>,
+    It: IntoParallelIterator<Item = &'a I>,
+    <It as IntoParallelIterator>::Iter: IndexedParallelIterator,
 {
     candidates
-        .into_iter()
+        .into_par_iter()
         .enumerate()
         .map(|(i, cand)| SearchRes::empty(i, cand.as_ref()))
         .collect()
@@ -130,7 +134,8 @@ where
 pub fn search<'a, It, I>(search_term: &str, candidates: It) -> Result<Vec<SearchRes<'a>>>
 where
     I: AsRef<str> + 'a,
-    It: IntoIterator<Item = &'a I>,
+    It: IntoParallelIterator<Item = &'a I>,
+    <It as IntoParallelIterator>::Iter: IndexedParallelIterator,
 {
     if search_term.is_empty() {
         Ok(search_empty(candidates))

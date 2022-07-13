@@ -7,6 +7,7 @@ const REG_GROUP_START: &str = "(";
 const REG_GROUP_END: &str = ")";
 const REG_ANY: &str = ".*?";
 const REG_ICASE: &str = "(?i)";
+const REG_NO_ICASE: &str = "(?-i)";
 
 // TODO: create an error struct and report what went wrong in more detail
 pub type Result<T> = std::result::Result<T, ()>;
@@ -38,7 +39,7 @@ fn compile_word(word: &str) -> Result<Regex> {
 fn smart_case(word: &str) -> &'static str {
     assert!(!word.is_empty());
     if word.chars().any(|c| c.is_uppercase()) {
-        ""
+        REG_NO_ICASE
     } else {
         REG_ICASE
     }
