@@ -12,6 +12,7 @@ mod compile;
 mod r#match;
 pub mod util;
 
+#[derive(Debug)]
 pub struct SearchRes<'a> {
     mat: Match,
     index: usize,
@@ -82,6 +83,14 @@ impl<'a> SearchRes<'a> {
             mat: Match::empty(),
         }
     }
+
+    fn new(index: usize, string: &'a str, indices: Vec<usize>) -> Self {
+        SearchRes {
+            index,
+            string,
+            mat: Match::from_vec(indices),
+        }
+    }
 }
 
 fn run_regexes_get_bytes(regs: &Vec<Regex>, string: &str) -> Option<HashSet<usize>> {
@@ -147,105 +156,20 @@ where
     }
 }
 
-#[test]
-fn test_search() {
-    let cands: Vec<String> = vec!["hej".to_string()];
-    search("hej", &cands).unwrap();
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_search_simple() {
+        let cands = vec!["hej"];
+        assert_eq!(
+            search("hej", &cands).unwrap(),
+            vec![SearchRes::new(0, "hej", vec![0, 1, 2])]
+        );
+
+        assert_eq!(search::<_, &str>("hej", &[]).unwrap(), vec![]);
+
+        assert_eq!(search("nej", &cands).unwrap(), vec![]);
+    }
 }
-
-// TODO: create tests from these
-//#[cfg(test)]
-//mod test {
-//     use super::*;
-
-//     impl Searcher {
-//         fn assert_invariants(&self) {
-//             assert_eq!(self.num_chars, self.search.chars().count());
-//             assert!(self
-//                 .active
-//                 .iter()
-//                 .all(|x| x.lcs.grid_columns() == self.num_chars));
-//             assert!(self.active.iter().all(|x| x.lcs.length() == self.num_chars));
-//             assert!(!self
-//                 .inactive
-//                 .iter()
-//                 .any(|x| x.lcs.grid_columns() > self.num_chars));
-//             assert!(!self
-//                 .inactive
-//                 .iter()
-//                 .any(|x| x.lcs.length() >= self.num_chars));
-//         }
-//     }
-
-//     #[test]
-//     fn test_lcs_searcher() {
-//         let mut searcher = Searcher::new(vec!["aaa", "aab", "aa", "abab", "bbbb"]);
-//         assert_eq!(searcher.get_sorted().count(), 5);
-//         assert_eq!(searcher.size_indication(), 0, "all grids should be empty");
-//         assert_eq!(searcher.get_search(), "");
-//         searcher.assert_invariants();
-
-//         assert!(searcher.push('a').is_ok());
-//         searcher.assert_invariants();
-//         assert_eq!(searcher.get_sorted().count(), 4);
-//         assert_eq!(searcher.get_search(), "a");
-
-//         searcher.pop();
-//         searcher.assert_invariants();
-//         assert_eq!(searcher.get_sorted().count(), 5);
-//         assert_eq!(searcher.get_search(), "");
-//         assert_eq!(searcher.size_indication(), 0, "all grids should be empty");
-
-//         assert!(searcher.push_str("aab").is_ok());
-//         searcher.assert_invariants();
-//         assert_eq!(searcher.get_sorted().count(), 2);
-
-//         searcher.pop();
-//         searcher.assert_invariants();
-//         assert_eq!(searcher.get_sorted().count(), 4);
-
-//         searcher.pop();
-//         searcher.assert_invariants();
-//         assert_eq!(searcher.get_sorted().count(), 4);
-
-//         searcher.pop();
-//         searcher.assert_invariants();
-//         assert_eq!(searcher.get_sorted().count(), 5);
-//         assert_eq!(searcher.get_search(), "");
-//         assert_eq!(searcher.size_indication(), 0, "all grids should be empty");
-//     }
-
-//     #[test]
-//     fn test_lcs_searcher_too_long() {
-//         let s = "aaaaaaaaaaa";
-//         assert!(s.chars().count() > Element::MAX.into());
-//         let mut searcher = Searcher::new(vec![s]);
-//         assert_eq!(Err(10), searcher.push_str(s));
-//         assert_eq!(&s[..10], searcher.get_search());
-//         assert_eq!(10, searcher.num_chars);
-//     }
-
-//     #[test]
-//     fn test_lcs_searcher_empty() {
-//         let mut searcher = Searcher::new::<String, Vec<String>>(Vec::new());
-//         assert!(searcher.push('a').is_ok());
-//         searcher.assert_invariants();
-//         assert_eq!(searcher.get_sorted().count(), 0);
-//         assert_eq!(searcher.get_search(), "a");
-//     }
-
-//     #[test]
-//     fn test_lcs_searcher_longer() {
-//         let mut searcher = Searcher::new(vec!["ab"]);
-//         assert_eq!(searcher.push_str("abb"), Ok(()));
-//         searcher.assert_invariants();
-//         assert_eq!(searcher.get_search(), "abb");
-//         assert_eq!(searcher.get_sorted().count(), 0);
-//         assert_eq!(searcher.get_sorted_take(10).count(), 0);
-
-//         searcher.pop();
-//         searcher.assert_invariants();
-//         assert_eq!(searcher.get_search(), "ab");
-//         assert_eq!(searcher.get_sorted().count(), 1);
-//     }
-// }

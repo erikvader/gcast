@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Match {
     indices: Vec<usize>,
 }
