@@ -51,6 +51,11 @@ fn main() {
     loop {
         // reset_term();
         println!("{} {}", "search:".blue(), search_term);
+        // println!(
+        //     "{} {:?}",
+        //     "regex:".blue(),
+        //     gcast::searcher::compile::compile_search_term_to_strings(&search_term)
+        // );
         let search_prev = Instant::now();
         if let Ok(mut search_res) = search(&search_term, &file_lines) {
             println!("{} {:?}", "search time:".blue(), search_prev.elapsed());

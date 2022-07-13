@@ -4,7 +4,7 @@ use rayon::prelude::*;
 use regex::Regex;
 
 use self::{
-    compile::{compile_search_term_to_regex, Result},
+    compile::{compile_search_term_to_regexes, Result},
     r#match::Match,
 };
 
@@ -141,7 +141,7 @@ where
         Ok(search_empty(candidates))
     } else {
         Ok(search_with_regex(
-            &compile_search_term_to_regex(search_term)?,
+            &compile_search_term_to_regexes(search_term)?,
             candidates,
         ))
     }

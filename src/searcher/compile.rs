@@ -12,7 +12,17 @@ const REG_NO_ICASE: &str = "(?-i)";
 // TODO: create an error struct and report what went wrong in more detail
 pub type Result<T> = std::result::Result<T, ()>;
 
-pub fn compile_search_term_to_regex(search_term: &str) -> Result<Vec<Regex>> {
+pub fn compile_search_term_to_regexes(search_term: &str) -> Result<Vec<Regex>> {
+    compile_search_term_to_strings(search_term).map(|v| {
+        v.into_iter()
+            .map(|reg_str| {
+                Regex::new(&reg_str).expect("the regex should always be correct")
+            })
+            .collect()
+    })
+}
+
+fn compile_search_term_to_strings(search_term: &str) -> Result<Vec<String>> {
     let regs: Result<Vec<_>> = search_term
         .split_whitespace()
         .map(|word| compile_word(word))
@@ -21,7 +31,7 @@ pub fn compile_search_term_to_regex(search_term: &str) -> Result<Vec<Regex>> {
     regs.and_then(|vec| if vec.is_empty() { Err(()) } else { Ok(vec) })
 }
 
-fn compile_word(word: &str) -> Result<Regex> {
+fn compile_word(word: &str) -> Result<String> {
     assert!(!word.is_empty());
     let reg_str = if let Some(w) = word.strip_prefix(QUOTE_WORD) {
         if w.is_empty() {
@@ -32,8 +42,7 @@ fn compile_word(word: &str) -> Result<Regex> {
     } else {
         fuzzy_word(word)
     };
-
-    Regex::new(&reg_str).map_err(|_| ())
+    Ok(reg_str)
 }
 
 fn smart_case(word: &str) -> &'static str {
@@ -76,7 +85,7 @@ fn test_compile() {
     assert!(compile_word("'a").is_ok());
     assert!(compile_word("'").is_err());
 
-    let regs = compile_search_term_to_regex("'a asd");
+    let regs = compile_search_term_to_regexes("'a asd");
     assert!(regs.is_ok());
     assert_eq!(regs.unwrap().len(), 2);
 }
