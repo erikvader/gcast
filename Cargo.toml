@@ -3,4 +3,6 @@ members = [
   "server",
   "searcher",
   "cli",
+  "client",
+  "protocol",
 ]

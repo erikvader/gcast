@@ -1,0 +1,27 @@
+<html>
+  <head></head>
+  <body>
+    <script type="text/javascript">
+      const module = {}
+    </script>
+    <script type="module">
+      import init, {State, init_rust} from "./pkg/client.js"
+      async function run() {
+          await init()
+          console.log("init")
+          init_rust()
+          console.log("init_rust")
+
+          let state = State.new(5)
+          state.register(n => {
+              console.log(n)
+              document.getElementById("hej").style.color = "red"
+          });
+          state.call_it()
+      }
+      run()
+    </script>
+
+    <div id="hej">hej</div>
+  </body>
+</html>
