@@ -57,7 +57,7 @@ fn compile_swiper(search_term: &str) -> Result<Vec<String>> {
         "if search_term is non-empty, then this must contain something"
     );
 
-    let regstring: String = vec![smart_case(search_term).to_string()]
+    let regstring: String = std::iter::once(smart_case(search_term).to_string())
         .into_iter()
         .chain(parts)
         .collect();
