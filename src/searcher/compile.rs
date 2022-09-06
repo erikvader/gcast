@@ -13,7 +13,7 @@ const REG_NO_ICASE: &str = "(?-i)";
 pub type Result<T> = std::result::Result<T, ()>;
 
 pub fn compile_search_term_to_regexes(search_term: &str) -> Result<Vec<Regex>> {
-    compile_search_term_to_strings(search_term).map(|v| {
+    compile_swiper(search_term).map(|v| {
         v.into_iter()
             .map(|reg_str| {
                 Regex::new(&reg_str).expect("the regex should always be correct")
@@ -22,13 +22,46 @@ pub fn compile_search_term_to_regexes(search_term: &str) -> Result<Vec<Regex>> {
     })
 }
 
-fn compile_search_term_to_strings(search_term: &str) -> Result<Vec<String>> {
+#[allow(dead_code)]
+fn compile_fzf(search_term: &str) -> Result<Vec<String>> {
     let regs: Result<Vec<_>> = search_term
         .split_whitespace()
         .map(|word| compile_word(word))
         .collect();
 
     regs.and_then(|vec| if vec.is_empty() { Err(()) } else { Ok(vec) })
+}
+
+fn compile_swiper(search_term: &str) -> Result<Vec<String>> {
+    if Regex::new(r"(^ ?$)|(^ [^ ])|([^ ] $)")
+        .unwrap()
+        .is_match(search_term)
+    {
+        return Err(());
+    }
+
+    let parts: Vec<_> = Regex::new(r"( +)|[^ ]+")
+        .unwrap()
+        .find_iter(&search_term)
+        .map(|m| {
+            if m.as_str().starts_with(" ") {
+                swiper_space(m.as_str())
+            } else {
+                swiper_word(m.as_str())
+            }
+        })
+        .collect();
+
+    assert!(
+        !parts.is_empty(),
+        "if search_term is non-empty, then this must contain something"
+    );
+
+    let regstring: String = vec![smart_case(search_term).to_string()]
+        .into_iter()
+        .chain(parts)
+        .collect();
+    Ok(vec![regstring])
 }
 
 fn compile_word(word: &str) -> Result<String> {
@@ -43,6 +76,19 @@ fn compile_word(word: &str) -> Result<String> {
         fuzzy_word(word)
     };
     Ok(reg_str)
+}
+
+fn swiper_space(spaces: &str) -> String {
+    match spaces.chars().count() {
+        x if x <= 0 => panic!("must be non-empty"),
+        1 => REG_ANY.into(),
+        x => format!(r" {{{}}}", x - 1),
+    }
+}
+
+fn swiper_word(word: &str) -> String {
+    assert!(!word.is_empty());
+    String::new() + REG_GROUP_START + &escape(word) + REG_GROUP_END
 }
 
 fn smart_case(word: &str) -> &'static str {
@@ -79,7 +125,7 @@ fn fuzzy_word(word: &str) -> String {
 }
 
 #[test]
-fn test_compile() {
+fn test_compile_fzf() {
     assert_eq!(literal_word("a?"), "(?i).*?(a\\?).*?");
     assert_eq!(fuzzy_word("a?"), "(?i).*?(a).*?(\\?).*?");
     assert!(compile_word("'a").is_ok());
@@ -88,4 +134,18 @@ fn test_compile() {
     let regs = compile_search_term_to_regexes("'a asd");
     assert!(regs.is_ok());
     assert_eq!(regs.unwrap().len(), 2);
+}
+
+#[test]
+fn test_compile_swiper() {
+    assert_eq!(compile_swiper(" "), Err(()));
+    assert_eq!(compile_swiper(""), Err(()));
+    assert_eq!(compile_swiper(" x"), Err(()));
+    assert_eq!(compile_swiper("x "), Err(()));
+    assert!(compile_swiper("x  ").is_ok());
+
+    assert_eq!(compile_swiper("hej hej"), Ok(vec![format!("{}(hej){}(hej)", REG_ICASE, REG_ANY)]));
+    assert_eq!(compile_swiper("hej  hej"), Ok(vec![format!("{}(hej) {{1}}(hej)", REG_ICASE)]));
+    assert_eq!(compile_swiper("hej    hej"), Ok(vec![format!("{}(hej) {{3}}(hej)", REG_ICASE)]));
+    assert_eq!(compile_swiper("hEj"), Ok(vec![format!("{}(hEj)", REG_NO_ICASE)]));
 }
