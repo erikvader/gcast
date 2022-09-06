@@ -1,26 +1,6 @@
-[package]
-name = "gcast"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-itertools = "0.10"
-regex = "1" #TODO: scale down on features
-regex-syntax = "0.6"
-rayon = "1"
-
-serde = {version="1", features=["derive"]}
-bincode = "1"
-tokio = {version="1", features=["full"]} #TODO: scale down on features
-
-# used in lcs-test
-colored = "2"
-
-[[bin]]
-name = "lcs-test"
-
-[[bin]]
-name = "server"
-
-# [[bin]]
-# name = "test-client"
+[workspace]
+members = [
+  "server",
+  "searcher",
+  "cli",
+]

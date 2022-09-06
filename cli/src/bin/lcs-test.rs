@@ -1,5 +1,5 @@
 use colored::*;
-use gcast::searcher::{
+use searcher::searcher::{
     search,
     util::{get_interspersed, sorted_take},
 };

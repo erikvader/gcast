@@ -56,6 +56,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "cli"
+version = "0.1.0"
+dependencies = [
+ "colored",
+ "searcher",
+]
+
+[[package]]
 name = "colored"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -116,20 +124,6 @@ name = "either"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f107b87b6afc2a64fd13cac55fe06d6c8859f12d4b14cbcdd2c67d0976781be"
-
-[[package]]
-name = "gcast"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "colored",
- "itertools",
- "rayon",
- "regex",
- "regex-syntax",
- "serde",
- "tokio",
-]
 
 [[package]]
 name = "hermit-abi"
@@ -327,6 +321,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
+name = "searcher"
+version = "0.1.0"
+dependencies = [
+ "itertools",
+ "rayon",
+ "regex",
+ "regex-syntax",
+]
+
+[[package]]
 name = "serde"
 version = "1.0.139"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -344,6 +348,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "server"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "serde",
+ "tokio",
 ]
 
 [[package]]
