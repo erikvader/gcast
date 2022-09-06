@@ -22,7 +22,7 @@ pub fn compile_search_term_to_regexes(search_term: &str) -> Result<Vec<Regex>> {
     })
 }
 
-#[allow(dead_code)]
+#[allow(dead_code)] // NOTE: maybe reintroduce in the future as a setting or something
 fn compile_fzf(search_term: &str) -> Result<Vec<String>> {
     let regs: Result<Vec<_>> = search_term
         .split_whitespace()
@@ -131,7 +131,7 @@ fn test_compile_fzf() {
     assert!(compile_word("'a").is_ok());
     assert!(compile_word("'").is_err());
 
-    let regs = compile_search_term_to_regexes("'a asd");
+    let regs = compile_fzf("'a asd");
     assert!(regs.is_ok());
     assert_eq!(regs.unwrap().len(), 2);
 }
@@ -144,8 +144,20 @@ fn test_compile_swiper() {
     assert_eq!(compile_swiper("x "), Err(()));
     assert!(compile_swiper("x  ").is_ok());
 
-    assert_eq!(compile_swiper("hej hej"), Ok(vec![format!("{}(hej){}(hej)", REG_ICASE, REG_ANY)]));
-    assert_eq!(compile_swiper("hej  hej"), Ok(vec![format!("{}(hej) {{1}}(hej)", REG_ICASE)]));
-    assert_eq!(compile_swiper("hej    hej"), Ok(vec![format!("{}(hej) {{3}}(hej)", REG_ICASE)]));
-    assert_eq!(compile_swiper("hEj"), Ok(vec![format!("{}(hEj)", REG_NO_ICASE)]));
+    assert_eq!(
+        compile_swiper("hej hej"),
+        Ok(vec![format!("{}(hej){}(hej)", REG_ICASE, REG_ANY)])
+    );
+    assert_eq!(
+        compile_swiper("hej  hej"),
+        Ok(vec![format!("{}(hej) {{1}}(hej)", REG_ICASE)])
+    );
+    assert_eq!(
+        compile_swiper("hej    hej"),
+        Ok(vec![format!("{}(hej) {{3}}(hej)", REG_ICASE)])
+    );
+    assert_eq!(
+        compile_swiper("hEj"),
+        Ok(vec![format!("{}(hEj)", REG_NO_ICASE)])
+    );
 }

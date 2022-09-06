@@ -1,3 +1,5 @@
+#![allow(dead_code)] // NOTE: this is just quick testing
+
 use colored::*;
 use searcher::searcher::{
     search,
@@ -5,8 +7,8 @@ use searcher::searcher::{
 };
 use std::{
     env, fs,
-    io::{self, BufRead, Write},
-    time::{Duration, Instant},
+    io::{self, Write},
+    time::Instant,
 };
 
 const CSI: &str = "\x1b[";
