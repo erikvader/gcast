@@ -21,6 +21,7 @@ impl State {
     }
 
     pub fn register(&mut self, callback: Function) {
+        log::info!("hejsan");
         self.callback = Some(callback);
     }
 
@@ -35,4 +36,5 @@ impl State {
 #[wasm_bindgen]
 pub fn init_rust() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    console_log::init_with_level(log::Level::Debug);
 }
