@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 tokio = {version="1.21", features=["full"]} #TODO: scale down on features
+tokio-tungstenite = "0.17"
+futures-util = "0.3"
 
 log = "0.4"
 simplelog = "0.12"
