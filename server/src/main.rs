@@ -1,14 +1,38 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use futures_util::{sink::SinkExt, StreamExt, TryStreamExt};
+use futures_util::{sink::SinkExt, Sink, StreamExt, TryStreamExt};
 use tokio::{
     net::{TcpListener, TcpStream},
     select,
     signal::unix::{signal, SignalKind},
 };
-use tokio_tungstenite::tungstenite::Message;
+use tokio_tungstenite::tungstenite;
+
+// TODO: två actors
+// TODO: en klient åt gången
 
 const PORT: u16 = 1337;
+
+#[derive(thiserror::Error, Debug)]
+enum WsSendError<E> {
+    #[error(transparent)]
+    Msg(#[from] protocol::MessageError),
+    #[error(transparent)]
+    Ws(E),
+}
+
+// TODO: move
+async fn ws_send<T, S>(msg: T, ws: &mut S) -> Result<(), WsSendError<S::Error>>
+where
+    T: Into<protocol::Message>,
+    S: Sink<tungstenite::Message> + Unpin,
+{
+    let bytes = msg.into().serialize()?;
+    ws.send(tungstenite::Message::Binary(bytes))
+        .await
+        .map_err(|e| WsSendError::Ws(e))?;
+    Ok(())
+}
 
 fn init_logger() {
     use simplelog::*;
@@ -37,7 +61,7 @@ async fn handle_connection(tcp_stream: TcpStream, addr: SocketAddr) {
     log::info!("Websocket ready");
 
     let (mut sink, mut stream) = ws.split();
-    sink.send(Message::text("hejsan"))
+    ws_send(protocol::to_client::pong::Pong, &mut sink)
         .await
         .expect("failed to send");
 

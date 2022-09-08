@@ -632,7 +632,9 @@ dependencies = [
  "atty",
  "futures-util",
  "log",
+ "protocol",
  "simplelog",
+ "thiserror",
  "tokio",
  "tokio-tungstenite",
 ]

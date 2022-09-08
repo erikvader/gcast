@@ -4,7 +4,7 @@ pub mod to_server;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-enum Message {
+pub enum Message {
     ToServer(to_server::ToServer),
     ToClient(to_client::ToClient),
 }
@@ -13,15 +13,26 @@ enum Message {
 #[error(transparent)]
 pub struct MessageError(#[from] bincode::Error);
 
-pub type DeResult<T> = std::result::Result<T, MessageError>;
-pub type SerResult = DeResult<Vec<u8>>;
-
 impl Message {
-    fn serialize(self) -> SerResult {
+    pub fn serialize(self) -> Result<Vec<u8>, MessageError> {
         bincode::serialize(&self).map_err(|e| e.into())
     }
 
-    fn deserialize(bytes: &[u8]) -> DeResult<Self> {
+    pub fn deserialize(bytes: &[u8]) -> Result<Self, MessageError> {
         bincode::deserialize(bytes).map_err(|e| e.into())
+    }
+
+    pub fn to_client(self) -> Option<to_client::ToClient> {
+        match self {
+            Message::ToClient(toclient) => Some(toclient),
+            Message::ToServer(_) => None,
+        }
+    }
+
+    pub fn to_server(self) -> Option<to_server::ToServer> {
+        match self {
+            Message::ToServer(toserver) => Some(toserver),
+            Message::ToClient(_) => None,
+        }
     }
 }

@@ -1,22 +1,15 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{DeResult, Message, SerResult};
+use crate::Message;
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum ToServer {
     Ping(ping::Ping),
 }
 
-impl ToServer {
-    fn serialize(self) -> SerResult {
-        Message::ToServer(self).serialize()
-    }
-
-    pub fn deserialize(bytes: &[u8]) -> DeResult<Option<Self>> {
-        match Message::deserialize(bytes)? {
-            Message::ToServer(toserver) => Ok(Some(toserver)),
-            Message::ToClient(_) => Ok(None),
-        }
+impl From<ToServer> for Message {
+    fn from(toserver: ToServer) -> Self {
+        Message::ToServer(toserver)
     }
 }
 
@@ -25,9 +18,9 @@ pub mod ping {
 
     #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
     pub struct Ping;
-    impl Ping {
-        pub fn serialize(self) -> SerResult {
-            ToServer::Ping(self).serialize()
+    impl From<Ping> for Message {
+        fn from(ping: Ping) -> Self {
+            ToServer::Ping(ping).into()
         }
     }
 }
