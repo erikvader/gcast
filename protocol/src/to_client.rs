@@ -1,15 +1,15 @@
 use serde::{Deserialize, Serialize};
 
-use crate::Message;
+use crate::MessageKind;
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum ToClient {
     Pong(pong::Pong),
 }
 
-impl From<ToClient> for Message {
-    fn from(toclient: ToClient) -> Message {
-        Message::ToClient(toclient)
+impl From<ToClient> for MessageKind {
+    fn from(toclient: ToClient) -> MessageKind {
+        MessageKind::ToClient(toclient)
     }
 }
 
@@ -18,8 +18,8 @@ pub mod pong {
 
     #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
     pub struct Pong;
-    impl From<Pong> for Message {
-        fn from(pong: Pong) -> Message {
+    impl From<Pong> for MessageKind {
+        fn from(pong: Pong) -> MessageKind {
             ToClient::Pong(pong).into()
         }
     }

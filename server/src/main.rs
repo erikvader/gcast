@@ -10,19 +10,20 @@ use tokio_tungstenite::tungstenite;
 
 // TODO: två actors
 // TODO: en klient åt gången
+// TODO: ws_recv
 
 const PORT: u16 = 1337;
 
 #[derive(thiserror::Error, Debug)]
-enum WsSendError<E> {
-    #[error(transparent)]
+enum WsError<E> {
+    #[error("serde error: {0}")]
     Msg(#[from] protocol::MessageError),
-    #[error(transparent)]
+    #[error("websocket error: {0}")]
     Ws(E),
 }
 
 // TODO: move
-async fn ws_send<T, S>(msg: T, ws: &mut S) -> Result<(), WsSendError<S::Error>>
+async fn ws_send<T, S>(msg: T, ws: &mut S) -> Result<(), WsError<S::Error>>
 where
     T: Into<protocol::Message>,
     S: Sink<tungstenite::Message> + Unpin,
@@ -30,7 +31,7 @@ where
     let bytes = msg.into().serialize()?;
     ws.send(tungstenite::Message::Binary(bytes))
         .await
-        .map_err(|e| WsSendError::Ws(e))?;
+        .map_err(|e| WsError::Ws(e))?;
     Ok(())
 }
 
