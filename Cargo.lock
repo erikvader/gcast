@@ -87,7 +87,11 @@ name = "cli"
 version = "0.1.0"
 dependencies = [
  "colored",
+ "log",
+ "protocol",
  "searcher",
+ "simplelog",
+ "tungstenite",
 ]
 
 [[package]]
@@ -631,12 +635,14 @@ version = "0.1.0"
 dependencies = [
  "atty",
  "futures-util",
+ "libc",
  "log",
  "protocol",
  "simplelog",
  "thiserror",
  "tokio",
  "tokio-tungstenite",
+ "tokio-util",
 ]
 
 [[package]]
@@ -810,6 +816,19 @@ dependencies = [
  "log",
  "tokio",
  "tungstenite",
+]
+
+[[package]]
+name = "tokio-util"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bb2e075f03b3d66d8d8785356224ba688d2906a371015e225beeb65ca92c740"
+dependencies = [
+ "bytes",
+ "futures-core",
+ "futures-sink",
+ "pin-project-lite",
+ "tokio",
 ]
 
 [[package]]
