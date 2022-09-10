@@ -7,5 +7,14 @@ edition = "2021"
 colored = "2"
 searcher = {path="../searcher"}
 
+protocol = {path="../protocol"}
+tungstenite = "0.17"
+
+log = "0.4"
+simplelog = "0.12"
+
 [[bin]]
 name = "lcs-test"
+
+[[bin]]
+name = "test-client"

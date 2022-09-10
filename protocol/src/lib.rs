@@ -39,14 +39,14 @@ impl Message {
         bincode::deserialize(bytes).map_err(|e| e.into())
     }
 
-    pub fn to_client(self) -> Option<to_client::ToClient> {
+    pub fn try_to_client(self) -> Option<to_client::ToClient> {
         match self.kind {
             MessageKind::ToClient(toclient) => Some(toclient),
             MessageKind::ToServer(_) => None,
         }
     }
 
-    pub fn to_server(self) -> Option<to_server::ToServer> {
+    pub fn try_to_server(self) -> Option<to_server::ToServer> {
         match self.kind {
             MessageKind::ToServer(toserver) => Some(toserver),
             MessageKind::ToClient(_) => None,
@@ -64,5 +64,18 @@ where
 {
     fn from(kind: K) -> Self {
         Message::new(kind.into())
+    }
+}
+
+pub trait ToMessage {
+    fn to_message(self) -> Message;
+}
+
+impl<T> ToMessage for T
+where
+    T: Into<Message>,
+{
+    fn to_message(self) -> Message {
+        self.into()
     }
 }

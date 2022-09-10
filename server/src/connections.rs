@@ -48,7 +48,7 @@ async fn handle_accept(
     log::info!("Websocket ready");
 
     let (mut sink, mut stream) = ws.split();
-    ws_send(protocol::to_client::pong::Pong, &mut sink)
+    ws_send(protocol::to_client::seat::Seat::Accept, &mut sink)
         .await
         .expect("failed to send");
 
