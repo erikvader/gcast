@@ -48,5 +48,7 @@ fn main() {
         }
     }
 
+    socket.close(None).expect("failed to close");
+    // std::thread::sleep(std::time::Duration::from_secs(5));
     log::info!("bye");
 }

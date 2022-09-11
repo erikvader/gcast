@@ -36,5 +36,6 @@ impl State {
 #[wasm_bindgen]
 pub fn init_rust() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    console_log::init_with_level(log::Level::Debug);
+    console_log::init_with_level(log::Level::Debug)
+        .expect("console logger failed to init");
 }

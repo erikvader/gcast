@@ -56,6 +56,20 @@ impl Message {
     pub fn id(&self) -> u64 {
         self.id
     }
+
+    pub fn is_to_server(&self) -> bool {
+        match self.kind {
+            MessageKind::ToServer(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_to_client(&self) -> bool {
+        match self.kind {
+            MessageKind::ToClient(_) => true,
+            _ => false,
+        }
+    }
 }
 
 impl<K> From<K> for Message

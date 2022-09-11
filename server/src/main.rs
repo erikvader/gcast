@@ -1,18 +1,16 @@
 mod caster;
 mod connections;
 mod signal;
+mod util;
 
 use futures_util::future::maybe_done;
 use protocol::Message;
-use tokio::{join, select, spawn, sync::mpsc};
+use tokio::{join, select, spawn, sync::mpsc, task::JoinError};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
     caster::caster_actor, connections::connections_actor, signal::signal_received,
 };
-
-// TODO: en klient åt gången
-// TODO: ws_recv
 
 const CHANNEL_SIZE: usize = 1024;
 type Sender = mpsc::Sender<Message>;
@@ -31,6 +29,14 @@ fn init_logger() {
 
     TermLogger::init(level, config, TerminalMode::Stdout, colors)
         .expect("could not init logger");
+}
+
+fn log_actor_error(res: Result<Result<(), anyhow::Error>, JoinError>, name: &str) {
+    match res {
+        Err(je) => log::error!("Actor '{}' join error: {}", name, je),
+        Ok(Err(ae)) => log::error!("Actor '{}' errored with: {:?}", name, ae),
+        Ok(Ok(())) => (),
+    }
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -66,15 +72,15 @@ async fn main() {
 
     join!(&mut caster, &mut connections);
     match (
-        caster.take_output().expect("value not taken yet"),
-        connections.take_output().expect("value not taken yet"),
+        caster.take_output().expect("value not taken"),
+        connections.take_output().expect("value not taken"),
     ) {
-        (Ok(_), Ok(_)) => log::info!("Tasks exited normally"),
-        (r1, r2) => log::error!(
-            "Something exited with error: caster={:?}, connections={:?}",
-            r1,
-            r2
-        ),
+        (Ok(Ok(())), Ok(Ok(()))) => log::info!("Tasks exited normally"),
+        (r1, r2) => {
+            log::error!("Some actor exited abnormally");
+            log_actor_error(r1, "caster");
+            log_actor_error(r2, "connections");
+        }
     }
 
     log::info!("Goodbye");
