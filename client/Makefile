@@ -4,7 +4,7 @@ build:
 
 .PHONY: serve
 serve:
-	darkhttpd web-root
+	@python serve.py
 
 .PHONY: clean
 clean:
