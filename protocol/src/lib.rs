@@ -10,7 +10,7 @@ use to_server::ServerMsg;
 const MESSAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum MessageKind {
+enum MessageKind {
     ToServer(to_server::ToServer),
     ToClient(to_client::ToClient),
 }
@@ -26,7 +26,7 @@ pub struct Message {
 pub struct MessageError(#[from] bincode::Error);
 
 impl Message {
-    pub fn new(kind: MessageKind) -> Self {
+    fn new(kind: MessageKind) -> Self {
         Message {
             id: MESSAGE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
             kind,

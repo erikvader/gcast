@@ -66,8 +66,14 @@ impl Agent for WS {
                     }
                 };
 
+                log::debug!("Trying to send something over websocket");
                 match tx.send(GlooMsg::Bytes(bytes)).await {
-                    Ok(()) => link2.send_message(WSOutput::Conn(true)),
+                    Ok(()) => {
+                        // NOTE: This branch is taken if websocket is already closed for
+                        // some reason.
+                        // 'WebSocket is already in CLOSING or CLOSED state'
+                        // link2.send_message(WSOutput::Conn(true));
+                    }
                     Err(WebSocketError::ConnectionClose(e)) => {
                         log::info!("websocket disconnected: {:?}", e);
                         link2.send_message(WSOutput::Conn(false));
@@ -120,10 +126,10 @@ fn try_to_client(msg: &GlooMsg) -> Option<ClientMsg> {
         GlooMsg::Bytes(bytes) => match protocol::Message::deserialize(&bytes) {
             Err(e) => log::error!("Could not deserialize a message: {}", e),
             Ok(m) => {
-                if let Some(toclient) = m.try_to_client() {
-                    return Some(toclient);
+                if m.is_to_client() {
+                    return m.try_to_client();
                 } else {
-                    log::warn!("message not meant for client");
+                    log::warn!("message not meant for client: {:?}", m);
                 }
             }
         },

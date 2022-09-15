@@ -13,6 +13,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 def main():
     with TCPServer(("", 8080), Handler) as httpd:
+        print("Serving...")
         httpd.serve_forever()
 
 if __name__ == "__main__":
