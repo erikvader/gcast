@@ -8,11 +8,13 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 yew = "0.19"
+yew-agent = "0.1"
 wasm-bindgen = "0.2"
 
 wasm-logger = "0.2"
 log = "0.4"
 
+protocol = {path="../protocol"}
 gloo-net = {version="0.2", features=["websocket"]}
 wasm-bindgen-futures = "0.4"
 futures = "0.3"
