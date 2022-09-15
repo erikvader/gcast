@@ -4,6 +4,8 @@ pub mod to_server;
 use std::sync::atomic::AtomicU64;
 
 use serde::{Deserialize, Serialize};
+use to_client::ClientMsg;
+use to_server::ServerMsg;
 
 const MESSAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -39,16 +41,16 @@ impl Message {
         bincode::deserialize(bytes).map_err(|e| e.into())
     }
 
-    pub fn try_to_client(self) -> Option<to_client::ToClient> {
+    pub fn try_to_client(self) -> Option<ClientMsg> {
         match self.kind {
-            MessageKind::ToClient(toclient) => Some(toclient),
+            MessageKind::ToClient(toclient) => Some(ClientMsg::new(self.id, toclient)),
             MessageKind::ToServer(_) => None,
         }
     }
 
-    pub fn try_to_server(self) -> Option<to_server::ToServer> {
+    pub fn try_to_server(self) -> Option<ServerMsg> {
         match self.kind {
-            MessageKind::ToServer(toserver) => Some(toserver),
+            MessageKind::ToServer(toserver) => Some(ServerMsg::new(self.id, toserver)),
             MessageKind::ToClient(_) => None,
         }
     }

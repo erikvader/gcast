@@ -1,5 +1,5 @@
 .PHONY: all
-all: server client
+all: server client cli
 
 .PHONY: server
 server:
@@ -9,3 +9,6 @@ server:
 client:
 	$(MAKE) -C client build
 
+.PHONY: cli
+cli:
+	cargo build -p cli

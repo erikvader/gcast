@@ -1,6 +1,6 @@
 use futures::{channel::mpsc, SinkExt, StreamExt};
 use gloo_net::websocket::{futures::WebSocket, Message as GlooMsg, WebSocketError};
-use protocol::to_client::ToClient;
+use protocol::to_client::{ClientMsg, ToClient};
 use std::{collections::HashSet, rc::Rc};
 use wasm_bindgen_futures::spawn_local;
 use yew_agent::{use_bridge, Agent, UseBridgeHandle};
@@ -14,7 +14,7 @@ pub struct WS {
 
 #[derive(Clone)]
 pub enum WSOutput {
-    Msg(u64, Rc<ToClient>),
+    Msg(Rc<ClientMsg>),
     Conn(bool),
 }
 
@@ -36,8 +36,8 @@ impl Agent for WS {
                 match msg {
                     Ok(m) => {
                         log::info!("Received: {:?}", m);
-                        if let Some((id, toclient)) = try_to_client(&m) {
-                            link2.send_message(WSOutput::Msg(id, Rc::new(toclient)));
+                        if let Some(toclient) = try_to_client(&m) {
+                            link2.send_message(WSOutput::Msg(Rc::new(toclient)));
                         }
                         link2.send_message(WSOutput::Conn(true));
                     }
@@ -115,14 +115,13 @@ impl Agent for WS {
     }
 }
 
-fn try_to_client(msg: &GlooMsg) -> Option<(u64, ToClient)> {
+fn try_to_client(msg: &GlooMsg) -> Option<ClientMsg> {
     match msg {
         GlooMsg::Bytes(bytes) => match protocol::Message::deserialize(&bytes) {
             Err(e) => log::error!("Could not deserialize a message: {}", e),
             Ok(m) => {
-                let id = m.id();
                 if let Some(toclient) = m.try_to_client() {
-                    return Some((id, toclient));
+                    return Some(toclient);
                 } else {
                     log::warn!("message not meant for client");
                 }
@@ -137,11 +136,11 @@ fn try_to_client(msg: &GlooMsg) -> Option<(u64, ToClient)> {
 
 pub fn use_websocket<F>(on_output: F) -> UseBridgeHandle<WS>
 where
-    F: Fn(u64, Rc<ToClient>) + 'static,
+    F: Fn(Rc<ClientMsg>) + 'static,
 {
     use_bridge(move |wsout| {
-        if let WSOutput::Msg(id, toclient) = wsout {
-            on_output(id, toclient)
+        if let WSOutput::Msg(toclient) = wsout {
+            on_output(toclient)
         }
     })
 }

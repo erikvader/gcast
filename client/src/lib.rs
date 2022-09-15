@@ -25,7 +25,7 @@ fn app() -> Html {
     };
     let _ws = {
         let accepted2 = accepted.clone();
-        use_websocket(move |_id, m| match *m {
+        use_websocket(move |m| match m.client_kind() {
             ToClient::Seat(Seat::Accept) => accepted2.set(Accepted::Accepted),
             ToClient::Seat(Seat::Reject) => accepted2.set(Accepted::Rejected),
         })
