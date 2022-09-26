@@ -1,5 +1,6 @@
 mod caster;
 mod connections;
+mod repeatable_oneshot;
 mod signal;
 mod util;
 
