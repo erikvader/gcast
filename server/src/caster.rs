@@ -1,6 +1,6 @@
 use tokio_util::sync::CancellationToken;
 
-use crate::{util::FutureCancel, Receiver, Sender};
+use crate::{future_cancel::FutureCancel, Receiver, Sender};
 
 pub async fn caster_actor(
     to_conn: Sender,

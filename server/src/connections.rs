@@ -10,7 +10,7 @@ use tokio::{
 use tokio_tungstenite::tungstenite::Message as TungMsg;
 use tokio_util::sync::CancellationToken;
 
-use crate::{util::FutureCancel, Receiver, Sender};
+use crate::{future_cancel::FutureCancel, Receiver, Sender};
 
 const PORT: u16 = 1337;
 
