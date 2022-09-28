@@ -7,6 +7,10 @@ use libmpv::{
     events::{Event, PropertyData},
     FileState, Format, Mpv,
 };
+use protocol::{
+    to_client::status::mpv::{Mpv as ClientMpv, PlayState},
+    to_server::mpvcontrol::MpvControl,
+};
 use tokio::sync::{mpsc, oneshot};
 
 pub use self::errors::*;
@@ -79,54 +83,46 @@ impl MpvStateHandle {
     }
 }
 
-// TODO: flytta till protocol
-#[derive(Debug, Clone, Copy)]
-pub enum MpvCommand {
-    TogglePause,
-    Quit,
-    CycleAudio,
-    VolumeUp,
-    VolumeDown,
-    ToggleMute,
-    SubDelayEarlier,
-    SubDelayLater,
-    NextChapter,
-    PrevChapter,
-    SeekBack,
-    SeekForward,
-    SeekBackLong,
-    SeekForwardLong,
-    CycleSub,
-    SubLarger,
-    SubSmaller,
-    SubMoveUp,
-    SubMoveDown,
+impl MpvState {
+    pub fn to_client_state(&self) -> Option<ClientMpv> {
+        use MpvState::*;
+        match self {
+            Load => Some(ClientMpv::Load),
+            End(_) => None,
+            Play(state) => Some(ClientMpv::Play(PlayState::new(
+                state.pause,
+                state.playback_time,
+                state.duration,
+                state.volume,
+                state.chapters,
+                state.chapter,
+            ))),
+        }
+    }
 }
 
-impl MpvCommand {
-    pub fn cmd_string(&self) -> Command {
-        use MpvCommand::*;
-        match self {
-            TogglePause => "cycle pause",
-            Quit => "quit",
-            CycleAudio => "cycle audio",
-            VolumeUp => "add volume 2",
-            VolumeDown => "add volume -2",
-            ToggleMute => "cycle mute",
-            SubDelayEarlier => "add sub-delay -0.1",
-            SubDelayLater => "add sub-delay 0.1",
-            NextChapter => "add chapter 1",
-            PrevChapter => "add chapter -1",
-            SeekBack => "seek -5",
-            SeekForward => "seek 5",
-            CycleSub => "cycle sub",
-            SeekBackLong => "seek -60",
-            SeekForwardLong => "seek 60",
-            SubLarger => "add sub-scale 0.1",
-            SubSmaller => "add sub-scale -0.1",
-            SubMoveUp => "add sub-pos -1",
-            SubMoveDown => "add sub-pos 1",
-        }
+pub fn control_string(ctrl: MpvControl) -> Command {
+    use MpvControl::*;
+    match ctrl {
+        TogglePause => "cycle pause",
+        Quit => "quit",
+        CycleAudio => "cycle audio",
+        VolumeUp => "add volume 2",
+        VolumeDown => "add volume -2",
+        ToggleMute => "cycle mute",
+        SubDelayEarlier => "add sub-delay -0.1",
+        SubDelayLater => "add sub-delay 0.1",
+        NextChapter => "add chapter 1",
+        PrevChapter => "add chapter -1",
+        SeekBack => "seek -5",
+        SeekForward => "seek 5",
+        CycleSub => "cycle sub",
+        SeekBackLong => "seek -60",
+        SeekForwardLong => "seek 60",
+        SubLarger => "add sub-scale 0.1",
+        SubSmaller => "add sub-scale -0.1",
+        SubMoveUp => "add sub-pos -1",
+        SubMoveDown => "add sub-pos 1",
     }
 }
 

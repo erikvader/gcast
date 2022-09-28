@@ -33,6 +33,7 @@ fn app() -> Html {
         use_websocket(move |m| match m.client_kind() {
             ToClient::Seat(Seat::Accept) => accepted2.set(Accepted::Accepted),
             ToClient::Seat(Seat::Reject) => accepted2.set(Accepted::Rejected),
+            _ => todo!(),
         })
     };
 

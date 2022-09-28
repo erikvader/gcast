@@ -6,14 +6,10 @@ pub enum Seat {
     Reject,
 }
 
-impl From<Seat> for MessageKind {
-    fn from(seat: Seat) -> MessageKind {
-        ToClient::Seat(seat).into()
-    }
-}
+into_ToClient!(Seat);
 
 impl Seat {
-    pub fn is_accecpted(&self) -> bool {
+    pub fn is_accepted(&self) -> bool {
         *self == Seat::Accept
     }
 }

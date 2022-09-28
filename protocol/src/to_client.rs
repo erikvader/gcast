@@ -1,4 +1,15 @@
+macro_rules! into_ToClient {
+    ($msg:ident) => {
+        impl From<$msg> for MessageKind {
+            fn from(m: $msg) -> MessageKind {
+                ToClient::$msg(m).into()
+            }
+        }
+    };
+}
+
 pub mod seat;
+pub mod status;
 
 use serde::{Deserialize, Serialize};
 
@@ -7,6 +18,7 @@ use crate::MessageKind;
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum ToClient {
     Seat(seat::Seat),
+    Status(status::Status),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
