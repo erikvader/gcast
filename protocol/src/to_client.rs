@@ -1,9 +1,9 @@
+pub mod front;
 pub mod seat;
-pub mod status;
 
 message! {
     enum super::MessageKind, ToClient {
         Seat(seat::Seat),
-        Status(status::Status),
+        Front(front::Front),
     }
 }

@@ -8,7 +8,7 @@ use libmpv::{
     FileState, Format, Mpv,
 };
 use protocol::{
-    to_client::status::mpv::{Mpv as ClientMpv, PlayState},
+    to_client::front::mpv::{Mpv as ClientMpv, PlayState},
     to_server::mpvcontrol::MpvControl,
 };
 use tokio::sync::{mpsc, oneshot};

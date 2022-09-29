@@ -1,7 +1,7 @@
 use ordered_float::NotNan;
 
 message! {
-    enum super::Status, Mpv {
+    enum super::Front, Mpv {
         Load,
         PlayState(PlayState),
     }
