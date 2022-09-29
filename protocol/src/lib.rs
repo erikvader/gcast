@@ -17,8 +17,6 @@ pub mod to_server;
 use std::sync::atomic::AtomicU64;
 
 use serde::{Deserialize, Serialize};
-use to_client::ClientMsg;
-use to_server::ServerMsg;
 
 const MESSAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -54,17 +52,31 @@ impl Message {
         bincode::deserialize(bytes).map_err(|e| e.into())
     }
 
-    pub fn try_to_client(self) -> Option<ClientMsg> {
+    pub fn take_to_client(self) -> to_client::ToClient {
         match self.kind {
-            MessageKind::ToClient(toclient) => Some(ClientMsg::new(self.id, toclient)),
-            MessageKind::ToServer(_) => None,
+            MessageKind::ToClient(toclient) => toclient,
+            MessageKind::ToServer(_) => panic!("tried to take ToClient on a ToServer"),
         }
     }
 
-    pub fn try_to_server(self) -> Option<ServerMsg> {
+    pub fn take_to_server(self) -> to_server::ToServer {
         match self.kind {
-            MessageKind::ToServer(toserver) => Some(ServerMsg::new(self.id, toserver)),
-            MessageKind::ToClient(_) => None,
+            MessageKind::ToServer(toserver) => toserver,
+            MessageKind::ToClient(_) => panic!("tried to take ToServer on a ToClient"),
+        }
+    }
+
+    pub fn borrow_to_client(&self) -> &to_client::ToClient {
+        match &self.kind {
+            MessageKind::ToClient(toclient) => toclient,
+            MessageKind::ToServer(_) => panic!("tried to borrow ToClient on a ToServer"),
+        }
+    }
+
+    pub fn borrow_to_server(&self) -> &to_server::ToServer {
+        match &self.kind {
+            MessageKind::ToServer(toserver) => toserver,
+            MessageKind::ToClient(_) => panic!("tried to borrow ToServer on a ToClient"),
         }
     }
 
@@ -106,5 +118,17 @@ where
 {
     fn to_message(self) -> Message {
         self.into()
+    }
+}
+
+impl AsRef<to_client::ToClient> for Message {
+    fn as_ref(&self) -> &to_client::ToClient {
+        self.borrow_to_client()
+    }
+}
+
+impl AsRef<to_server::ToServer> for Message {
+    fn as_ref(&self) -> &to_server::ToServer {
+        self.borrow_to_server()
     }
 }

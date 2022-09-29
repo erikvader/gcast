@@ -1,6 +1,5 @@
 use futures::{channel::mpsc, SinkExt, StreamExt};
 use gloo_net::websocket::{futures::WebSocket, Message as GlooMsg, WebSocketError};
-use protocol::to_client::{ClientMsg, ToClient};
 use std::{collections::HashSet, rc::Rc};
 use wasm_bindgen_futures::spawn_local;
 use yew_agent::{use_bridge, Agent, UseBridgeHandle};
@@ -14,7 +13,7 @@ pub struct WS {
 
 #[derive(Clone)]
 pub enum WSOutput {
-    Msg(Rc<ClientMsg>),
+    Msg(Rc<protocol::Message>),
     Conn(bool),
 }
 
@@ -121,13 +120,13 @@ impl Agent for WS {
     }
 }
 
-fn try_to_client(msg: &GlooMsg) -> Option<ClientMsg> {
+fn try_to_client(msg: &GlooMsg) -> Option<protocol::Message> {
     match msg {
         GlooMsg::Bytes(bytes) => match protocol::Message::deserialize(&bytes) {
             Err(e) => log::error!("Could not deserialize a message: {}", e),
             Ok(m) => {
                 if m.is_to_client() {
-                    return m.try_to_client();
+                    return Some(m);
                 } else {
                     log::warn!("message not meant for client: {:?}", m);
                 }
@@ -142,7 +141,7 @@ fn try_to_client(msg: &GlooMsg) -> Option<ClientMsg> {
 
 pub fn use_websocket<F>(on_output: F) -> UseBridgeHandle<WS>
 where
-    F: Fn(Rc<ClientMsg>) + 'static,
+    F: Fn(Rc<protocol::Message>) + 'static,
 {
     use_bridge(move |wsout| {
         if let WSOutput::Msg(toclient) = wsout {

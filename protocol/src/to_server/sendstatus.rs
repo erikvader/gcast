@@ -1,3 +1,3 @@
 message! {
-    struct super::ToServer, SendStatus {}
+    struct super::ToServer, SendStatus;
 }
