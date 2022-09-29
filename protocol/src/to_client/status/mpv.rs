@@ -1,22 +1,20 @@
 use ordered_float::NotNan;
 
-use super::*;
-
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum Mpv {
-    Load,
-    Play(PlayState),
+message! {
+    enum super::Status, Mpv {
+        Load,
+        PlayState(PlayState),
+    }
 }
 
-into_Status!(Mpv);
-
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct PlayState {
-    pause: bool,
-    progress: NotNan<f64>,
-    length: NotNan<f64>,
-    volume: NotNan<f64>,
-    chapter: Option<(i64, i64)>,
+message! {
+    struct Mpv, PlayState {
+        pause: bool,
+        progress: NotNan<f64>,
+        length: NotNan<f64>,
+        volume: NotNan<f64>,
+        chapter: Option<(i64, i64)>,
+    }
 }
 
 impl PlayState {

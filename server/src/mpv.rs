@@ -89,7 +89,7 @@ impl MpvState {
         match self {
             Load => Some(ClientMpv::Load),
             End(_) => None,
-            Play(state) => Some(ClientMpv::Play(PlayState::new(
+            Play(state) => Some(ClientMpv::PlayState(PlayState::new(
                 state.pause,
                 state.playback_time,
                 state.duration,

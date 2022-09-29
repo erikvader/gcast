@@ -1,3 +1,16 @@
+macro_rules! message {
+    ($enumstruct:ident $kind:ty, $name:ident $body:tt) => {
+        #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
+        pub $enumstruct $name $body
+
+        impl From<$name> for $crate::MessageKind {
+            fn from(m: $name) -> Self {
+                <$kind>::$name(m).into()
+            }
+        }
+    }
+}
+
 pub mod to_client;
 pub mod to_server;
 

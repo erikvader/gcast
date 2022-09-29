@@ -1,26 +1,15 @@
-macro_rules! into_ToServer {
-    ($msg:ident) => {
-        impl From<$msg> for MessageKind {
-            fn from(m: $msg) -> MessageKind {
-                ToServer::$msg(m).into()
-            }
-        }
-    };
-}
-
 pub mod mpvcontrol;
-pub mod mpvplay;
+pub mod mpvstart;
 pub mod sendstatus;
+pub mod spotifystart;
 
-use serde::{Deserialize, Serialize};
-
-use crate::MessageKind;
-
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum ToServer {
-    SendStatus(sendstatus::SendStatus),
-    MpvControl(mpvcontrol::MpvControl),
-    MpvPlay(mpvplay::MpvPlay),
+message! {
+    enum super::MessageKind, ToServer {
+        SendStatus(sendstatus::SendStatus),
+        MpvControl(mpvcontrol::MpvControl),
+        MpvStart(mpvstart::MpvStart),
+        SpotifyStart(spotifystart::SpotifyStart),
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -44,11 +33,5 @@ impl ServerMsg {
 
     pub fn id(&self) -> u64 {
         self.id
-    }
-}
-
-impl From<ToServer> for MessageKind {
-    fn from(toserver: ToServer) -> Self {
-        MessageKind::ToServer(toserver)
     }
 }
