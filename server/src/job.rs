@@ -6,24 +6,50 @@ use tokio::{
 };
 
 pub struct Job<T> {
-    handle: JoinHandle<()>,
+    handle: Option<JoinHandle<()>>,
     tx: T,
 }
+
+#[derive(thiserror::Error, Debug)]
+#[error("Job exited, can't send")]
+pub struct JobExited;
 
 pub type JobMpsc<M> = Job<mpsc::Sender<M>>;
 pub type JobOne<M> = Job<RO::Sender<M>>;
 
 impl<T> Job<T> {
     fn new(tx: T, handle: JoinHandle<()>) -> Self {
-        Job { tx, handle }
+        Job {
+            tx,
+            handle: Some(handle),
+        }
     }
 
-    pub async fn terminate_wait(self) {
+    pub async fn terminate_wait(mut self) {
         drop(self.tx);
-        match self.handle.await {
-            Err(err) if err.is_panic() => std::panic::resume_unwind(err.into_panic()),
-            Err(_) => unreachable!("There is no way to call abort on the handle"),
-            Ok(()) => (),
+        Self::impl_wait(&mut self.handle).await;
+    }
+
+    pub async fn wait(&mut self) {
+        Self::impl_wait(&mut self.handle).await;
+    }
+
+    async fn impl_wait(handle: &mut Option<JoinHandle<()>>) {
+        match handle {
+            None => (),
+            Some(hand) => {
+                match hand.await {
+                    Err(err) if err.is_panic() => {
+                        std::panic::resume_unwind(err.into_panic())
+                    }
+                    Err(err) if err.is_cancelled() => {
+                        unreachable!("There is no way to call abort on the handle")
+                    }
+                    Err(_) => unreachable!("a new variant got introduced"),
+                    Ok(()) => (),
+                }
+                *handle = None;
+            }
         }
     }
 }
@@ -38,8 +64,8 @@ impl<M> JobMpsc<M> {
         Self::new(tx, task::spawn(task(rx)))
     }
 
-    pub async fn send(&self, msg: M) -> Result<(), ()> {
-        self.tx.send(msg).await.map_err(|_| ())
+    pub async fn send(&self, msg: M) -> Result<(), JobExited> {
+        self.tx.send(msg).await.map_err(|_| JobExited)
     }
 }
 
@@ -53,7 +79,7 @@ impl<M> JobOne<M> {
         Self::new(tx, task::spawn(task(rx)))
     }
 
-    pub async fn send(&self, msg: M) -> Result<(), ()> {
-        self.tx.send(msg).await.map_err(|_| ())
+    pub async fn send(&self, msg: M) -> Result<(), JobExited> {
+        self.tx.send(msg).await.map_err(|_| JobExited)
     }
 }
