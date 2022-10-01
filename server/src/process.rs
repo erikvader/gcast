@@ -5,17 +5,12 @@ use std::{
     process::{ExitStatus, Stdio},
     time::Duration,
 };
-use tokio::{
-    pin,
-    process::Command,
-    sync::{mpsc, oneshot},
-    time::timeout,
-};
+use tokio::{pin, process::Command, sync::oneshot, task::JoinHandle, time::timeout};
 
 const SIGTERM_TIMEOUT: u64 = 5;
 
 pub struct Process {
-    proc_done: mpsc::Receiver<IOResult<ExitStatus>>,
+    proc_done: JoinHandle<IOResult<ExitStatus>>,
     kill: Option<oneshot::Sender<()>>,
 }
 
@@ -31,21 +26,19 @@ impl Process {
             .stderr(File::create(errfile)?)
             .spawn()?;
 
-        let (done_tx, done_rx) = mpsc::channel(1);
         let (kill_tx, kill_rx) = oneshot::channel();
         let pid = child.id().expect("has not been waited yet");
 
         log::info!("Spawned process '{}' with pid {}", exe, pid);
 
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             let wait = child.wait();
             pin!(wait);
 
             tokio::select! {
                 w = &mut wait => {
                     log::debug!("Process with pid {} exited by itself", pid);
-                    done_tx.send(w).await.ok();
-                    return;
+                    return w;
                 },
                 _ = kill_rx => (),
             }
@@ -60,27 +53,29 @@ impl Process {
             if let Ok(res) =
                 timeout(Duration::from_secs(SIGTERM_TIMEOUT), &mut wait).await
             {
-                done_tx.send(res).await.ok();
-                return;
+                return res;
             }
 
             let kill_succ = sigkill(pid);
             log::debug!("Sending SIGKILL, success={}", kill_succ);
-            done_tx.send(wait.await).await.ok();
+            wait.await
         });
 
         Ok(Process {
-            proc_done: done_rx,
+            proc_done: handle,
             kill: Some(kill_tx),
         })
     }
 
     // cancel safe wait
     pub async fn wait(&mut self) -> IOResult<ExitStatus> {
-        if let Some(msg) = self.proc_done.recv().await {
-            msg
-        } else {
-            panic!("Process task must have panicked, or this was called twice");
+        match (&mut self.proc_done).await {
+            Ok(res) => res,
+            Err(je) if je.is_panic() => std::panic::resume_unwind(je.into_panic()),
+            Err(je) if je.is_cancelled() => {
+                unreachable!("`abort` is never called on the `JoinHandle`")
+            }
+            _ => unreachable!("a new variant of `JoinError` has been introduced"),
         }
     }
 
