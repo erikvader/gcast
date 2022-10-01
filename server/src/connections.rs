@@ -1,7 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use anyhow::Context;
-use futures_util::{Sink, SinkExt, Stream, StreamExt, TryStreamExt};
+use futures_util::{Sink, SinkExt, StreamExt, TryStreamExt};
 use protocol::{to_client::seat::Seat, Message};
 use tokio::{
     net::{TcpListener, TcpStream},
