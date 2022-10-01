@@ -1,5 +1,9 @@
 use clap::{Parser, Subcommand};
-use protocol::{to_server::spotifystart, Message, ToMessage};
+use protocol::{
+    to_client::{seat, ToClient},
+    to_server::{sendstatus, spotifystart},
+    Message, ToMessage,
+};
 use tungstenite::connect;
 
 #[derive(Parser)]
@@ -39,6 +43,12 @@ fn main() {
     log::info!("Connected!");
     log::debug!("response: {:?}", response);
 
+    if !read_seat(&mut socket) {
+        return;
+    }
+
+    send_read_state(&mut socket);
+
     let tosend = match &cli.command {
         Commands::SpotifyStart => spotifystart::Start.to_message(),
         Commands::SpotifyStop => spotifystart::Stop.to_message(),
@@ -59,13 +69,59 @@ fn main() {
             break;
         }
 
-        if let tungstenite::Message::Binary(data) = msg {
-            let msg = Message::deserialize(&data).expect("could not deserialize");
-            log::info!("Received parsed: {:?}", msg);
-        }
+        log::info!("Received parsed: {:?}", parse_tung_msg(msg));
     }
 
     socket.close(None).expect("failed to close");
     // std::thread::sleep(std::time::Duration::from_secs(5));
     log::info!("bye");
+}
+
+fn parse_tung_msg(msg: tungstenite::Message) -> protocol::Message {
+    if let tungstenite::Message::Binary(data) = msg {
+        Message::deserialize(&data).expect("could not deserialize")
+    } else {
+        panic!("nani");
+    }
+}
+
+type WS =
+    tungstenite::WebSocket<tungstenite::stream::MaybeTlsStream<std::net::TcpStream>>;
+
+fn read_seat(socket: &mut WS) -> bool {
+    loop {
+        let msg = parse_tung_msg(socket.read_message().expect("could not read message"));
+        match msg.take_to_client() {
+            ToClient::Seat(seat::Accept) => {
+                log::info!("got accepted");
+                break true;
+            }
+            ToClient::Seat(seat::Reject) => {
+                log::warn!("got rejected");
+                break false;
+            }
+            _ => (),
+        }
+    }
+}
+
+fn send_read_state(socket: &mut WS) {
+    let data = sendstatus::SendStatus
+        .to_message()
+        .serialize()
+        .expect("ser failed");
+    socket
+        .write_message(tungstenite::Message::Binary(data))
+        .expect("could not send");
+
+    loop {
+        let msg = parse_tung_msg(socket.read_message().expect("could not read message"));
+        match msg.take_to_client() {
+            ToClient::Front(f) => {
+                log::info!("got state {:?}", f);
+                break;
+            }
+            _ => (),
+        }
+    }
 }
