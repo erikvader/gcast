@@ -10,12 +10,17 @@ pub struct Job<T> {
     tx: T,
 }
 
+pub enum JobMsg<T> {
+    SendStatus,
+    Ctrl(T),
+}
+
 #[derive(thiserror::Error, Debug)]
 #[error("Job exited, can't send")]
 pub struct JobExited;
 
-pub type JobMpsc<M> = Job<mpsc::Sender<M>>;
-pub type JobOne<M> = Job<RO::Sender<M>>;
+pub type JobMpsc<M> = Job<mpsc::Sender<JobMsg<M>>>;
+pub type JobOne<M> = Job<RO::Sender<JobMsg<M>>>;
 
 impl<T> Job<T> {
     fn new(tx: T, handle: JoinHandle<()>) -> Self {
@@ -58,14 +63,21 @@ impl<M> JobMpsc<M> {
     pub fn start<F, O>(task: O) -> Self
     where
         F: Future<Output = ()> + Send + 'static,
-        O: FnOnce(mpsc::Receiver<M>) -> F,
+        O: FnOnce(mpsc::Receiver<JobMsg<M>>) -> F,
     {
         let (tx, rx) = mpsc::channel(1024);
         Self::new(tx, task::spawn(task(rx)))
     }
 
-    pub async fn send(&self, msg: M) -> Result<(), JobExited> {
-        self.tx.send(msg).await.map_err(|_| JobExited)
+    pub async fn send_ctrl(&self, msg: M) -> Result<(), JobExited> {
+        self.tx.send(JobMsg::Ctrl(msg)).await.map_err(|_| JobExited)
+    }
+
+    pub async fn send_status(&self) -> Result<(), JobExited> {
+        self.tx
+            .send(JobMsg::SendStatus)
+            .await
+            .map_err(|_| JobExited)
     }
 }
 
@@ -73,13 +85,20 @@ impl<M> JobOne<M> {
     pub fn start<F, O>(task: O) -> Self
     where
         F: Future<Output = ()> + Send + 'static,
-        O: FnOnce(RO::Receiver<M>) -> F,
+        O: FnOnce(RO::Receiver<JobMsg<M>>) -> F,
     {
         let (tx, rx) = RO::repeat_oneshot();
         Self::new(tx, task::spawn(task(rx)))
     }
 
-    pub async fn send(&self, msg: M) -> Result<(), JobExited> {
-        self.tx.send(msg).await.map_err(|_| JobExited)
+    pub async fn send_ctrl(&self, msg: M) -> Result<(), JobExited> {
+        self.tx.send(JobMsg::Ctrl(msg)).await.map_err(|_| JobExited)
+    }
+
+    pub async fn send_status(&self) -> Result<(), JobExited> {
+        self.tx
+            .send(JobMsg::SendStatus)
+            .await
+            .map_err(|_| JobExited)
     }
 }

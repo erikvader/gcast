@@ -1,7 +1,7 @@
 mod frontjob;
 
 use protocol::{
-    to_server::{spotifystart, ToServer},
+    to_server::{mpvstart, spotifystart, ToServer},
     Message,
 };
 use tokio::select;
@@ -17,19 +17,33 @@ async fn handle_msg(msg: Message, front: &mut FrontJob, to_conn: &Sender) {
 
     use ToServer::*;
     match msg.take_to_server() {
-        SendStatus(_) => {
-            if to_conn.send(front.status()).await.is_err() {
-                log::warn!("seems like connections is down");
+        SendStatus(_) => front.send_status().await,
+        MpvControl(_) => todo!(),
+        MpvStart(mpvstart::File(path)) => {
+            if let Some(string) = path.to_str() {
+                try_start_mpv(front, string.to_string());
+            } else {
+                log::error!("the path '{:?}' is not a valid UTF-8 string", path);
             }
         }
-        MpvControl(_) => todo!(),
-        MpvStart(_) => todo!(),
+        MpvStart(mpvstart::Url(url)) => try_start_mpv(front, url),
+        MpvStart(mpvstart::Stop) => {
+            if !front.is_mpv() {
+                log::warn!("mpv is not running, ignoring stop request");
+            } else {
+                log::info!("Killing mpv");
+                front.kill(to_conn.clone()).await;
+            }
+        }
         SpotifyStart(spotifystart::Start) => {
-            if front.is_spotify() {
-                log::warn!("spotify is already running, ignoring start request");
+            if front.is_something() {
+                log::warn!(
+                    "'{}' is already running, ignoring start request",
+                    front.name()
+                );
             } else {
                 log::info!("Starting spotify");
-                front.start_spotify();
+                front.start_spotify(to_conn.clone());
             }
         }
         SpotifyStart(spotifystart::Stop) => {
@@ -37,9 +51,21 @@ async fn handle_msg(msg: Message, front: &mut FrontJob, to_conn: &Sender) {
                 log::warn!("spotify is not running, ignoring stop request");
             } else {
                 log::info!("Killing spotify");
-                front.kill().await;
+                front.kill(to_conn.clone()).await;
             }
         }
+    }
+}
+
+fn try_start_mpv(front: &mut FrontJob, path: String) {
+    if front.is_something() {
+        log::warn!(
+            "'{}' is already running, ignoring file request",
+            front.name()
+        );
+    } else {
+        log::info!("Starting mpv");
+        front.start_mpv(path, todo!());
     }
 }
 
@@ -48,7 +74,7 @@ pub async fn caster_actor(
     mut from_conn: Receiver,
     canceltoken: CancellationToken,
 ) -> anyhow::Result<()> {
-    let mut front = FrontJob::default();
+    let mut front = FrontJob::none_job(to_conn.clone());
 
     loop {
         select! {
@@ -59,7 +85,7 @@ pub async fn caster_actor(
             },
             _ = front.wait() => {
                 log::warn!("Application '{}' exited", front.name());
-                front.kill().await;
+                front.kill(to_conn.clone()).await;
             }
         }
     }
@@ -69,7 +95,7 @@ pub async fn caster_actor(
             "Trying to exit caster, but killing '{}' first",
             front.name()
         );
-        front.kill().await;
+        front.kill(to_conn.clone()).await;
     }
 
     log::info!("Caster actor exited");
