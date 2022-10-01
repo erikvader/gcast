@@ -32,7 +32,7 @@ async fn handle_msg(msg: Message, front: &mut FrontJob, to_conn: &Sender) {
                 log::warn!("mpv is not running, ignoring stop request");
             } else {
                 log::info!("Killing mpv");
-                front.kill(to_conn.clone()).await;
+                front.kill().await;
             }
         }
         SpotifyStart(spotifystart::Start) => {
@@ -43,7 +43,7 @@ async fn handle_msg(msg: Message, front: &mut FrontJob, to_conn: &Sender) {
                 );
             } else {
                 log::info!("Starting spotify");
-                front.start_spotify(to_conn.clone());
+                front.start_spotify();
             }
         }
         SpotifyStart(spotifystart::Stop) => {
@@ -51,7 +51,7 @@ async fn handle_msg(msg: Message, front: &mut FrontJob, to_conn: &Sender) {
                 log::warn!("spotify is not running, ignoring stop request");
             } else {
                 log::info!("Killing spotify");
-                front.kill(to_conn.clone()).await;
+                front.kill().await;
             }
         }
     }
@@ -65,7 +65,7 @@ fn try_start_mpv(front: &mut FrontJob, path: String) {
         );
     } else {
         log::info!("Starting mpv");
-        front.start_mpv(path, todo!());
+        front.start_mpv(path);
     }
 }
 
@@ -74,7 +74,7 @@ pub async fn caster_actor(
     mut from_conn: Receiver,
     canceltoken: CancellationToken,
 ) -> anyhow::Result<()> {
-    let mut front = FrontJob::none_job(to_conn.clone());
+    let mut front = FrontJob::new(to_conn.clone());
 
     loop {
         select! {
@@ -85,7 +85,7 @@ pub async fn caster_actor(
             },
             _ = front.wait() => {
                 log::warn!("Application '{}' exited", front.name());
-                front.kill(to_conn.clone()).await;
+                front.kill().await;
             }
         }
     }
@@ -95,7 +95,7 @@ pub async fn caster_actor(
             "Trying to exit caster, but killing '{}' first",
             front.name()
         );
-        front.kill(to_conn.clone()).await;
+        front.kill().await;
     }
 
     log::info!("Caster actor exited");
