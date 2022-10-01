@@ -1,5 +1,12 @@
 macro_rules! message {
-    ($enumstruct:ident $kind:ty, $name:ident $body:tt) => {
+    (enum $kind:ty, $name:ident $body:tt) => {
+        pub use $name::*;
+        message!{@x enum $kind, $name $body}
+    };
+    (struct $kind:ty, $name:ident $body:tt) => {
+        message!{@x struct $kind, $name $body}
+    };
+    (@x $enumstruct:ident $kind:ty, $name:ident $body:tt) => {
         #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
         pub $enumstruct $name $body
 
@@ -8,7 +15,7 @@ macro_rules! message {
                 <$kind>::$name(m).into()
             }
         }
-    }
+    };
 }
 
 pub mod to_client;
