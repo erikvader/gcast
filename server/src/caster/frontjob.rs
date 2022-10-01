@@ -87,9 +87,9 @@ impl FrontJob {
 
     pub fn none_job(to_conn: Sender) -> Self {
         Self::None(JobMpsc::start(|mut rx| async move {
-            to_conn.send(front::None.to_message()).await.ok();
+            send_to_conn(&to_conn, front::None).await;
             while let Some(_) = rx.recv().await {
-                to_conn.send(front::None.to_message()).await.ok();
+                send_to_conn(&to_conn, front::None).await;
             }
         }))
     }
@@ -115,7 +115,7 @@ async fn spotify(
     mut rx: mpsc::Receiver<JobMsg<()>>,
     to_conn: Sender,
 ) -> anyhow::Result<()> {
-    to_conn.send(front::Spotify.to_message()).await.ok();
+    send_to_conn(&to_conn, front::Spotify).await;
     let mut proc = Process::start("spotify")?;
     select! {
         _ = rx.recv() => {
@@ -137,7 +137,7 @@ async fn mpv(
     file: String,
     to_conn: Sender,
 ) -> anyhow::Result<()> {
-    to_conn.send(front::mpv::Load.to_message()).await.ok();
+    send_to_conn(&to_conn, front::mpv::Load).await;
     let (handle, mut states) = mpv::mpv(&file)?;
     loop {
         select! {
@@ -147,4 +147,10 @@ async fn mpv(
         break;
     }
     Ok(())
+}
+
+async fn send_to_conn(to_conn: &Sender, msg: impl ToMessage) {
+    if to_conn.send(msg.to_message()).await.is_err() {
+        log::warn!("seems like connections is down");
+    }
 }
