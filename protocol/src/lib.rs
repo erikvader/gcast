@@ -25,7 +25,7 @@ use std::sync::atomic::AtomicU64;
 
 use serde::{Deserialize, Serialize};
 
-const MESSAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
+static MESSAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 enum MessageKind {
