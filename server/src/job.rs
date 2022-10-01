@@ -7,7 +7,7 @@ use tokio::{
 
 pub struct Job<T> {
     handle: Option<JoinHandle<()>>,
-    tx: T,
+    tx: Option<T>,
 }
 
 pub enum JobMsg<T> {
@@ -25,14 +25,18 @@ pub type JobOne<M> = Job<RO::Sender<JobMsg<M>>>;
 impl<T> Job<T> {
     fn new(tx: T, handle: JoinHandle<()>) -> Self {
         Job {
-            tx,
+            tx: Some(tx),
             handle: Some(handle),
         }
     }
 
-    pub async fn terminate_wait(mut self) {
-        drop(self.tx);
+    pub async fn terminate_wait(&mut self) {
+        self.terminate();
         Self::impl_wait(&mut self.handle).await;
+    }
+
+    pub fn terminate(&mut self) {
+        drop(self.tx.take());
     }
 
     pub async fn wait(&mut self) {
@@ -70,11 +74,19 @@ impl<M> JobMpsc<M> {
     }
 
     pub async fn send_ctrl(&self, msg: M) -> Result<(), JobExited> {
-        self.tx.send(JobMsg::Ctrl(msg)).await.map_err(|_| JobExited)
+        // TODO: figure out a way to avoid copying these lines four times
+        self.tx
+            .as_ref()
+            .ok_or(JobExited)?
+            .send(JobMsg::Ctrl(msg))
+            .await
+            .map_err(|_| JobExited)
     }
 
     pub async fn send_status(&self) -> Result<(), JobExited> {
         self.tx
+            .as_ref()
+            .ok_or(JobExited)?
             .send(JobMsg::SendStatus)
             .await
             .map_err(|_| JobExited)
@@ -92,11 +104,18 @@ impl<M> JobOne<M> {
     }
 
     pub async fn send_ctrl(&self, msg: M) -> Result<(), JobExited> {
-        self.tx.send(JobMsg::Ctrl(msg)).await.map_err(|_| JobExited)
+        self.tx
+            .as_ref()
+            .ok_or(JobExited)?
+            .send(JobMsg::Ctrl(msg))
+            .await
+            .map_err(|_| JobExited)
     }
 
     pub async fn send_status(&self) -> Result<(), JobExited> {
         self.tx
+            .as_ref()
+            .ok_or(JobExited)?
             .send(JobMsg::SendStatus)
             .await
             .map_err(|_| JobExited)

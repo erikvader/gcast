@@ -122,6 +122,7 @@ pub async fn connections_actor(
 
     loop {
         log::debug!("Waiting for a new connection to accept...");
+        // TODO: listen on `from_cast` and throw away all messages
         let (stream, addr) = match listener.accept().cancellable(&canceltoken).await {
             Some(x) => x.context("failed to accept tcp stream")?,
             None => {

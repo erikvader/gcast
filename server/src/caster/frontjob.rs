@@ -54,11 +54,12 @@ impl FrontJob {
 
     pub async fn kill(&mut self) {
         use Variant::*;
-        match std::mem::replace(&mut self.var, Variant::none_job(self.to_conn.clone())) {
+        match &mut self.var {
             Spotify(j) => j.terminate_wait().await,
             Mpv(j) => j.terminate_wait().await,
             None(j) => j.terminate_wait().await,
         }
+        self.var = Variant::none_job(self.to_conn.clone());
     }
 
     pub async fn send_status(&self) {
