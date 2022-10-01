@@ -1,5 +1,18 @@
-use protocol::{Message, ToMessage};
+use clap::{Parser, Subcommand};
+use protocol::{to_server::spotifystart, Message, ToMessage};
 use tungstenite::connect;
+
+#[derive(Parser)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand, Clone)]
+enum Commands {
+    SpotifyStart,
+    SpotifyStop,
+}
 
 fn init_logger() {
     use simplelog::*;
@@ -16,6 +29,7 @@ fn init_logger() {
 
 fn main() {
     init_logger();
+    let cli = Cli::parse();
 
     let target_url = "ws://127.0.0.1:1337";
     log::info!("Connecting to {}...", target_url);
@@ -25,7 +39,10 @@ fn main() {
     log::info!("Connected!");
     log::debug!("response: {:?}", response);
 
-    let tosend = protocol::to_server::sendstatus::SendStatus.to_message();
+    let tosend = match &cli.command {
+        Commands::SpotifyStart => spotifystart::Start.to_message(),
+        Commands::SpotifyStop => spotifystart::Stop.to_message(),
+    };
     log::info!("Sending: {:?}", tosend);
     let data = tosend.serialize().expect("serialization failed");
     socket
