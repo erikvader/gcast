@@ -117,8 +117,8 @@ pub fn control_string(ctrl: MpvControl) -> Command {
         SeekBack => "seek -5",
         SeekForward => "seek 5",
         CycleSub => "cycle sub",
-        SeekBackLong => "seek -60",
-        SeekForwardLong => "seek 60",
+        SeekBackLong => "seek -90",
+        SeekForwardLong => "seek 90",
         SubLarger => "add sub-scale 0.1",
         SubSmaller => "add sub-scale -0.1",
         SubMoveUp => "add sub-pos -1",
@@ -150,7 +150,7 @@ fn observe_some_properties(ctx: &libmpv::events::EventContext<'_>) -> libmpv::Re
     Ok(())
 }
 
-pub fn mpv(path: &'static str) -> MpvResult<(MpvHandle, MpvStateHandle)> {
+pub fn mpv(path: &str) -> MpvResult<(MpvHandle, MpvStateHandle)> {
     let (h_tx, h_rx): (HandleSnd, _) = mpsc::channel(1000);
     let (s_tx, s_rx): (_, StateRcv) = mpsc::channel(1000);
 
