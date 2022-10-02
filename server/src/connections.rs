@@ -93,6 +93,7 @@ async fn handle_accept(
                         break;
                     },
                     Some(TungMsg::Binary(msg)) => handle_binary(&msg, to_cast).await,
+                    Some(TungMsg::Close(msg)) => log::debug!("Closed message with '{:?}'", msg),
                     Some(msg) => log::warn!("Got a non-binary message {:?}", msg),
                 }
             },

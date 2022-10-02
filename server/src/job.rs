@@ -69,7 +69,7 @@ impl<M> JobMpsc<M> {
         F: Future<Output = ()> + Send + 'static,
         O: FnOnce(mpsc::Receiver<JobMsg<M>>) -> F,
     {
-        let (tx, rx) = mpsc::channel(1024);
+        let (tx, rx) = mpsc::channel(crate::CHANNEL_SIZE);
         Self::new(tx, task::spawn(task(rx)))
     }
 

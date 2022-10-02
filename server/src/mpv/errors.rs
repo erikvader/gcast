@@ -46,7 +46,7 @@ impl From<libmpv::Error> for SafeLibMpvError {
 pub enum MpvError {
     #[error("mpv error: {0}")]
     Mpv(#[from] SafeLibMpvError),
-    #[error("associated thread is not running anymore")]
+    #[error("Mpv::Exited: thread is not running anymore")]
     Exited,
 }
 

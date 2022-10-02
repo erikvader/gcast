@@ -84,7 +84,7 @@ pub async fn caster_actor(
                 break;
             },
             _ = front.wait() => {
-                log::warn!("Application '{}' exited", front.name());
+                log::info!("Application '{}' exited", front.name());
                 front.kill().await;
             }
         }

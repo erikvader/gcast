@@ -158,8 +158,8 @@ fn observe_some_properties(ctx: &libmpv::events::EventContext<'_>) -> libmpv::Re
 }
 
 pub fn mpv(path: &str) -> MpvResult<(MpvHandle, MpvStateHandle)> {
-    let (h_tx, h_rx): (HandleSnd, _) = mpsc::channel(1000);
-    let (s_tx, s_rx): (_, StateRcv) = mpsc::channel(1000);
+    let (h_tx, h_rx): (HandleSnd, _) = mpsc::channel(crate::CHANNEL_SIZE);
+    let (s_tx, s_rx): (_, StateRcv) = mpsc::channel(crate::CHANNEL_SIZE);
 
     let mpv = Mpv::with_initializer(|x| {
         x.set_property("force-window", "immediate")?;
@@ -185,7 +185,7 @@ pub fn mpv(path: &str) -> MpvResult<(MpvHandle, MpvStateHandle)> {
                     }
                     tx_res.send(res.map_err(|e| e.into())).ok();
                 }
-                log::debug!("Mpv handle thread shutting down");
+                log::debug!("Mpv handle thread shut down");
             });
 
             s.spawn(|| {
@@ -206,10 +206,10 @@ pub fn mpv(path: &str) -> MpvResult<(MpvHandle, MpvStateHandle)> {
                     wait_for_end(&s_tx, &mut ev_ctx, state);
                 }
 
-                log::debug!("Mpv state thread shutting down");
+                log::debug!("Mpv state thread shut down");
             });
         });
-        log::debug!("Mpv thread shutting down");
+        log::debug!("Mpv thread shut down");
     });
 
     Ok((MpvHandle { tx: h_tx }, MpvStateHandle { rx: s_rx }))
