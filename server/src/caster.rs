@@ -11,7 +11,7 @@ use crate::{Receiver, Sender};
 
 use self::frontjob::FrontJob;
 
-async fn handle_msg(msg: Message, front: &mut FrontJob, to_conn: &Sender) {
+async fn handle_msg(msg: Message, front: &mut FrontJob) {
     log::debug!("Handling message: {:?}", msg);
     assert!(msg.is_to_server());
 
@@ -74,11 +74,11 @@ pub async fn caster_actor(
     mut from_conn: Receiver,
     canceltoken: CancellationToken,
 ) -> anyhow::Result<()> {
-    let mut front = FrontJob::new(to_conn.clone());
+    let mut front = FrontJob::new(to_conn);
 
     loop {
         select! {
-            Some(msg) = from_conn.recv() => handle_msg(msg, &mut front, &to_conn).await,
+            Some(msg) = from_conn.recv() => handle_msg(msg, &mut front).await,
             _ = canceltoken.cancelled() => {
                 log::debug!("caster got cancelled");
                 break;

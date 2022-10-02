@@ -101,11 +101,10 @@ impl MpvState {
     }
 }
 
-pub fn control_string(ctrl: MpvControl) -> Command {
+fn control_string(ctrl: &MpvControl) -> Command {
     use MpvControl::*;
     match ctrl {
         TogglePause => "cycle pause",
-        Quit => "quit",
         CycleAudio => "cycle audio",
         VolumeUp => "add volume 2",
         VolumeDown => "add volume -2",
@@ -127,7 +126,7 @@ pub fn control_string(ctrl: MpvControl) -> Command {
 }
 
 impl MpvHandle {
-    pub async fn command(&self, cmd: Command) -> MpvResult<()> {
+    async fn command_str(&self, cmd: Command) -> MpvResult<()> {
         let (tx, rx) = oneshot::channel();
         if self.tx.send((cmd, tx)).await.is_err() {
             return Err(MpvError::Exited);
@@ -136,6 +135,14 @@ impl MpvHandle {
             Ok(res) => res,
             Err(_) => Err(MpvError::Exited),
         }
+    }
+
+    pub async fn command(&self, cmd: &MpvControl) -> MpvResult<()> {
+        self.command_str(control_string(cmd)).await
+    }
+
+    pub async fn quit(&self) -> MpvResult<()> {
+        self.command_str("quit").await
     }
 }
 
@@ -176,7 +183,7 @@ pub fn mpv(path: &str) -> MpvResult<(MpvHandle, MpvStateHandle)> {
                     if let Err(e) = &res {
                         log::error!("mpv errored: {}", e); // TODO: remove since handle probably also will log?
                     }
-                    let _ = tx_res.send(res.map_err(|e| e.into()));
+                    tx_res.send(res.map_err(|e| e.into())).ok();
                 }
                 log::debug!("Mpv handle thread shutting down");
             });
@@ -191,7 +198,7 @@ pub fn mpv(path: &str) -> MpvResult<(MpvHandle, MpvStateHandle)> {
                         "Failed to observe properties, shutting down state thread: {}",
                         e
                     );
-                    let _ = s_tx.blocking_send(Err(e.into()));
+                    s_tx.blocking_send(Err(e.into())).ok();
                     return;
                 }
 
@@ -233,7 +240,7 @@ fn wait_for_play(
     s_tx: &StateSnd,
     ev_ctx: &mut libmpv::events::EventContext,
 ) -> Option<State> {
-    let _ = s_tx.blocking_send(Ok(MpvState::Load));
+    s_tx.blocking_send(Ok(MpvState::Load)).ok();
     let mut partial = StateBuilder::default();
 
     loop {
@@ -244,15 +251,15 @@ fn wait_for_play(
         match ev_ctx.wait_event(EV_CTX_WAIT) {
             None => (),
             Some(Ok(Event::Shutdown)) => {
-                let _ = s_tx.blocking_send(Ok(MpvState::End(EndReason::Quit)));
+                s_tx.blocking_send(Ok(MpvState::End(EndReason::Quit))).ok();
                 return None;
             }
             Some(Ok(Event::EndFile(r))) => {
-                let _ = s_tx.blocking_send(Ok(MpvState::End(r.into())));
+                s_tx.blocking_send(Ok(MpvState::End(r.into()))).ok();
                 return None;
             }
             Some(Err(e)) => {
-                let _ = s_tx.blocking_send(Err(e.into()));
+                s_tx.blocking_send(Err(e.into())).ok();
                 return None;
             }
             Some(Ok(Event::PropertyChange { name, change, .. })) => {
@@ -281,7 +288,7 @@ fn wait_for_end(
     ev_ctx: &mut libmpv::events::EventContext,
     mut state: State,
 ) {
-    let _ = s_tx.blocking_send(Ok(MpvState::Play(state.clone())));
+    s_tx.blocking_send(Ok(MpvState::Play(state.clone()))).ok();
     loop {
         if s_tx.is_closed() {
             return;
@@ -290,15 +297,15 @@ fn wait_for_end(
         match ev_ctx.wait_event(EV_CTX_WAIT) {
             None => (),
             Some(Ok(Event::Shutdown)) => {
-                let _ = s_tx.blocking_send(Ok(MpvState::End(EndReason::Quit)));
+                s_tx.blocking_send(Ok(MpvState::End(EndReason::Quit))).ok();
                 return;
             }
             Some(Ok(Event::EndFile(r))) => {
-                let _ = s_tx.blocking_send(Ok(MpvState::End(r.into())));
+                s_tx.blocking_send(Ok(MpvState::End(r.into()))).ok();
                 return;
             }
             Some(Err(e)) => {
-                let _ = s_tx.blocking_send(Err(e.into()));
+                s_tx.blocking_send(Err(e.into())).ok();
                 return;
             }
             Some(Ok(Event::PropertyChange { name, change, .. })) => {
@@ -312,7 +319,7 @@ fn wait_for_end(
                     _ => (),
                 };
 
-                let _ = s_tx.blocking_send(Ok(MpvState::Play(state.clone())));
+                s_tx.blocking_send(Ok(MpvState::Play(state.clone()))).ok();
             }
             Some(Ok(_)) => (),
         }
