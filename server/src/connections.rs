@@ -56,6 +56,20 @@ async fn handle_rejections(
     }
 }
 
+async fn throw_away(mut from_cast: Receiver, canceltoken: CancellationToken) -> Receiver {
+    log::debug!("throwing away messages from caster");
+    loop {
+        match from_cast.recv().cancellable(&canceltoken).await {
+            None => break from_cast,
+            Some(Some(msg)) => log::trace!("Threw away msg: {:?}", msg),
+            Some(None) => {
+                log::warn!("caster seems to be down");
+                break from_cast;
+            }
+        };
+    }
+}
+
 async fn handle_accept(
     tcp_stream: TcpStream,
     addr: SocketAddr,
@@ -123,8 +137,10 @@ pub async fn connections_actor(
     log::info!("Listening on: {}", addr);
 
     loop {
+        let throw_token = canceltoken.child_token();
+        let throw_handle = tokio::spawn(throw_away(from_cast, throw_token.clone()));
+
         log::debug!("Waiting for a new connection to accept...");
-        // TODO: listen on `from_cast` and throw away all messages
         let (stream, addr) = match listener.accept().cancellable(&canceltoken).await {
             Some(x) => x.context("failed to accept tcp stream")?,
             None => {
@@ -132,6 +148,10 @@ pub async fn connections_actor(
                 break;
             }
         };
+
+        log::debug!("Cancelling and waiting for throw_handle to exit...");
+        throw_token.cancel();
+        from_cast = throw_handle.await.expect("throw_handle panicked"); // TODO: resume panic?
 
         let rejections_token = canceltoken.child_token();
         let rej_handle =
