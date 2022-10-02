@@ -16,10 +16,10 @@ pub async fn signal_received() {
     let mut sigterm = signal(SignalKind::terminate()).expect("sigterm signal failed");
     select! {
         _ = sigint.recv() => {
-            log::debug!("received sigint");
+            log::debug!("Received sigint");
         },
         _ = sigterm.recv() => {
-            log::debug!("received sigterm");
+            log::debug!("Received sigterm");
         }
     }
 }

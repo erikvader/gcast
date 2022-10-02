@@ -23,13 +23,13 @@ async fn handle_msg(msg: Message, front: &mut FrontJob) {
             if let Some(string) = path.to_str() {
                 try_start_mpv(front, string.to_string());
             } else {
-                log::error!("the path '{:?}' is not a valid UTF-8 string", path);
+                log::error!("The path '{:?}' is not a valid UTF-8 string", path);
             }
         }
         MpvStart(mpvstart::Url(url)) => try_start_mpv(front, url),
         MpvStart(mpvstart::Stop) => {
             if !front.is_mpv() {
-                log::warn!("mpv is not running, ignoring stop request");
+                log::warn!("Mpv is not running, ignoring stop request");
             } else {
                 log::info!("Killing mpv");
                 front.kill().await;
@@ -48,7 +48,7 @@ async fn handle_msg(msg: Message, front: &mut FrontJob) {
         }
         SpotifyStart(spotifystart::Stop) => {
             if !front.is_spotify() {
-                log::warn!("spotify is not running, ignoring stop request");
+                log::warn!("Spotify is not running, ignoring stop request");
             } else {
                 log::info!("Killing spotify");
                 front.kill().await;
@@ -80,7 +80,7 @@ pub async fn caster_actor(
         select! {
             Some(msg) = from_conn.recv() => handle_msg(msg, &mut front).await,
             _ = canceltoken.cancelled() => {
-                log::debug!("caster got cancelled");
+                log::debug!("Caster got cancelled");
                 break;
             },
             _ = front.wait() => {

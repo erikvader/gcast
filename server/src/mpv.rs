@@ -178,10 +178,10 @@ pub fn mpv(path: &str) -> MpvResult<(MpvHandle, MpvStateHandle)> {
                 let mut h_rx = h_rx;
                 barrier.wait();
                 while let Some((cmd, tx_res)) = h_rx.blocking_recv() {
-                    log::debug!("executing mpv command: {}", cmd);
+                    log::debug!("Executing mpv command: {}", cmd);
                     let res = mpv.command(cmd, &[]); // NOTE: args is just appended to cmd
                     if let Err(e) = &res {
-                        log::error!("mpv errored: {}", e); // TODO: remove since handle probably also will log?
+                        log::error!("Mpv errored: {}", e); // TODO: remove since handle probably also will log?
                     }
                     tx_res.send(res.map_err(|e| e.into())).ok();
                 }
@@ -263,7 +263,7 @@ fn wait_for_play(
                 return None;
             }
             Some(Ok(Event::PropertyChange { name, change, .. })) => {
-                log::debug!("change: {} to {:?}", name, change);
+                log::debug!("Change: {} to {:?}", name, change);
                 match name {
                     "pause" => partial.pause(take_flag(&change)),
                     "playback-time" => partial.playback_time(take_double(&change)),

@@ -41,16 +41,16 @@ impl Agent for WS {
                         link2.send_message(WSOutput::Conn(true));
                     }
                     Err(WebSocketError::ConnectionClose(e)) => {
-                        log::warn!("websocket disconnected: {:?}", e);
+                        log::warn!("Websocket disconnected: {:?}", e);
                         link2.send_message(WSOutput::Conn(false));
                     }
                     Err(e) => {
-                        log::error!("failed to read: {}", e);
+                        log::error!("Failed to read: {}", e);
                     }
                 }
             }
             link2.send_message(WSOutput::Conn(false));
-            log::info!("websocket closed");
+            log::info!("Websocket closed");
         });
 
         let (ctx, mut crx) = mpsc::channel::<Self::Input>(1000);
@@ -74,10 +74,10 @@ impl Agent for WS {
                         // link2.send_message(WSOutput::Conn(true));
                     }
                     Err(WebSocketError::ConnectionClose(e)) => {
-                        log::info!("websocket disconnected: {:?}", e);
+                        log::info!("Websocket disconnected: {:?}", e);
                         link2.send_message(WSOutput::Conn(false));
                     }
-                    Err(e) => log::error!("failed to send: {}", e),
+                    Err(e) => log::error!("Failed to send: {}", e),
                 }
             }
             link2.send_message(WSOutput::Conn(false));
@@ -105,7 +105,7 @@ impl Agent for WS {
 
     fn handle_input(&mut self, msg: Self::Input, _id: yew_agent::HandlerId) {
         if let Err(e) = self.tx.try_send(msg) {
-            log::error!("failed to send to WS: {}", e);
+            log::error!("Failed to send to WS: {}", e);
         }
     }
 
@@ -128,7 +128,7 @@ fn try_to_client(msg: &GlooMsg) -> Option<protocol::Message> {
                 if m.is_to_client() {
                     return Some(m);
                 } else {
-                    log::warn!("message not meant for client: {:?}", m);
+                    log::warn!("Message not meant for client: {:?}", m);
                 }
             }
         },

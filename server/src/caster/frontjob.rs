@@ -70,14 +70,14 @@ impl FrontJob {
             Mpv(j) => j.send_status().await,
         };
         if res.is_err() {
-            log::error!("couldn't request for status, job is down");
+            log::error!("Couldn't request for status, job is down");
         }
     }
 
     pub async fn send_mpv_ctrl(&self, ctrl: MpvControl) {
         if let Variant::Mpv(j) = &self.var {
             if j.send_ctrl(ctrl).await.is_err() {
-                log::error!("couldn't send ctrl, job is down");
+                log::error!("Couldn't send ctrl, job is down");
             }
         } else {
             log::warn!(
@@ -151,17 +151,17 @@ async fn spotify(mut rx: mpsc::Receiver<JobMsg<()>>, to_conn: Sender) -> io::Res
             msg = rx.recv() => {
                 match msg {
                     None => {
-                        log::debug!("signal to terminate spotify received");
+                        log::debug!("Signal to terminate spotify received");
                         proc.kill();
                         let status = proc.wait().await?;
-                        log::debug!("spotify process exited with: {}", status);
+                        log::debug!("Spotify process exited with: {}", status);
                         break Ok(());
                     }
                     Some(_) => send_to_conn(&to_conn, front::Spotify).await,
                 }
             },
             res = proc.wait() => {
-                log::warn!("spotify process exited early with: {}", res?);
+                log::warn!("Spotify process exited early with: {}", res?);
                 break Ok(());
             },
         }
@@ -181,7 +181,7 @@ async fn mpv(
             msg = rx.recv() => {
                 match msg {
                     None => {
-                        log::debug!("mpv exit signal received");
+                        log::debug!("Mpv exit signal received");
                         handle.quit().await?;
                         break;
                     },
@@ -207,6 +207,6 @@ async fn mpv(
 
 async fn send_to_conn(to_conn: &Sender, msg: impl ToMessage) {
     if to_conn.send(msg.to_message()).await.is_err() {
-        log::warn!("seems like connections is down");
+        log::warn!("Seems like connections is down");
     }
 }

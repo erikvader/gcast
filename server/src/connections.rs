@@ -42,7 +42,7 @@ async fn handle_rejections(
         let (stream, addr) = match listener.accept().cancellable(&canceltoken).await {
             Some(x) => x.context("failed to accept tcp stream")?,
             None => {
-                log::debug!("handle_rejections got cancelled");
+                log::debug!("Handle_rejections got cancelled");
                 return Ok(listener);
             }
         };
@@ -57,13 +57,13 @@ async fn handle_rejections(
 }
 
 async fn throw_away(mut from_cast: Receiver, canceltoken: CancellationToken) -> Receiver {
-    log::debug!("throwing away messages from caster");
+    log::debug!("Throwing away messages from caster");
     loop {
         match from_cast.recv().cancellable(&canceltoken).await {
             None => break from_cast,
             Some(Some(msg)) => log::trace!("Threw away msg: {:?}", msg),
             Some(None) => {
-                log::warn!("caster seems to be down");
+                log::warn!("Caster seems to be down");
                 break from_cast;
             }
         };
@@ -98,7 +98,7 @@ async fn handle_accept(
                 }
             },
             _ = canceltoken.cancelled() => {
-                log::debug!("handle_accept got cancelled");
+                log::debug!("Handle_accept got cancelled");
                 break;
             },
             Some(msg) = from_cast.recv() => ws_send(msg, &mut sink).await?,

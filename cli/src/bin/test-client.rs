@@ -46,7 +46,7 @@ fn main() {
     let (mut socket, response) = connect(target_url).expect("connect failed");
 
     log::info!("Connected!");
-    log::debug!("response: {:?}", response);
+    log::debug!("Response: {:?}", response);
 
     if !read_seat(&mut socket) {
         return;
@@ -84,7 +84,7 @@ fn main() {
 
     socket.close(None).expect("failed to close");
     // std::thread::sleep(std::time::Duration::from_secs(5));
-    log::info!("bye");
+    log::info!("Bye");
 }
 
 fn parse_tung_msg(msg: tungstenite::Message) -> protocol::Message {
@@ -103,11 +103,11 @@ fn read_seat(socket: &mut WS) -> bool {
         let msg = parse_tung_msg(socket.read_message().expect("could not read message"));
         match msg.take_to_client() {
             ToClient::Seat(seat::Accept) => {
-                log::info!("got accepted");
+                log::info!("Got accepted");
                 break true;
             }
             ToClient::Seat(seat::Reject) => {
-                log::warn!("got rejected");
+                log::warn!("Got rejected");
                 break false;
             }
             _ => (),
@@ -128,7 +128,7 @@ fn send_read_state(socket: &mut WS) {
         let msg = parse_tung_msg(socket.read_message().expect("could not read message"));
         match msg.take_to_client() {
             ToClient::Front(f) => {
-                log::info!("got state {:?}", f);
+                log::info!("Got state {:?}", f);
                 break;
             }
             _ => (),
