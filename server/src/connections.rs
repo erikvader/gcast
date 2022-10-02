@@ -78,18 +78,8 @@ async fn handle_accept(
                         log::info!("Client closed");
                         break;
                     },
-                    Some(TungMsg::Binary(msg)) => {
-                        match Message::deserialize(&msg) {
-                            Err(e) => log::warn!("Failed to deserialize message {:?} cuz {}", &msg, e),
-                            Ok(m) if m.is_to_server() => if to_cast.send(m).await.is_err() {
-                                log::warn!("Seems like caster is down");
-                            },
-                            Ok(m) => log::warn!("Received a message to client: {:?}", m),
-                        }
-                    }
-                    Some(msg) => {
-                        log::warn!("Got a non-binary message {:?}", msg);
-                    }
+                    Some(TungMsg::Binary(msg)) => handle_binary(&msg, to_cast).await,
+                    Some(msg) => log::warn!("Got a non-binary message {:?}", msg),
                 }
             },
             _ = canceltoken.cancelled() => {
@@ -109,6 +99,18 @@ async fn handle_accept(
     }
     log::info!("Disconnected: {}", addr);
     Ok(())
+}
+
+async fn handle_binary(msg: &[u8], to_cast: &mut Sender) {
+    match Message::deserialize(&msg) {
+        Err(e) => log::warn!("Failed to deserialize message {:?} cuz {}", &msg, e),
+        Ok(m) if m.is_to_server() => {
+            if to_cast.send(m).await.is_err() {
+                log::warn!("Seems like caster is down");
+            }
+        }
+        Ok(m) => log::warn!("Received a message to client: {:?}", m),
+    }
 }
 
 pub async fn connections_actor(
@@ -132,7 +134,8 @@ pub async fn connections_actor(
         };
 
         let rejections_token = canceltoken.child_token();
-        let handle = tokio::spawn(handle_rejections(listener, rejections_token.clone()));
+        let rej_handle =
+            tokio::spawn(handle_rejections(listener, rejections_token.clone()));
         if let Err(e) = handle_accept(
             stream,
             addr,
@@ -147,8 +150,9 @@ pub async fn connections_actor(
 
         log::debug!("Cancelling and waiting for handle_rejections to exit...");
         rejections_token.cancel();
-        listener = handle
+        listener = rej_handle
             .await
+            // TODO: resume panic?
             .expect("rejections handler panicked")
             .context("handle_rejections failed to give back TcpListener")?;
     }
