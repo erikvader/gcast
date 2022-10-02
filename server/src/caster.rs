@@ -18,7 +18,7 @@ async fn handle_msg(msg: Message, front: &mut FrontJob) {
     use ToServer::*;
     match msg.take_to_server() {
         SendStatus(_) => front.send_status().await,
-        MpvControl(_) => todo!(),
+        MpvControl(ctrl) => front.send_mpv_ctrl(ctrl).await,
         MpvStart(mpvstart::File(path)) => {
             if let Some(string) = path.to_str() {
                 try_start_mpv(front, string.to_string());

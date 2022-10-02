@@ -1,15 +1,15 @@
-use std::path::PathBuf;
+use std::{io, path::PathBuf};
 
 use protocol::{
     to_client::{self, front},
     to_server::{mpvcontrol::MpvControl, mpvstart},
     Message, ToMessage,
 };
-use tokio::{select, sync::mpsc};
+use tokio::{join, select, sync::mpsc};
 
 use crate::{
     job::{Job, JobMpsc, JobMsg},
-    mpv,
+    mpv::{self, MpvError, MpvResult},
     process::Process,
     Sender,
 };
@@ -74,6 +74,20 @@ impl FrontJob {
         }
     }
 
+    pub async fn send_mpv_ctrl(&self, ctrl: MpvControl) {
+        if let Variant::Mpv(j) = &self.var {
+            if j.send_ctrl(ctrl).await.is_err() {
+                log::error!("couldn't send ctrl, job is down");
+            }
+        } else {
+            log::warn!(
+                "Trying to send '{:?}' but mpv is not active, '{}' is",
+                ctrl,
+                self.name()
+            );
+        }
+    }
+
     pub fn is_something(&self) -> bool {
         use Variant::*;
         match self.var {
@@ -102,7 +116,7 @@ impl FrontJob {
         let to_conn = self.to_conn.clone();
         self.var = Variant::Spotify(JobMpsc::start(|rx| async move {
             if let Err(e) = spotify(rx, to_conn).await {
-                log::error!("Starting spotify failed with: {:?}", e);
+                log::error!("Starting spotify failed with: {}", e);
             }
         }));
     }
@@ -110,8 +124,8 @@ impl FrontJob {
     pub fn start_mpv(&mut self, file: String) {
         let to_conn = self.to_conn.clone();
         self.var = Variant::Mpv(JobMpsc::start(|rx| async move {
-            if let Err(e) = mpv(rx, file, to_conn).await {
-                log::error!("Starting mpv failed with: {:?}", e);
+            if let Err(e) = mpv(rx, &file, to_conn).await {
+                log::error!("Starting mpv failed with: {}", e);
             }
         }));
     }
@@ -128,10 +142,7 @@ impl Variant {
     }
 }
 
-async fn spotify(
-    mut rx: mpsc::Receiver<JobMsg<()>>,
-    to_conn: Sender,
-) -> anyhow::Result<()> {
+async fn spotify(mut rx: mpsc::Receiver<JobMsg<()>>, to_conn: Sender) -> io::Result<()> {
     send_to_conn(&to_conn, front::Spotify).await;
     let mut proc = Process::start("spotify")?;
 
@@ -159,18 +170,37 @@ async fn spotify(
 
 async fn mpv(
     mut rx: mpsc::Receiver<JobMsg<MpvControl>>,
-    file: String,
+    file: &str,
     to_conn: Sender,
-) -> anyhow::Result<()> {
-    send_to_conn(&to_conn, front::mpv::Load).await;
+) -> MpvResult<()> {
     let (handle, mut states) = mpv::mpv(&file)?;
-    // TODO:
+
+    let mut last_state = front::mpv::Load;
     loop {
         select! {
-            _ = rx.recv() => {},
-            _ = states.next() => (),
+            msg = rx.recv() => {
+                match msg {
+                    None => {
+                        log::debug!("mpv exit signal received");
+                        handle.quit().await?;
+                        break;
+                    },
+                    Some(JobMsg::SendStatus) => send_to_conn(&to_conn, last_state.clone()).await,
+                    Some(JobMsg::Ctrl(ctrl)) => handle.command(&ctrl).await?,
+                }
+            },
+            state = states.next() => {
+                match state.map(|s| s.to_client_state()) {
+                    Ok(Some(s)) => {
+                        last_state = s.clone();
+                        send_to_conn(&to_conn, s).await;
+                    }
+                    Ok(None) => (),
+                    Err(MpvError::Exited) => break,
+                    Err(e) => return Err(e),
+                }
+            }
         }
-        break;
     }
     Ok(())
 }

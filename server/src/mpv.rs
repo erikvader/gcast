@@ -14,9 +14,9 @@ use protocol::{
 use tokio::sync::{mpsc, oneshot};
 
 pub use self::errors::*;
+pub type MpvResult<T> = Result<T, MpvError>;
 
 type Command = &'static str;
-type MpvResult<T> = Result<T, MpvError>;
 type StateRcv = mpsc::Receiver<MpvResult<MpvState>>;
 type StateSnd = mpsc::Sender<MpvResult<MpvState>>;
 type HandleResp = oneshot::Sender<MpvResult<()>>;

@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use protocol::{
     to_client::{seat, ToClient},
-    to_server::{sendstatus, spotifystart},
+    to_server::{mpvcontrol, mpvstart, sendstatus, spotifystart},
     Message, ToMessage,
 };
 use tungstenite::connect;
@@ -10,12 +10,17 @@ use tungstenite::connect;
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+    #[arg(long)]
+    listen: bool,
 }
 
 #[derive(Subcommand, Clone)]
 enum Commands {
     SpotifyStart,
     SpotifyStop,
+    MpvPlay { file: String },
+    MpvStop,
+    MpvPause,
 }
 
 fn init_logger() {
@@ -52,6 +57,9 @@ fn main() {
     let tosend = match &cli.command {
         Commands::SpotifyStart => spotifystart::Start.to_message(),
         Commands::SpotifyStop => spotifystart::Stop.to_message(),
+        Commands::MpvPlay { file } => mpvstart::Url(file.clone()).to_message(),
+        Commands::MpvStop => mpvstart::Stop.to_message(),
+        Commands::MpvPause => mpvcontrol::TogglePause.to_message(),
     };
     log::info!("Sending: {:?}", tosend);
     let data = tosend.serialize().expect("serialization failed");
@@ -60,16 +68,18 @@ fn main() {
         .expect("could not send");
     log::info!("Sent");
 
-    log::info!("Listening for all replies...");
-    loop {
-        let msg = socket.read_message().expect("could not read");
-        log::info!("Received raw: {:?}", msg);
+    if cli.listen {
+        log::info!("Listening for all replies...");
+        loop {
+            let msg = socket.read_message().expect("could not read");
+            log::info!("Received raw: {:?}", msg);
 
-        if msg.is_close() {
-            break;
+            if msg.is_close() {
+                break;
+            }
+
+            log::info!("Received parsed: {:?}", parse_tung_msg(msg));
         }
-
-        log::info!("Received parsed: {:?}", parse_tung_msg(msg));
     }
 
     socket.close(None).expect("failed to close");
