@@ -1,3 +1,5 @@
+pub mod fscontrol;
+pub mod fsstart;
 pub mod mpvcontrol;
 pub mod mpvstart;
 pub mod sendstatus;
@@ -9,5 +11,7 @@ message! {
         MpvControl(mpvcontrol::MpvControl),
         MpvStart(mpvstart::MpvStart),
         SpotifyStart(spotifystart::SpotifyStart),
+        FsStart(fsstart::FsStart),
+        FsControl(fscontrol::FsControl),
     }
 }

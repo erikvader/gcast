@@ -1,3 +1,4 @@
+pub mod filesearch;
 pub mod mpv;
 
 message! {
@@ -5,6 +6,6 @@ message! {
         None,
         Spotify,
         Mpv(mpv::Mpv),
-        FileSearch, // list of search results, string that produced those results, last cache date, whether cache is updating and its progress
+        FileSearch(filesearch::FileSearch),
     }
 }
