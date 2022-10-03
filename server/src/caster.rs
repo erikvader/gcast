@@ -19,14 +19,9 @@ async fn handle_msg(msg: Message, front: &mut FrontJob) {
     match msg.take_to_server() {
         SendStatus(_) => front.send_status().await,
         MpvControl(ctrl) => front.send_mpv_ctrl(ctrl).await,
-        MpvStart(mpvstart::File(path)) => {
-            if let Some(string) = path.to_str() {
-                try_start_mpv(front, string.to_string());
-            } else {
-                log::error!("The path '{:?}' is not a valid UTF-8 string", path);
-            }
+        MpvStart(mpvstart::File(s)) | MpvStart(mpvstart::Url(s)) => {
+            try_start_mpv(front, s)
         }
-        MpvStart(mpvstart::Url(url)) => try_start_mpv(front, url),
         MpvStart(mpvstart::Stop) => {
             if !front.is_mpv() {
                 log::warn!("Mpv is not running, ignoring stop request");
@@ -54,6 +49,7 @@ async fn handle_msg(msg: Message, front: &mut FrontJob) {
                 front.kill().await;
             }
         }
+        _ => todo!(),
     }
 }
 
