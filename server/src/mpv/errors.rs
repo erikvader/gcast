@@ -48,6 +48,8 @@ pub enum MpvError {
     Mpv(#[from] SafeLibMpvError),
     #[error("Mpv::Exited: thread is not running anymore")]
     Exited,
+    #[error("Mpv thread already running")]
+    AlreadyRunning,
 }
 
 impl From<libmpv::Error> for MpvError {

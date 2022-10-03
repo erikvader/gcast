@@ -1,6 +1,9 @@
 pub mod errors;
 
-use std::thread;
+use std::{
+    sync::atomic::{AtomicBool, Ordering},
+    thread,
+};
 
 use derive_builder::Builder;
 use libmpv::{
@@ -23,6 +26,8 @@ type HandleResp = oneshot::Sender<MpvResult<()>>;
 type HandleSnd = mpsc::Sender<(Command, HandleResp)>;
 
 const EV_CTX_WAIT: f64 = 5.0;
+
+static MPV_THREAD_ON: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug)]
 pub struct MpvHandle {
@@ -158,6 +163,10 @@ fn observe_some_properties(ctx: &libmpv::events::EventContext<'_>) -> libmpv::Re
 }
 
 pub fn mpv(path: &str) -> MpvResult<(MpvHandle, MpvStateHandle)> {
+    if MPV_THREAD_ON.swap(true, Ordering::SeqCst) {
+        return Err(MpvError::AlreadyRunning);
+    }
+
     let (h_tx, h_rx): (HandleSnd, _) = mpsc::channel(crate::CHANNEL_SIZE);
     let (s_tx, s_rx): (_, StateRcv) = mpsc::channel(crate::CHANNEL_SIZE);
 
@@ -209,6 +218,8 @@ pub fn mpv(path: &str) -> MpvResult<(MpvHandle, MpvStateHandle)> {
                 log::debug!("Mpv state thread shut down");
             });
         });
+
+        MPV_THREAD_ON.store(false, Ordering::SeqCst);
         log::debug!("Mpv thread shut down");
     });
 
