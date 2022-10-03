@@ -1077,6 +1077,7 @@ dependencies = [
  "libmpv",
  "log",
  "protocol",
+ "searcher",
  "simplelog",
  "thiserror",
  "tokio",
