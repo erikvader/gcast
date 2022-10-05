@@ -9,7 +9,7 @@ use tokio::{join, select, sync::mpsc};
 
 use crate::{
     filer::{self, FilerError, FilerResult},
-    job::{Job, JobMpsc, JobMsg, JobOne},
+    job::{Job, JobMpsc, JobMsg},
     mpv::{self, MpvError, MpvResult},
     process::Process,
     Sender,

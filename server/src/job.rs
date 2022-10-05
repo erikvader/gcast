@@ -1,4 +1,3 @@
-use crate::repeatable_oneshot as RO;
 use std::future::Future;
 use tokio::{
     sync::mpsc,
@@ -20,7 +19,6 @@ pub enum JobMsg<T> {
 pub struct JobExited;
 
 pub type JobMpsc<M> = Job<mpsc::Sender<JobMsg<M>>>;
-pub type JobOne<M> = Job<RO::Sender<JobMsg<M>>>; // TODO: remove
 
 impl<T> Job<T> {
     fn new(tx: T, handle: JoinHandle<()>) -> Self {
@@ -70,36 +68,6 @@ impl<M> JobMpsc<M> {
         O: FnOnce(mpsc::Receiver<JobMsg<M>>) -> F,
     {
         let (tx, rx) = mpsc::channel(crate::CHANNEL_SIZE);
-        Self::new(tx, task::spawn(task(rx)))
-    }
-
-    pub async fn send_ctrl(&self, msg: M) -> Result<(), JobExited> {
-        // TODO: figure out a way to avoid copying these lines four times
-        self.tx
-            .as_ref()
-            .ok_or(JobExited)?
-            .send(JobMsg::Ctrl(msg))
-            .await
-            .map_err(|_| JobExited)
-    }
-
-    pub async fn send_status(&self) -> Result<(), JobExited> {
-        self.tx
-            .as_ref()
-            .ok_or(JobExited)?
-            .send(JobMsg::SendStatus)
-            .await
-            .map_err(|_| JobExited)
-    }
-}
-
-impl<M> JobOne<M> {
-    pub fn start<F, O>(task: O) -> Self
-    where
-        F: Future<Output = ()> + Send + 'static,
-        O: FnOnce(RO::Receiver<JobMsg<M>>) -> F,
-    {
-        let (tx, rx) = RO::repeat_oneshot();
         Self::new(tx, task::spawn(task(rx)))
     }
 
