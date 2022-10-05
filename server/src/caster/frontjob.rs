@@ -179,38 +179,42 @@ async fn mpv(
     file: &str,
     to_conn: Sender,
 ) -> MpvResult<()> {
-    let (handle, mut states) = mpv::mpv(&file)?;
+    let mut handle = mpv::mpv(&file)?;
 
     let mut last_state = front::mpv::Load;
-    loop {
+    let retval = loop {
         select! {
             msg = rx.recv() => {
                 match msg {
                     None => {
                         log::debug!("Mpv exit signal received");
-                        handle.quit().await?;
-                        // TODO: wait for mpv to exit
-                        break;
+                        handle.quit().await.ok();
+                        break Ok(());
                     },
                     Some(JobMsg::SendStatus) => send_to_conn(&to_conn, last_state.clone()).await,
-                    Some(JobMsg::Ctrl(ctrl)) => handle.command(&ctrl).await?,
+                    Some(JobMsg::Ctrl(ctrl)) => if let Err(e) = handle.command(&ctrl).await {
+                        break Err(e);
+                    },
                 }
             },
-            state = states.next() => {
+            state = handle.next() => {
                 match state.map(|s| s.to_client_state()) {
                     Ok(Some(s)) => {
                         last_state = s.clone();
                         send_to_conn(&to_conn, s).await;
                     }
                     Ok(None) => (),
-                    Err(MpvError::Exited) => break,
-                    Err(e) => return Err(e),
+                    Err(MpvError::Exited) => break Ok(()),
+                    Err(e) => {
+                        break Err(e);
+                    }
                 }
             }
         }
-    }
+    };
 
-    Ok(())
+    handle.wait_until_closed().await;
+    retval
 }
 
 async fn filer(

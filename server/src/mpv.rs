@@ -1,7 +1,10 @@
 pub mod errors;
 
 use std::{
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     thread,
 };
 
@@ -14,7 +17,7 @@ use protocol::{
     to_client::front::mpv::{Mpv as ClientMpv, PlayState},
     to_server::mpvcontrol::MpvControl,
 };
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, Notify};
 
 pub use self::errors::*;
 pub type MpvResult<T> = Result<T, MpvError>;
@@ -29,15 +32,11 @@ const EV_CTX_WAIT: f64 = 5.0;
 
 static MPV_THREAD_ON: AtomicBool = AtomicBool::new(false);
 
-// TODO: merge both handles
 #[derive(Debug)]
 pub struct MpvHandle {
     tx: HandleSnd,
-}
-
-#[derive(Debug)]
-pub struct MpvStateHandle {
     rx: StateRcv,
+    closed_notify: Arc<Notify>,
 }
 
 #[derive(Debug)]
@@ -80,12 +79,6 @@ impl From<u32> for EndReason {
             5 => Redirect,
             x => Unknown(x),
         }
-    }
-}
-
-impl MpvStateHandle {
-    pub async fn next(&mut self) -> MpvResult<MpvState> {
-        self.rx.recv().await.unwrap_or(Err(MpvError::Exited))
     }
 }
 
@@ -150,6 +143,17 @@ impl MpvHandle {
     pub async fn quit(&self) -> MpvResult<()> {
         self.command_str("quit").await
     }
+
+    pub async fn next(&mut self) -> MpvResult<MpvState> {
+        self.rx.recv().await.unwrap_or(Err(MpvError::Exited))
+    }
+
+    pub async fn wait_until_closed(self) {
+        drop(self.tx);
+        drop(self.rx);
+        log::debug!("Waiting for mpv threads to close");
+        self.closed_notify.notified().await;
+    }
 }
 
 fn observe_some_properties(ctx: &libmpv::events::EventContext<'_>) -> libmpv::Result<()> {
@@ -163,13 +167,15 @@ fn observe_some_properties(ctx: &libmpv::events::EventContext<'_>) -> libmpv::Re
     Ok(())
 }
 
-pub fn mpv(path: &str) -> MpvResult<(MpvHandle, MpvStateHandle)> {
+pub fn mpv(path: &str) -> MpvResult<MpvHandle> {
     if MPV_THREAD_ON.swap(true, Ordering::SeqCst) {
         return Err(MpvError::AlreadyRunning);
     }
 
     let (h_tx, h_rx): (HandleSnd, _) = mpsc::channel(crate::CHANNEL_SIZE);
     let (s_tx, s_rx): (_, StateRcv) = mpsc::channel(crate::CHANNEL_SIZE);
+    let closed_notify = Arc::new(Notify::new());
+    let closed_notify2 = Arc::clone(&closed_notify);
 
     let mpv = Mpv::with_initializer(|x| {
         x.set_property("force-window", "immediate")?;
@@ -220,11 +226,16 @@ pub fn mpv(path: &str) -> MpvResult<(MpvHandle, MpvStateHandle)> {
             });
         });
 
+        closed_notify.notify_one();
         MPV_THREAD_ON.store(false, Ordering::SeqCst);
         log::debug!("Mpv thread shut down");
     });
 
-    Ok((MpvHandle { tx: h_tx }, MpvStateHandle { rx: s_rx }))
+    Ok(MpvHandle {
+        tx: h_tx,
+        rx: s_rx,
+        closed_notify: closed_notify2,
+    })
 }
 
 fn take_flag(data: &PropertyData) -> bool {
