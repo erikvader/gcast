@@ -1,8 +1,10 @@
 use std::{thread, time::Duration};
 
-use super::{CacheRcv, SearchRcv, StateSnd};
+use crate::repeatable_oneshot::multiplex::MultiplexReceiver;
 
-pub(super) fn run_filer(h_rx: SearchRcv, s_tx: StateSnd, c_rx: CacheRcv) {
+use super::StateSnd;
+
+pub(super) fn run_filer(rx: MultiplexReceiver<String, ()>, tx: StateSnd) {
     loop {
         log::debug!("run_filer");
         thread::sleep(Duration::from_secs(1));

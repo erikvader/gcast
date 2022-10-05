@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tokio::sync::{Mutex, Notify};
+use tokio::sync::{mpsc, Mutex, Notify};
 
 #[derive(thiserror::Error, Debug)]
 #[error("Other end closed, nowhere to send or nothing to receive")]
@@ -63,5 +63,70 @@ impl<T> Receiver<T> {
 
     pub fn is_closed(&self) -> bool {
         Arc::strong_count(&self.data) == 1
+    }
+}
+
+pub mod multiplex {
+    use super::*;
+
+    pub enum Either<T1, T2> {
+        Left(T1),
+        Right(T2),
+    }
+
+    pub struct MultiplexReceiver<T1, T2> {
+        rx: mpsc::Receiver<Either<T1, T2>>,
+        notify: Arc<Notify>,
+    }
+
+    impl<T1, T2> MultiplexReceiver<T1, T2> {
+        pub fn blocking_recv(&mut self) -> Option<Either<T1, T2>> {
+            self.notify.notify_one();
+            self.rx.blocking_recv()
+        }
+    }
+
+    pub fn multiplex<T1, T2>(
+        left: Receiver<T1>,
+        right: Receiver<T2>,
+    ) -> MultiplexReceiver<T1, T2>
+    where
+        T1: Send + 'static,
+        T2: Send + 'static,
+    {
+        let (tx, rx) = mpsc::channel(1);
+        let notify = Arc::new(Notify::new());
+        let notify2 = Arc::clone(&notify);
+
+        tokio::spawn(async move {
+            let mut l = Box::pin(left.recv());
+            let mut r = Box::pin(right.recv());
+            loop {
+                notify2.notified().await;
+
+                tokio::select! {
+                    x = &mut l => {
+                        match x {
+                            Err(_) => break,
+                            Ok(res) => if tx.send(Either::Left(res)).await.is_err() {
+                                break
+                            }
+                        }
+                        l = Box::pin(left.recv());
+                    }
+                    x = &mut r => {
+                        match x {
+                            Err(_) => break,
+                            Ok(res) => if tx.send(Either::Right(res)).await.is_err() {
+                                break
+                            }
+                        }
+                        r = Box::pin(right.recv());
+                    }
+                }
+            }
+        });
+
+        MultiplexReceiver { rx, notify }
     }
 }

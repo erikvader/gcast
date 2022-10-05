@@ -68,7 +68,8 @@ pub fn filer() -> FilerResult<Handle> {
     let (s_tx, s_rx): (_, StateRcv) = mpsc::channel(crate::CHANNEL_SIZE);
 
     thread::spawn(move || {
-        run_filer::run_filer(h_rx, s_tx, c_rx);
+        let mult = repeatable_oneshot::multiplex::multiplex(h_rx, c_rx);
+        run_filer::run_filer(mult, s_tx);
         FILER_THREAD_ON.store(false, Ordering::SeqCst);
     });
 
