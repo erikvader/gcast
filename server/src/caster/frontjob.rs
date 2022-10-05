@@ -2,13 +2,14 @@ use std::{io, path::PathBuf};
 
 use protocol::{
     to_client::{self, front},
-    to_server::{mpvcontrol::MpvControl, mpvstart},
+    to_server::{fscontrol::FsControl, mpvcontrol::MpvControl, mpvstart},
     Message, ToMessage,
 };
 use tokio::{join, select, sync::mpsc};
 
 use crate::{
-    job::{Job, JobMpsc, JobMsg},
+    filer::{self, FilerError, FilerResult},
+    job::{Job, JobMpsc, JobMsg, JobOne},
     mpv::{self, MpvError, MpvResult},
     process::Process,
     Sender,
@@ -22,7 +23,7 @@ pub struct FrontJob {
 enum Variant {
     Spotify(JobMpsc<()>),
     Mpv(JobMpsc<MpvControl>),
-    // FileSearch(JobOnce<JobMsg<FSControl>>),
+    Filer(JobMpsc<FsControl>),
     None(JobMpsc<()>),
 }
 
@@ -39,6 +40,7 @@ impl FrontJob {
         match &mut self.var {
             Spotify(j) => j.wait().await,
             Mpv(j) => j.wait().await,
+            Filer(j) => j.wait().await,
             None(j) => j.wait().await,
         }
     }
@@ -48,6 +50,7 @@ impl FrontJob {
         match self.var {
             Spotify(_) => "spotify",
             Mpv(_) => "mpv",
+            Filer(_) => "filesearch",
             None(_) => "nothing",
         }
     }
@@ -57,6 +60,7 @@ impl FrontJob {
         match &mut self.var {
             Spotify(j) => j.terminate_wait().await,
             Mpv(j) => j.terminate_wait().await,
+            Filer(j) => j.terminate_wait().await,
             None(j) => j.terminate_wait().await,
         }
         self.var = Variant::none_job(self.to_conn.clone());
@@ -68,6 +72,7 @@ impl FrontJob {
             None(j) => j.send_status().await,
             Spotify(j) => j.send_status().await,
             Mpv(j) => j.send_status().await,
+            Filer(j) => j.send_status().await,
         };
         if res.is_err() {
             log::error!("Couldn't request for status, job is down");
@@ -89,27 +94,19 @@ impl FrontJob {
     }
 
     pub fn is_something(&self) -> bool {
-        use Variant::*;
-        match self.var {
-            None(_) => false,
-            _ => true,
-        }
+        !matches!(self.var, Variant::None(_))
     }
 
     pub fn is_spotify(&self) -> bool {
-        use Variant::*;
-        match self.var {
-            Spotify(_) => true,
-            _ => false,
-        }
+        matches!(self.var, Variant::Spotify(_))
     }
 
     pub fn is_mpv(&self) -> bool {
-        use Variant::*;
-        match self.var {
-            Mpv(_) => true,
-            _ => false,
-        }
+        matches!(self.var, Variant::Mpv(_))
+    }
+
+    pub fn is_filer(&self) -> bool {
+        matches!(self.var, Variant::Filer(_))
     }
 
     pub fn start_spotify(&mut self) {
@@ -126,6 +123,15 @@ impl FrontJob {
         self.var = Variant::Mpv(JobMpsc::start(|rx| async move {
             if let Err(e) = mpv(rx, &file, to_conn).await {
                 log::error!("Starting mpv failed with: {}", e);
+            }
+        }));
+    }
+
+    pub fn start_filer(&mut self) {
+        let to_conn = self.to_conn.clone();
+        self.var = Variant::Filer(JobMpsc::start(|rx| async move {
+            if let Err(e) = filer(rx, to_conn).await {
+                log::error!("Starting filer failed with: {}", e);
             }
         }));
     }
@@ -183,6 +189,7 @@ async fn mpv(
                     None => {
                         log::debug!("Mpv exit signal received");
                         handle.quit().await?;
+                        // TODO: wait for mpv to exit
                         break;
                     },
                     Some(JobMsg::SendStatus) => send_to_conn(&to_conn, last_state.clone()).await,
@@ -202,6 +209,45 @@ async fn mpv(
             }
         }
     }
+
+    Ok(())
+}
+
+async fn filer(
+    mut rx: mpsc::Receiver<JobMsg<FsControl>>,
+    to_conn: Sender,
+) -> FilerResult<()> {
+    let mut handle = filer::filer()?;
+
+    let mut last_state = front::filesearch::FileSearch::default();
+    loop {
+        select! {
+            msg = rx.recv() => {
+                match msg {
+                    None => {
+                        log::debug!("Filer exit signal receiver");
+                        // TODO: handle kill
+                        // TODO: wait for filer to exit
+                        break;
+                    },
+                    Some(JobMsg::SendStatus) => send_to_conn(&to_conn, last_state.clone()).await,
+                    Some(JobMsg::Ctrl(FsControl::Search(s))) => handle.search(s).await?,
+                    Some(JobMsg::Ctrl(FsControl::RefreshCache)) => handle.refresh_cache().await?,
+                }
+            },
+            state = handle.next() => {
+                match state {
+                    Ok(s) => {
+                        last_state = s.clone();
+                        send_to_conn(&to_conn, s).await;
+                    }
+                    Err(FilerError::Exited) => break,
+                    Err(e) => return Err(e),
+                }
+            }
+        }
+    }
+
     Ok(())
 }
 

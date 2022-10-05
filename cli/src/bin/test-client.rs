@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use protocol::{
     to_client::{seat, ToClient},
-    to_server::{mpvcontrol, mpvstart, sendstatus, spotifystart},
+    to_server::{fsstart, mpvcontrol, mpvstart, sendstatus, spotifystart},
     Message, ToMessage,
 };
 use tungstenite::connect;
@@ -18,6 +18,8 @@ struct Cli {
 enum Commands {
     SpotifyStart,
     SpotifyStop,
+    FilerStart,
+    FilerStop,
     MpvPlay { file: String },
     MpvStop,
     MpvPause,
@@ -57,6 +59,8 @@ fn main() {
     let tosend = match &cli.command {
         Commands::SpotifyStart => spotifystart::Start.to_message(),
         Commands::SpotifyStop => spotifystart::Stop.to_message(),
+        Commands::FilerStart => fsstart::Start.to_message(),
+        Commands::FilerStop => fsstart::Stop.to_message(),
         Commands::MpvPlay { file } => mpvstart::Url(file.clone()).to_message(),
         Commands::MpvStop => mpvstart::Stop.to_message(),
         Commands::MpvPause => mpvcontrol::TogglePause.to_message(),

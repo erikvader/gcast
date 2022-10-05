@@ -1,7 +1,7 @@
 mod frontjob;
 
 use protocol::{
-    to_server::{mpvstart, spotifystart, ToServer},
+    to_server::{fsstart, mpvstart, spotifystart, ToServer},
     Message,
 };
 use tokio::select;
@@ -49,7 +49,26 @@ async fn handle_msg(msg: Message, front: &mut FrontJob) {
                 front.kill().await;
             }
         }
-        _ => todo!(),
+        FsStart(fsstart::Start) => {
+            if front.is_something() {
+                log::warn!(
+                    "'{}' is already running, ignoring start request",
+                    front.name()
+                );
+            } else {
+                log::info!("Starting filer");
+                front.start_filer();
+            }
+        }
+        FsStart(fsstart::Stop) => {
+            if !front.is_filer() {
+                log::warn!("Filer is not running, ignoring stop request");
+            } else {
+                log::info!("Killing filer");
+                front.kill().await;
+            }
+        }
+        FsControl(_) => todo!(),
     }
 }
 

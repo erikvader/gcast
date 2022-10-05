@@ -2,6 +2,7 @@ message! {
     enum super::Front, FileSearch {
         Refreshing(Refreshing),
         Results(Results),
+        Init(Init),
     }
 }
 
@@ -14,7 +15,20 @@ message! {
 message! {
     struct FileSearch, Results {
         pub results: Vec<String>,
-        pub last_cache_date: (), // TODO: some kind of date type
         pub query: String,
+    }
+}
+
+message! {
+    struct FileSearch, Init {
+        pub last_cache_date: Option<()>, // TODO: some kind of date type
+    }
+}
+
+impl Default for FileSearch {
+    fn default() -> Self {
+        Self::Init(Init {
+            last_cache_date: None,
+        })
     }
 }

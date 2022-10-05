@@ -29,6 +29,7 @@ const EV_CTX_WAIT: f64 = 5.0;
 
 static MPV_THREAD_ON: AtomicBool = AtomicBool::new(false);
 
+// TODO: merge both handles
 #[derive(Debug)]
 pub struct MpvHandle {
     tx: HandleSnd,

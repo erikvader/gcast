@@ -20,7 +20,7 @@ pub enum JobMsg<T> {
 pub struct JobExited;
 
 pub type JobMpsc<M> = Job<mpsc::Sender<JobMsg<M>>>;
-pub type JobOne<M> = Job<RO::Sender<JobMsg<M>>>;
+pub type JobOne<M> = Job<RO::Sender<JobMsg<M>>>; // TODO: remove
 
 impl<T> Job<T> {
     fn new(tx: T, handle: JoinHandle<()>) -> Self {
