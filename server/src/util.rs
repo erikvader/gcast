@@ -38,3 +38,11 @@ pub async fn join_handle_wait<T>(handle: &mut JoinHandle<T>) -> T {
 pub async fn join_handle_wait_take<T>(mut handle: JoinHandle<T>) -> T {
     join_handle_wait(&mut handle).await
 }
+
+macro_rules! break_err {
+    ($e:expr) => {
+        if let Err(e) = $e {
+            break Err(e);
+        }
+    };
+}

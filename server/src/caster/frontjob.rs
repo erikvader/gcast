@@ -1,15 +1,15 @@
-use std::{io, path::PathBuf};
+use std::io;
 
 use protocol::{
-    to_client::{self, front},
-    to_server::{fscontrol::FsControl, mpvcontrol::MpvControl, mpvstart},
-    Message, ToMessage,
+    to_client::front,
+    to_server::{fscontrol::FsControl, mpvcontrol::MpvControl},
+    ToMessage,
 };
-use tokio::{join, select, sync::mpsc};
+use tokio::{select, sync::mpsc};
 
 use crate::{
     filer::{self, FilerError, FilerResult},
-    job::{Job, JobMpsc, JobMsg},
+    job::{JobMpsc, JobMsg},
     mpv::{self, MpvError, MpvResult},
     process::Process,
     Sender,
@@ -25,6 +25,7 @@ enum Variant {
     Mpv(JobMpsc<MpvControl>),
     Filer(JobMpsc<FsControl>),
     None(JobMpsc<()>),
+    // TODO: View that display all logs? Or send every log message to the client if one is connected?
 }
 
 impl FrontJob {
@@ -192,9 +193,7 @@ async fn mpv(
                         break Ok(());
                     },
                     Some(JobMsg::SendStatus) => send_to_conn(&to_conn, last_state.clone()).await,
-                    Some(JobMsg::Ctrl(ctrl)) => if let Err(e) = handle.command(&ctrl).await {
-                        break Err(e);
-                    },
+                    Some(JobMsg::Ctrl(ctrl)) => break_err!(handle.command(&ctrl).await),
                 }
             },
             state = handle.next() => {
@@ -224,7 +223,7 @@ async fn filer(
     let mut handle = filer::filer()?;
 
     let mut last_state = front::filesearch::FileSearch::default();
-    loop {
+    let retval = loop {
         select! {
             msg = rx.recv() => {
                 match msg {
@@ -232,11 +231,11 @@ async fn filer(
                         log::debug!("Filer exit signal receiver");
                         // TODO: handle kill
                         // TODO: wait for filer to exit
-                        break;
+                        break Ok(());
                     },
                     Some(JobMsg::SendStatus) => send_to_conn(&to_conn, last_state.clone()).await,
-                    Some(JobMsg::Ctrl(FsControl::Search(s))) => handle.search(s).await?,
-                    Some(JobMsg::Ctrl(FsControl::RefreshCache)) => handle.refresh_cache().await?,
+                    Some(JobMsg::Ctrl(FsControl::Search(s))) => break_err!(handle.search(s).await),
+                    Some(JobMsg::Ctrl(FsControl::RefreshCache)) => break_err!(handle.refresh_cache().await),
                 }
             },
             state = handle.next() => {
@@ -245,14 +244,14 @@ async fn filer(
                         last_state = s.clone();
                         send_to_conn(&to_conn, s).await;
                     }
-                    Err(FilerError::Exited) => break,
-                    Err(e) => return Err(e),
+                    Err(FilerError::Exited) => break Ok(()),
+                    Err(e) => break Err(e),
                 }
             }
         }
-    }
+    };
 
-    Ok(())
+    retval
 }
 
 async fn send_to_conn(to_conn: &Sender, msg: impl ToMessage) {
