@@ -1,10 +1,7 @@
 pub mod errors;
 
 use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicBool, Ordering},
     thread,
 };
 
@@ -17,7 +14,12 @@ use protocol::{
     to_client::front::mpv::{Mpv as ClientMpv, PlayState},
     to_server::mpvcontrol::MpvControl,
 };
-use tokio::sync::{mpsc, oneshot, Notify};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task::JoinHandle,
+};
+
+use crate::util::join_handle_wait_take;
 
 pub use self::errors::*;
 pub type MpvResult<T> = Result<T, MpvError>;
@@ -36,7 +38,7 @@ static MPV_THREAD_ON: AtomicBool = AtomicBool::new(false);
 pub struct MpvHandle {
     tx: HandleSnd,
     rx: StateRcv,
-    closed_notify: Arc<Notify>,
+    joinhandle: JoinHandle<()>,
 }
 
 #[derive(Debug)]
@@ -152,7 +154,7 @@ impl MpvHandle {
         drop(self.tx);
         drop(self.rx);
         log::debug!("Waiting for mpv threads to close");
-        self.closed_notify.notified().await;
+        join_handle_wait_take(self.joinhandle).await;
     }
 }
 
@@ -174,8 +176,6 @@ pub fn mpv(path: &str) -> MpvResult<MpvHandle> {
 
     let (h_tx, h_rx): (HandleSnd, _) = mpsc::channel(crate::CHANNEL_SIZE);
     let (s_tx, s_rx): (_, StateRcv) = mpsc::channel(crate::CHANNEL_SIZE);
-    let closed_notify = Arc::new(Notify::new());
-    let closed_notify2 = Arc::clone(&closed_notify);
 
     let mpv = Mpv::with_initializer(|x| {
         x.set_property("force-window", "immediate")?;
@@ -187,7 +187,7 @@ pub fn mpv(path: &str) -> MpvResult<MpvHandle> {
     log::debug!("loading file: {}", path);
     mpv.playlist_load_files(&[(path, FileState::Replace, None)])?;
 
-    thread::spawn(move || {
+    let joinhandle = tokio::task::spawn_blocking(move || {
         let barrier = std::sync::Barrier::new(2);
         thread::scope(|s| {
             s.spawn(|| {
@@ -226,7 +226,6 @@ pub fn mpv(path: &str) -> MpvResult<MpvHandle> {
             });
         });
 
-        closed_notify.notify_one();
         MPV_THREAD_ON.store(false, Ordering::SeqCst);
         log::debug!("Mpv thread shut down");
     });
@@ -234,7 +233,7 @@ pub fn mpv(path: &str) -> MpvResult<MpvHandle> {
     Ok(MpvHandle {
         tx: h_tx,
         rx: s_rx,
-        closed_notify: closed_notify2,
+        joinhandle,
     })
 }
 
