@@ -9,7 +9,7 @@ use protocol::{
     to_client::front::{self, filesearch::FileSearch},
     to_server::fscontrol::FsControl,
 };
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, task::JoinHandle};
 
 use crate::repeatable_oneshot;
 
@@ -36,6 +36,7 @@ pub struct Handle {
     rx: StateRcv,
     tx: SearchSnd,
     cache_tx: CacheSnd,
+    joinhandle: JoinHandle<()>,
 }
 
 impl Handle {
@@ -67,7 +68,7 @@ pub fn filer() -> FilerResult<Handle> {
     let (c_tx, c_rx): (CacheSnd, _) = repeatable_oneshot::repeat_oneshot();
     let (s_tx, s_rx): (_, StateRcv) = mpsc::channel(crate::CHANNEL_SIZE);
 
-    thread::spawn(move || {
+    let joinhandle = tokio::task::spawn_blocking(move || {
         let mult = repeatable_oneshot::multiplex::multiplex(h_rx, c_rx);
         run_filer::run_filer(mult, s_tx);
         FILER_THREAD_ON.store(false, Ordering::SeqCst);
@@ -77,5 +78,6 @@ pub fn filer() -> FilerResult<Handle> {
         rx: s_rx,
         tx: h_tx,
         cache_tx: c_tx,
+        joinhandle,
     })
 }
