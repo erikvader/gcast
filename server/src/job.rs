@@ -4,6 +4,8 @@ use tokio::{
     task::{self, JoinHandle},
 };
 
+use crate::util::join_handle_wait;
+
 pub struct Job<T> {
     handle: Option<JoinHandle<()>>,
     tx: Option<T>,
@@ -45,17 +47,8 @@ impl<T> Job<T> {
         match handle {
             None => (),
             Some(hand) => {
-                match hand.await {
-                    Err(err) if err.is_panic() => {
-                        std::panic::resume_unwind(err.into_panic())
-                    }
-                    Err(err) if err.is_cancelled() => {
-                        unreachable!("There is no way to call abort on the handle")
-                    }
-                    Err(_) => unreachable!("a new variant got introduced"),
-                    Ok(()) => (),
-                }
-                *handle = None;
+                join_handle_wait(hand).await;
+                handle.take();
             }
         }
     }

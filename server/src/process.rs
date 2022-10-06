@@ -7,6 +7,8 @@ use std::{
 };
 use tokio::{pin, process::Command, sync::oneshot, task::JoinHandle, time::timeout};
 
+use crate::util::join_handle_wait;
+
 const SIGTERM_TIMEOUT: u64 = 5;
 
 pub struct Process {
@@ -69,14 +71,7 @@ impl Process {
 
     // cancel safe wait
     pub async fn wait(&mut self) -> IOResult<ExitStatus> {
-        match (&mut self.proc_done).await {
-            Ok(res) => res,
-            Err(je) if je.is_panic() => std::panic::resume_unwind(je.into_panic()),
-            Err(je) if je.is_cancelled() => {
-                unreachable!("`abort` is never called on the `JoinHandle`")
-            }
-            _ => unreachable!("a new variant of `JoinError` has been introduced"),
-        }
+        join_handle_wait(&mut self.proc_done).await
     }
 
     pub fn kill(&mut self) -> bool {

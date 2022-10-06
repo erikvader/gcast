@@ -10,7 +10,10 @@ use tokio::{
 use tokio_tungstenite::tungstenite::Message as TungMsg;
 use tokio_util::sync::CancellationToken;
 
-use crate::{util::FutureCancel, Receiver, Sender};
+use crate::{
+    util::{join_handle_wait_take, FutureCancel},
+    Receiver, Sender,
+};
 
 const PORT: u16 = 1337;
 
@@ -152,7 +155,7 @@ pub async fn connections_actor(
 
         log::debug!("Cancelling and waiting for throw_handle to exit...");
         throw_token.cancel();
-        from_cast = throw_handle.await.expect("throw_handle panicked"); // TODO: resume panic?
+        from_cast = join_handle_wait_take(throw_handle).await;
 
         let rejections_token = canceltoken.child_token();
         let rej_handle =
@@ -171,10 +174,8 @@ pub async fn connections_actor(
 
         log::debug!("Cancelling and waiting for handle_rejections to exit...");
         rejections_token.cancel();
-        listener = rej_handle
+        listener = join_handle_wait_take(rej_handle)
             .await
-            // TODO: resume panic?
-            .expect("rejections handler panicked")
             .context("handle_rejections failed to give back TcpListener")?;
     }
 
