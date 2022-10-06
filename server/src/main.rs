@@ -1,12 +1,12 @@
 mod caster;
 mod connections;
 mod filer;
-mod future_cancel;
 mod job;
 mod mpv;
 mod process;
 mod repeatable_oneshot;
 mod signal;
+mod util;
 
 use futures_util::future::maybe_done;
 use protocol::Message;
