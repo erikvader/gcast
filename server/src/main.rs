@@ -1,6 +1,7 @@
 #[macro_use]
 mod util;
 mod caster;
+mod config;
 mod connections;
 mod filer;
 mod job;
@@ -47,8 +48,9 @@ fn log_actor_error(res: Result<Result<(), anyhow::Error>, JoinError>, name: &str
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    log::info!("Welcome");
     init_logger();
+    log::info!("Welcome");
+    config::init_config();
 
     let (to_cast, from_conn) = mpsc::channel(CHANNEL_SIZE);
     let (to_conn, from_cast) = mpsc::channel(CHANNEL_SIZE);

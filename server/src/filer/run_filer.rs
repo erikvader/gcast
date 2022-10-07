@@ -7,7 +7,10 @@ use std::{
 
 use walkdir::{DirEntry, WalkDir};
 
-use crate::repeatable_oneshot::multiplex::{Either, MultiplexReceiver};
+use crate::{
+    config,
+    repeatable_oneshot::multiplex::{Either, MultiplexReceiver},
+};
 
 use super::StateSnd;
 
@@ -36,10 +39,7 @@ impl Cache {
 }
 
 pub(super) fn run_filer(mut rx: MultiplexReceiver<String, ()>, tx: StateSnd) {
-    let cache_dir = PathBuf::from("~/.cache/gcast");
-    let cache_file = cache_dir.join("file_cache");
-    let conf_dir = PathBuf::from("~/.config/gcast");
-    let conf_file = conf_dir.join("movie_dirs");
+    let cache_file = config::cache_dir().join("files_cache");
 
     let mut cache = match read_cache(&cache_file) {
         Ok(c) => c,
@@ -57,7 +57,7 @@ pub(super) fn run_filer(mut rx: MultiplexReceiver<String, ()>, tx: StateSnd) {
             }
             Some(Either::Left(query)) => todo!(),
             Some(Either::Right(())) => {
-                refresh_cache(&conf_file, &cache_file);
+                refresh_cache(&cache_file);
             }
         }
     }
@@ -111,18 +111,11 @@ fn all_files(
         .filter_map(|res| res.ok())
 }
 
-fn read_config(path: &Path) -> io::Result<Vec<String>> {
-    Ok(read_to_string(path)?
-        .lines()
-        .map(|s| s.to_string())
-        .collect())
-}
-
 fn explode_all(dirs: &[&Path]) -> (Vec<DirEntry>, Vec<DirEntry>) {
     todo!()
 }
 
 // TODO: make this report progress
-fn refresh_cache(config_file: &Path, cache_file: &Path) -> anyhow::Result<Cache> {
+fn refresh_cache(cache_file: &Path) -> anyhow::Result<Cache> {
     todo!()
 }

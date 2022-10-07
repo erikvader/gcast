@@ -11,6 +11,7 @@ futures-util = "0.3"
 async-trait = "0.1"
 
 libc = "0.2"
+dirs = "4.0"
 
 log = "0.4"
 simplelog = "0.12"
