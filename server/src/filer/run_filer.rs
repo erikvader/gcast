@@ -1,10 +1,11 @@
 use std::{
-    fs::{create_dir_all, read_to_string, File},
-    io::{self, ErrorKind},
-    path::{Path, PathBuf},
+    fs::{create_dir_all, File},
+    io::ErrorKind,
+    path::Path,
     time::SystemTime,
 };
 
+use protocol::to_client::front::filesearch;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::{
@@ -16,24 +17,42 @@ use super::StateSnd;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct Cache {
-    files: Vec<String>,
-    updated: SystemTime,
+    files: Vec<CacheEntry>,
+    updated: Option<SystemTime>,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct CacheEntry {
+    path: String,
+    root: usize,
+}
+
+impl CacheEntry {
+    fn new(path: String, root: usize) -> Self {
+        Self { path, root }
+    }
+}
+
+impl AsRef<str> for CacheEntry {
+    fn as_ref(&self) -> &str {
+        &self.path
+    }
 }
 
 impl Default for Cache {
     fn default() -> Self {
         Self {
             files: Vec::new(),
-            updated: std::time::UNIX_EPOCH,
+            updated: None,
         }
     }
 }
 
 impl Cache {
-    fn new(files: Vec<String>) -> Self {
+    fn new(files: Vec<CacheEntry>) -> Self {
         Self {
             files,
-            updated: SystemTime::now(),
+            updated: Some(SystemTime::now()),
         }
     }
 }
@@ -49,6 +68,11 @@ pub(super) fn run_filer(mut rx: MultiplexReceiver<String, ()>, tx: StateSnd) {
         }
     };
 
+    tx.blocking_send(Ok(filesearch::FileSearch::Init(filesearch::Init {
+        last_cache_date: cache.updated,
+    })))
+    .ok();
+
     loop {
         match rx.blocking_recv() {
             None => {
@@ -57,7 +81,11 @@ pub(super) fn run_filer(mut rx: MultiplexReceiver<String, ()>, tx: StateSnd) {
             }
             Some(Either::Left(query)) => todo!(),
             Some(Either::Right(())) => {
-                refresh_cache(&cache_file);
+                cache = refresh_cache(&tx);
+                match write_cache(&cache_file, &cache) {
+                    Ok(()) => (),
+                    Err(e) => log::error!("Failed to write cache cuz: {:?}", e),
+                }
             }
         }
     }
@@ -85,11 +113,9 @@ fn write_cache(path: &Path, contents: &Cache) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn all_files(
-    dirs: impl IntoIterator<Item = impl AsRef<Path>>,
-) -> impl Iterator<Item = String> {
-    dirs.into_iter()
-        .flat_map(|p| WalkDir::new(p))
+fn all_files(dir: impl AsRef<Path>) -> impl Iterator<Item = DirEntry> {
+    WalkDir::new(dir)
+        .into_iter()
         .inspect(|res| {
             if let Err(e) = res {
                 log::error!("Failed to walk: {}", e)
@@ -97,25 +123,81 @@ fn all_files(
         })
         .filter_map(|res| res.ok())
         .filter(|entry| entry.file_type().is_file())
-        .map(|file| {
-            file.path()
-                .to_str()
-                .map(|s| s.to_string())
-                .ok_or_else(|| file)
-        })
-        .inspect(|res| {
-            if let Err(file) = res {
-                log::error!("Failed to convert '{:?}' to a String", file);
+}
+
+fn explode(
+    path: &Path,
+    mut on_file: impl FnMut(DirEntry),
+    mut on_dir: impl FnMut(DirEntry),
+) {
+    for de in WalkDir::new(path).max_depth(1).min_depth(1) {
+        match de {
+            Ok(e) if e.file_type().is_dir() => on_dir(e),
+            Ok(e) if e.file_type().is_file() => on_file(e),
+            Ok(e) => log::warn!("Found file of type '{:?}', ignoring...", e.file_type()),
+            Err(e) => {
+                log::error!("Failed to walk '{}' cuz '{}'", path.display(), e);
             }
-        })
-        .filter_map(|res| res.ok())
+        }
+    }
 }
 
-fn explode_all(dirs: &[&Path]) -> (Vec<DirEntry>, Vec<DirEntry>) {
-    todo!()
+fn refresh_cache(tx: &StateSnd) -> Cache {
+    let mut dirs: Vec<(usize, DirEntry)> = Vec::new();
+    let mut files: Vec<CacheEntry> = Vec::new();
+
+    let mut on_file =
+        |de: DirEntry, i: usize| match de.into_path().into_os_string().into_string() {
+            Ok(path) => files.push(CacheEntry::new(path, i)),
+            Err(path) => log::error!("Failed to convert '{:?} to a String", path),
+        };
+
+    {
+        let total_roots = config::root_dirs().len();
+        for (i, root) in config::root_dirs().iter().enumerate() {
+            send_refreshing(tx, i, total_roots, true);
+            explode(root.as_ref(), |de| on_file(de, i), |de| dirs.push((i, de)));
+        }
+        send_refreshing(tx, total_roots, total_roots, true);
+    }
+
+    {
+        let total_dirs = dirs.len();
+        for (i, (root, dir)) in dirs.into_iter().enumerate() {
+            send_refreshing(tx, i, total_dirs, false);
+            all_files(dir.path()).for_each(|de| on_file(de, root));
+        }
+        send_refreshing(tx, total_dirs, total_dirs, false);
+    }
+
+    Cache::new(files)
 }
 
-// TODO: make this report progress
-fn refresh_cache(cache_file: &Path) -> anyhow::Result<Cache> {
-    todo!()
+fn send_refreshing(tx: &StateSnd, i: usize, total: usize, exploding: bool) {
+    let progress = progress(i, total);
+    let msg = Ok(filesearch::FileSearch::Refreshing(filesearch::Refreshing {
+        exploding,
+        progress,
+    }));
+
+    tx.blocking_send(msg).ok();
+}
+
+fn progress(i: usize, total: usize) -> u8 {
+    if total == 0 && i != 0 {
+        0u8
+    } else if i >= total {
+        100u8
+    } else {
+        (100.0 * (i as f64 / total as f64)) as u8
+    }
+}
+
+#[test]
+fn test_progress() {
+    assert_eq!(progress(0, 0), 100);
+    assert_eq!(progress(1, 0), 0);
+    assert_eq!(progress(1, 1), 100);
+    assert_eq!(progress(0, 1), 0);
+    assert_eq!(progress(5, 10), 50);
 }

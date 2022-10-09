@@ -12,13 +12,14 @@ use crate::{Receiver, Sender};
 use self::frontjob::FrontJob;
 
 async fn handle_msg(msg: Message, front: &mut FrontJob) {
-    log::debug!("Handling message: {:?}", msg);
+    log::info!("Handling message: {:?}", msg);
     assert!(msg.is_to_server());
 
     use ToServer::*;
     match msg.take_to_server() {
         SendStatus(_) => front.send_status().await,
         MpvControl(ctrl) => front.send_mpv_ctrl(ctrl).await,
+        FsControl(ctrl) => front.send_filer_ctrl(ctrl).await,
         MpvStart(mpvstart::File(s)) | MpvStart(mpvstart::Url(s)) => {
             try_start_mpv(front, s)
         }
@@ -68,7 +69,6 @@ async fn handle_msg(msg: Message, front: &mut FrontJob) {
                 front.kill().await;
             }
         }
-        FsControl(_) => todo!(), // TODO:
     }
 }
 

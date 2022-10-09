@@ -94,6 +94,20 @@ impl FrontJob {
         }
     }
 
+    pub async fn send_filer_ctrl(&self, ctrl: FsControl) {
+        if let Variant::Filer(j) = &self.var {
+            if j.send_ctrl(ctrl).await.is_err() {
+                log::error!("Couldn't send ctrl, job is down");
+            }
+        } else {
+            log::warn!(
+                "Trying to send '{:?}' but filer is not active, '{}' is",
+                ctrl,
+                self.name()
+            );
+        }
+    }
+
     pub fn is_something(&self) -> bool {
         !matches!(self.var, Variant::None(_))
     }
@@ -212,6 +226,7 @@ async fn mpv(
         }
     };
 
+    log::debug!("Waiting for mpv handle to exit");
     handle.wait_until_closed().await;
     retval
 }
@@ -229,8 +244,7 @@ async fn filer(
                 match msg {
                     None => {
                         log::debug!("Filer exit signal receiver");
-                        // TODO: handle kill
-                        // TODO: wait for filer to exit
+                        handle.kill();
                         break Ok(());
                     },
                     Some(JobMsg::SendStatus) => send_to_conn(&to_conn, last_state.clone()).await,
@@ -251,6 +265,8 @@ async fn filer(
         }
     };
 
+    log::debug!("Waiting for filer handle to exit");
+    handle.wait_until_closed().await;
     retval
 }
 

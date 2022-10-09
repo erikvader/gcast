@@ -45,8 +45,8 @@ fn get_instance() -> &'static Config {
     CONF.get().expect("Config was not initialized")
 }
 
-pub fn root_dir(i: usize) -> Option<&'static str> {
-    get_instance().root_dirs.get(i).map(|s| s.as_str())
+pub fn root_dirs() -> &'static [String] {
+    &get_instance().root_dirs
 }
 
 pub fn conf_dir() -> &'static Path {

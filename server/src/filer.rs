@@ -11,7 +11,7 @@ use protocol::{
 };
 use tokio::{sync::mpsc, task::JoinHandle};
 
-use crate::repeatable_oneshot;
+use crate::{repeatable_oneshot, util::join_handle_wait_take};
 
 static FILER_THREAD_ON: AtomicBool = AtomicBool::new(false);
 
@@ -56,6 +56,17 @@ impl Handle {
             return Err(FilerError::Exited);
         }
         Ok(())
+    }
+
+    pub async fn wait_until_closed(self) {
+        drop(self.rx);
+        drop(self.tx);
+        drop(self.cache_tx);
+        join_handle_wait_take(self.joinhandle).await;
+    }
+
+    pub fn kill(&mut self) {
+        // TODO: set an atomicbool to tell the thread to exit ASAP?
     }
 }
 

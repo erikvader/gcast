@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use protocol::{
     to_client::{seat, ToClient},
-    to_server::{fsstart, mpvcontrol, mpvstart, sendstatus, spotifystart},
+    to_server::{fscontrol, fsstart, mpvcontrol, mpvstart, sendstatus, spotifystart},
     Message, ToMessage,
 };
 use tungstenite::connect;
@@ -20,6 +20,7 @@ enum Commands {
     SpotifyStop,
     FilerStart,
     FilerStop,
+    FilerRefreshCache,
     MpvPlay { file: String },
     MpvStop,
     MpvPause,
@@ -61,6 +62,7 @@ fn main() {
         Commands::SpotifyStop => spotifystart::Stop.to_message(),
         Commands::FilerStart => fsstart::Start.to_message(),
         Commands::FilerStop => fsstart::Stop.to_message(),
+        Commands::FilerRefreshCache => fscontrol::RefreshCache.to_message(),
         Commands::MpvPlay { file } => mpvstart::Url(file.clone()).to_message(),
         Commands::MpvStop => mpvstart::Stop.to_message(),
         Commands::MpvPause => mpvcontrol::TogglePause.to_message(),
