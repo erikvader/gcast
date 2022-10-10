@@ -28,6 +28,42 @@ enum Variant {
     // TODO: View that display all logs? Or send every log message to the client if one is connected?
 }
 
+macro_rules! start_check {
+    ($self:ident, $continueif:expr) => {
+        if !$continueif {
+            log::warn!(
+                "'{}' is already running, ignoring start request",
+                $self.name()
+            );
+            return;
+        }
+    };
+}
+
+macro_rules! stop_check {
+    ($me:expr, $continueif:expr) => {
+        if !$continueif {
+            if !$continueif {
+                log::warn!("{} is not running, ignoring stop request", $me);
+                return;
+            }
+        }
+    };
+}
+
+macro_rules! send_ctrl_check {
+    ($self:ident, $me:expr, $continueif:expr) => {
+        if !$continueif {
+            log::warn!(
+                "Trying to send ctrl message, but {} is not active, '{}' is",
+                $me,
+                $self.name()
+            );
+            return;
+        }
+    };
+}
+
 impl FrontJob {
     pub fn new(to_conn: Sender) -> Self {
         Self {
@@ -85,30 +121,26 @@ impl FrontJob {
     }
 
     pub async fn send_mpv_ctrl(&self, ctrl: MpvControl) {
-        if let Variant::Mpv(j) = &self.var {
-            if j.send_ctrl(ctrl).await.is_err() {
-                log::error!("Couldn't send ctrl, job is down");
+        send_ctrl_check!(self, "mpv", self.is_mpv());
+        match &self.var {
+            Variant::Mpv(j) => {
+                if j.send_ctrl(ctrl).await.is_err() {
+                    log::error!("Couldn't send ctrl, job is down");
+                }
             }
-        } else {
-            log::warn!(
-                "Trying to send '{:?}' but mpv is not active, '{}' is",
-                ctrl,
-                self.name()
-            );
+            _ => unreachable!("must be mpv due to check"),
         }
     }
 
     pub async fn send_filer_ctrl(&self, ctrl: FsControl) {
-        if let Variant::Filer(j) = &self.var {
-            if j.send_ctrl(ctrl).await.is_err() {
-                log::error!("Couldn't send ctrl, job is down");
+        send_ctrl_check!(self, "filer", self.is_filer());
+        match &self.var {
+            Variant::Filer(j) => {
+                if j.send_ctrl(ctrl).await.is_err() {
+                    log::error!("Couldn't send ctrl, job is down");
+                }
             }
-        } else {
-            log::warn!(
-                "Trying to send '{:?}' but filer is not active, '{}' is",
-                ctrl,
-                self.name()
-            );
+            _ => unreachable!("must be filer due to check"),
         }
     }
 
@@ -133,80 +165,43 @@ impl FrontJob {
     }
 
     pub async fn start_spotify(&mut self) {
-        if self.is_something() {
-            log::warn!(
-                "'{}' is already running, ignoring spotify start request",
-                self.name()
-            );
-            return;
-        }
-
+        start_check!(self, self.is_none());
         log::info!("Starting spotify");
         self.transition(Variant::spotify_job).await;
     }
 
     pub async fn stop_spotify(&mut self) {
-        if !self.is_spotify() {
-            log::warn!("Spotify is not running, ignoring stop request");
-            return;
-        }
+        stop_check!("Spotify", self.is_spotify());
         self.kill().await;
     }
 
     pub async fn start_mpv_url(&mut self, url: String) {
-        if self.is_something() {
-            log::warn!(
-                "'{}' is already running, ignoring mpv start request",
-                self.name()
-            );
-            return;
-        }
-
+        start_check!(self, self.is_none());
         log::info!("Starting mpv with url");
         self.transition(|to_conn| Variant::mpv_job(to_conn, url))
             .await;
     }
 
     pub async fn start_mpv_file(&mut self, file: String) {
-        if self.is_something() && !self.is_filer() {
-            log::warn!(
-                "'{}' is already running, ignoring mpv start request",
-                self.name()
-            );
-            return;
-        }
-
+        start_check!(self, self.is_none() || self.is_filer());
         log::info!("Starting mpv with file");
         self.transition(|to_conn| Variant::mpv_job(to_conn, file))
             .await;
     }
 
     pub async fn stop_mpv(&mut self) {
-        if !self.is_mpv() {
-            log::warn!("Mpv is not running, ignoring stop request");
-            return;
-        }
+        stop_check!("Mpv", self.is_mpv());
         self.kill().await;
     }
 
     pub async fn start_filer(&mut self) {
-        if self.is_something() {
-            log::warn!(
-                "'{}' is already running, ignoring filer start request",
-                self.name()
-            );
-            return;
-        }
-
+        start_check!(self, self.is_none());
         log::info!("Starting filer");
         self.transition(Variant::filer_job).await;
     }
 
     pub async fn stop_filer(&mut self) {
-        if !self.is_filer() {
-            log::warn!("Filer is not running, ignoring stop request");
-            return;
-        }
+        stop_check!("Filer", self.is_filer());
         self.kill().await;
     }
 }
