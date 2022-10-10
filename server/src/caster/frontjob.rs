@@ -36,6 +36,22 @@ impl FrontJob {
         }
     }
 
+    async fn transition<F>(&mut self, next_state: F)
+    where
+        F: FnOnce(Sender) -> Variant,
+    {
+        log::debug!("Transitioning, waiting for {} to terminate", self.name());
+        use Variant::*;
+        match &mut self.var {
+            Spotify(j) => j.terminate_wait().await,
+            Mpv(j) => j.terminate_wait().await,
+            Filer(j) => j.terminate_wait().await,
+            None(j) => j.terminate_wait().await,
+        }
+        self.var = next_state(self.to_conn.clone());
+        log::debug!("Transitioned into {}", self.name());
+    }
+
     pub async fn wait(&mut self) {
         use Variant::*;
         match &mut self.var {
@@ -47,24 +63,12 @@ impl FrontJob {
     }
 
     pub fn name(&self) -> &'static str {
-        use Variant::*;
-        match self.var {
-            Spotify(_) => "spotify",
-            Mpv(_) => "mpv",
-            Filer(_) => "filesearch",
-            None(_) => "nothing",
-        }
+        self.var.name()
     }
 
     pub async fn kill(&mut self) {
-        use Variant::*;
-        match &mut self.var {
-            Spotify(j) => j.terminate_wait().await,
-            Mpv(j) => j.terminate_wait().await,
-            Filer(j) => j.terminate_wait().await,
-            None(j) => j.terminate_wait().await,
-        }
-        self.var = Variant::none_job(self.to_conn.clone());
+        log::info!("Killing {}", self.name());
+        self.transition(Variant::none_job).await;
     }
 
     pub async fn send_status(&self) {
@@ -109,7 +113,11 @@ impl FrontJob {
     }
 
     pub fn is_something(&self) -> bool {
-        !matches!(self.var, Variant::None(_))
+        !self.is_none()
+    }
+
+    pub fn is_none(&self) -> bool {
+        matches!(self.var, Variant::None(_))
     }
 
     pub fn is_spotify(&self) -> bool {
@@ -124,31 +132,82 @@ impl FrontJob {
         matches!(self.var, Variant::Filer(_))
     }
 
-    pub fn start_spotify(&mut self) {
-        let to_conn = self.to_conn.clone();
-        self.var = Variant::Spotify(JobMpsc::start(|rx| async move {
-            if let Err(e) = spotify(rx, to_conn).await {
-                log::error!("Starting spotify failed with: {}", e);
-            }
-        }));
+    pub async fn start_spotify(&mut self) {
+        if self.is_something() {
+            log::warn!(
+                "'{}' is already running, ignoring spotify start request",
+                self.name()
+            );
+            return;
+        }
+
+        log::info!("Starting spotify");
+        self.transition(Variant::spotify_job).await;
     }
 
-    pub fn start_mpv(&mut self, file: String) {
-        let to_conn = self.to_conn.clone();
-        self.var = Variant::Mpv(JobMpsc::start(|rx| async move {
-            if let Err(e) = mpv(rx, &file, to_conn).await {
-                log::error!("Starting mpv failed with: {}", e);
-            }
-        }));
+    pub async fn stop_spotify(&mut self) {
+        if !self.is_spotify() {
+            log::warn!("Spotify is not running, ignoring stop request");
+            return;
+        }
+        self.kill().await;
     }
 
-    pub fn start_filer(&mut self) {
-        let to_conn = self.to_conn.clone();
-        self.var = Variant::Filer(JobMpsc::start(|rx| async move {
-            if let Err(e) = filer(rx, to_conn).await {
-                log::error!("Starting filer failed with: {}", e);
-            }
-        }));
+    pub async fn start_mpv_url(&mut self, url: String) {
+        if self.is_something() {
+            log::warn!(
+                "'{}' is already running, ignoring mpv start request",
+                self.name()
+            );
+            return;
+        }
+
+        log::info!("Starting mpv with url");
+        self.transition(|to_conn| Variant::mpv_job(to_conn, url))
+            .await;
+    }
+
+    pub async fn start_mpv_file(&mut self, file: String) {
+        if self.is_something() && !self.is_filer() {
+            log::warn!(
+                "'{}' is already running, ignoring mpv start request",
+                self.name()
+            );
+            return;
+        }
+
+        log::info!("Starting mpv with file");
+        self.transition(|to_conn| Variant::mpv_job(to_conn, file))
+            .await;
+    }
+
+    pub async fn stop_mpv(&mut self) {
+        if !self.is_mpv() {
+            log::warn!("Mpv is not running, ignoring stop request");
+            return;
+        }
+        self.kill().await;
+    }
+
+    pub async fn start_filer(&mut self) {
+        if self.is_something() {
+            log::warn!(
+                "'{}' is already running, ignoring filer start request",
+                self.name()
+            );
+            return;
+        }
+
+        log::info!("Starting filer");
+        self.transition(Variant::filer_job).await;
+    }
+
+    pub async fn stop_filer(&mut self) {
+        if !self.is_filer() {
+            log::warn!("Filer is not running, ignoring stop request");
+            return;
+        }
+        self.kill().await;
     }
 }
 
@@ -156,10 +215,45 @@ impl Variant {
     fn none_job(to_conn: Sender) -> Self {
         Self::None(JobMpsc::start(|mut rx| async move {
             send_to_conn(&to_conn, front::None).await;
-            while let Some(_) = rx.recv().await {
+            while let Some(jm) = rx.recv().await {
+                assert!(jm.is_send_status(), "there is no way to send Ctrl(T) here");
                 send_to_conn(&to_conn, front::None).await;
             }
         }))
+    }
+
+    fn mpv_job(to_conn: Sender, file: String) -> Self {
+        Variant::Mpv(JobMpsc::start(|rx| async move {
+            if let Err(e) = mpv(rx, &file, to_conn).await {
+                log::error!("Starting mpv failed with: {}", e);
+            }
+        }))
+    }
+
+    fn filer_job(to_conn: Sender) -> Self {
+        Variant::Filer(JobMpsc::start(|rx| async move {
+            if let Err(e) = filer(rx, to_conn).await {
+                log::error!("Starting filer failed with: {}", e);
+            }
+        }))
+    }
+
+    fn spotify_job(to_conn: Sender) -> Self {
+        Variant::Spotify(JobMpsc::start(|rx| async move {
+            if let Err(e) = spotify(rx, to_conn).await {
+                log::error!("Starting spotify failed with: {}", e);
+            }
+        }))
+    }
+
+    pub fn name(&self) -> &'static str {
+        use Variant::*;
+        match self {
+            Spotify(_) => "spotify",
+            Mpv(_) => "mpv",
+            Filer(_) => "filesearch",
+            None(_) => "nothing",
+        }
     }
 }
 
@@ -178,7 +272,10 @@ async fn spotify(mut rx: mpsc::Receiver<JobMsg<()>>, to_conn: Sender) -> io::Res
                         log::debug!("Spotify process exited with: {}", status);
                         break Ok(());
                     }
-                    Some(_) => send_to_conn(&to_conn, front::Spotify).await,
+                    Some(jm) => {
+                        assert!(jm.is_send_status(), "there is no way to send Ctrl(T) here");
+                        send_to_conn(&to_conn, front::Spotify).await;
+                    }
                 }
             },
             res = proc.wait() => {

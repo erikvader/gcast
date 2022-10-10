@@ -82,3 +82,9 @@ impl<M> JobMpsc<M> {
             .map_err(|_| JobExited)
     }
 }
+
+impl<T> JobMsg<T> {
+    pub fn is_send_status(&self) -> bool {
+        matches!(self, JobMsg::SendStatus)
+    }
+}
