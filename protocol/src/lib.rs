@@ -1,14 +1,22 @@
+macro_rules! message_part {
+    ($($rest:tt)+) => {
+        #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
+        $($rest)+
+    };
+}
+
 macro_rules! message {
     (enum $kind:ty, $name:ident $body:tt) => {
         pub use $name::*;
-        message!{@x enum $kind, $name $body}
+        message! {@x enum $kind, $name $body}
     };
     (struct $kind:ty, $name:ident $body:tt) => {
-        message!{@x struct $kind, $name $body}
+        message! {@x struct $kind, $name $body}
     };
     (@x $enumstruct:ident $kind:ty, $name:ident $body:tt) => {
-        #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
-        pub $enumstruct $name $body
+        message_part! {
+            pub $enumstruct $name $body
+        }
 
         impl From<$name> for $crate::MessageKind {
             fn from(m: $name) -> Self {
