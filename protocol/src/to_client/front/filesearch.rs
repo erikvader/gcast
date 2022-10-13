@@ -10,15 +10,24 @@ message! {
 
 message! {
     struct FileSearch, Refreshing {
-        pub progress: u8, // [0-99]
+        pub progress: u8,
         pub exploding: bool,
     }
 }
 
 message! {
     struct FileSearch, Results {
-        pub results: Vec<String>, // TODO: String -> struct med String, index i config::root_dir, vec med index att highlighta
+        pub results: Vec<SearchResult>,
         pub query: String,
+        pub query_valid: bool,
+    }
+}
+
+message_part! {
+    struct SearchResult {
+        pub path: String,
+        pub root: usize,
+        pub indices: Vec<usize>
     }
 }
 

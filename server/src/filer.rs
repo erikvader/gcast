@@ -1,3 +1,4 @@
+mod cache;
 mod run_filer;
 
 use std::{
@@ -25,6 +26,7 @@ pub enum FilerError {
     Exited,
 }
 
+// TODO: is an error ever sent? Remove FilerResult?
 type StateRcv = mpsc::Receiver<FilerResult<front::filesearch::FileSearch>>;
 type StateSnd = mpsc::Sender<FilerResult<front::filesearch::FileSearch>>;
 type SearchSnd = repeatable_oneshot::Sender<String>;
