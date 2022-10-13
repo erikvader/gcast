@@ -21,6 +21,7 @@ enum Commands {
     FilerStart,
     FilerStop,
     FilerRefreshCache,
+    FilerSearch { query: String },
     MpvPlay { file: String },
     MpvStop,
     MpvPause,
@@ -63,28 +64,34 @@ fn main() {
         Commands::FilerStart => fsstart::Start.to_message(),
         Commands::FilerStop => fsstart::Stop.to_message(),
         Commands::FilerRefreshCache => fscontrol::RefreshCache.to_message(),
+        Commands::FilerSearch { query } => {
+            fscontrol::Search(query.to_string()).to_message()
+        }
         Commands::MpvPlay { file } => mpvstart::Url(file.clone()).to_message(),
         Commands::MpvStop => mpvstart::Stop.to_message(),
         Commands::MpvPause => mpvcontrol::TogglePause.to_message(),
     };
+
     log::info!("Sending: {:?}", tosend);
     let data = tosend.serialize().expect("serialization failed");
-    socket
-        .write_message(tungstenite::Message::Binary(data))
-        .expect("could not send");
-    log::info!("Sent");
+    for _ in 0..1 {
+        socket
+            .write_message(tungstenite::Message::Binary(data.clone()))
+            .expect("could not send");
+        log::info!("Sent");
+    }
 
     if cli.listen {
         log::info!("Listening for all replies...");
         loop {
             let msg = socket.read_message().expect("could not read");
-            log::info!("Received raw: {:?}", msg);
+            // log::info!("Received raw: {:?}", msg);
 
             if msg.is_close() {
                 break;
             }
 
-            log::info!("Received parsed: {:?}", parse_tung_msg(msg));
+            log::info!("Received: {:#?}", parse_tung_msg(msg));
         }
     }
 
