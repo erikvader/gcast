@@ -9,8 +9,12 @@ const REG_ANY: &str = ".*?";
 const REG_ICASE: &str = "(?i)";
 const REG_NO_ICASE: &str = "(?-i)";
 
-// TODO: create an error struct and report what went wrong in more detail
-pub type Result<T> = std::result::Result<T, ()>;
+// TODO: report what went wrong in more detail
+#[derive(Debug, thiserror::Error, PartialEq)]
+#[error("failed to compile query to regex")]
+pub struct CompileError;
+
+pub type Result<T> = std::result::Result<T, CompileError>;
 
 pub fn compile_search_term_to_regexes(search_term: &str) -> Result<Vec<Regex>> {
     compile_swiper(search_term).map(|v| {
@@ -29,7 +33,13 @@ fn compile_fzf(search_term: &str) -> Result<Vec<String>> {
         .map(|word| compile_word(word))
         .collect();
 
-    regs.and_then(|vec| if vec.is_empty() { Err(()) } else { Ok(vec) })
+    regs.and_then(|vec| {
+        if vec.is_empty() {
+            Err(CompileError)
+        } else {
+            Ok(vec)
+        }
+    })
 }
 
 fn compile_swiper(search_term: &str) -> Result<Vec<String>> {
@@ -37,7 +47,7 @@ fn compile_swiper(search_term: &str) -> Result<Vec<String>> {
         .unwrap()
         .is_match(search_term)
     {
-        return Err(());
+        return Err(CompileError);
     }
 
     let parts: Vec<_> = Regex::new(r"( +)|[^ ]+")
@@ -68,7 +78,7 @@ fn compile_word(word: &str) -> Result<String> {
     assert!(!word.is_empty());
     let reg_str = if let Some(w) = word.strip_prefix(QUOTE_WORD) {
         if w.is_empty() {
-            return Err(());
+            return Err(CompileError);
         } else {
             literal_word(w)
         }
@@ -138,10 +148,10 @@ fn test_compile_fzf() {
 
 #[test]
 fn test_compile_swiper() {
-    assert_eq!(compile_swiper(" "), Err(()));
-    assert_eq!(compile_swiper(""), Err(()));
-    assert_eq!(compile_swiper(" x"), Err(()));
-    assert_eq!(compile_swiper("x "), Err(()));
+    assert_eq!(compile_swiper(" "), Err(CompileError));
+    assert_eq!(compile_swiper(""), Err(CompileError));
+    assert_eq!(compile_swiper(" x"), Err(CompileError));
+    assert_eq!(compile_swiper("x "), Err(CompileError));
     assert!(compile_swiper("x  ").is_ok());
 
     assert_eq!(

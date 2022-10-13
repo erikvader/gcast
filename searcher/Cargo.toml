@@ -8,3 +8,4 @@ itertools = "0.10"
 regex = "1" #TODO: scale down on features
 regex-syntax = "0.6"
 rayon = "1"
+thiserror="1.0"

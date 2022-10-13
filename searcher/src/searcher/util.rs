@@ -78,12 +78,24 @@ where
     if len == 0 {
         return &mut [][..];
     }
-    if len <= items.len() {
-        let (beg, _, _) = items.select_nth_unstable(len - 1);
+    if len < items.len() {
+        let (beg, _, _) = items.select_nth_unstable(len);
         beg.sort_unstable();
         beg
     } else {
         items.sort_unstable();
         items
     }
+}
+
+#[test]
+fn test_sorted_take() {
+    let mut list = vec![6, 4, 3, 1];
+    assert_eq!(sorted_take(&mut list, 2), &[1, 3]);
+
+    assert_eq!(sorted_take(&mut list, 0), &[]);
+
+    assert_eq!(sorted_take(&mut list, 10), &[1, 3, 4, 6]);
+
+    assert_eq!(sorted_take::<()>(&mut [], 10), &[]);
 }
