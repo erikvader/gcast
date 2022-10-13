@@ -1,7 +1,7 @@
 macro_rules! message_part {
     ($($rest:tt)+) => {
         #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
-        $($rest)+
+        pub $($rest)+
     };
 }
 
@@ -15,12 +15,18 @@ macro_rules! message {
     };
     (@x $enumstruct:ident $kind:ty, $name:ident $body:tt) => {
         message_part! {
-            pub $enumstruct $name $body
+            $enumstruct $name $body
         }
 
-        impl From<$name> for $crate::MessageKind {
+        impl From<$name> for $crate::Message {
             fn from(m: $name) -> Self {
                 <$kind>::$name(m).into()
+            }
+        }
+
+        impl From<$name> for $kind {
+            fn from(m: $name) -> Self {
+                <$kind>::$name(m)
             }
         }
     };
@@ -31,20 +37,20 @@ pub mod to_server;
 
 use std::sync::atomic::AtomicU64;
 
-use serde::{Deserialize, Serialize};
-
 static MESSAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-enum MessageKind {
-    ToServer(to_server::ToServer),
-    ToClient(to_client::ToClient),
+message_part! {
+    enum MessageKind {
+        ToServer(to_server::ToServer),
+        ToClient(to_client::ToClient),
+    }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct Message {
-    id: u64,
-    kind: MessageKind,
+message_part! {
+    struct Message {
+        id: u64,
+        kind: MessageKind,
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -114,12 +120,18 @@ impl Message {
     }
 }
 
-impl<K> From<K> for Message
-where
-    K: Into<MessageKind>,
-{
-    fn from(kind: K) -> Self {
-        Message::new(kind.into())
+// impl<K> From<K> for Message
+// where
+//     K: Into<MessageKind>,
+// {
+//     fn from(kind: K) -> Self {
+//         Message::new(kind.into())
+//     }
+// }
+
+impl From<MessageKind> for Message {
+    fn from(mk: MessageKind) -> Self {
+        Message::new(mk)
     }
 }
 
