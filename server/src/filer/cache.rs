@@ -1,6 +1,5 @@
 use std::{
     fs::{create_dir_all, File},
-    io::ErrorKind,
     path::Path,
     time::SystemTime,
 };
@@ -9,6 +8,8 @@ use protocol::to_client::front::filesearch;
 use walkdir::{DirEntry, WalkDir};
 
 use super::StateSnd;
+
+const EXT_WHITELIST: &[&str] = &[".mp4", ".mkv", ".wmv", ".webm", ".avi"];
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub(super) struct Cache {
@@ -136,8 +137,7 @@ pub(super) fn refresh_cache(tx: &StateSnd, roots: Vec<String>) -> Cache {
 
     let mut on_file =
         |de: DirEntry, i: usize| match de.into_path().into_os_string().into_string() {
-            // TODO: extension whitelist
-            Ok(path) => files.push(CacheEntry::new(
+            Ok(path) if has_whitelisted_extension(&path) => files.push(CacheEntry::new(
                 path,
                 i,
                 roots
@@ -145,6 +145,7 @@ pub(super) fn refresh_cache(tx: &StateSnd, roots: Vec<String>) -> Cache {
                     .expect("i is from enumerate, i.e. always in range")
                     .len(),
             )),
+            Ok(_) => (),
             Err(path) => log::error!("Failed to convert '{:?} to a String", path),
         };
 
@@ -167,6 +168,10 @@ pub(super) fn refresh_cache(tx: &StateSnd, roots: Vec<String>) -> Cache {
     }
 
     Cache::new(files, roots)
+}
+
+fn has_whitelisted_extension(path: &str) -> bool {
+    EXT_WHITELIST.iter().any(|ext| path.ends_with(ext))
 }
 
 fn send_refreshing(tx: &StateSnd, i: usize, total: usize, exploding: bool) {

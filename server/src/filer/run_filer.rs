@@ -19,7 +19,7 @@ use super::{
     StateSnd,
 };
 
-const NUM_SEARCH_RESULTS: usize = 2; // TODO: 20
+const NUM_SEARCH_RESULTS: usize = 20;
 
 pub(super) fn run_filer(mut rx: MultiplexReceiver<String, ()>, tx: StateSnd) {
     let cache_file = config::cache_dir().join("files_cache");
