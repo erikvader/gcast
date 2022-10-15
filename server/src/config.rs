@@ -60,7 +60,8 @@ pub fn cache_dir() -> &'static Path {
 fn read_root_dirs(path: &Path) -> io::Result<Vec<String>> {
     Ok(fs::read_to_string(path)?
         .lines()
-        .map(|s| s.to_string())
+        // NOTE: only specifying a '/' is not supported
+        .map(|s| s.trim_end_matches("/").to_string())
         .filter_map(|s| {
             if !s.starts_with("/") {
                 log::error!("Root dir path '{}' is not absolute, ignoring", s);

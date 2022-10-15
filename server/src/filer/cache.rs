@@ -8,39 +8,47 @@ use std::{
 use protocol::to_client::front::filesearch;
 use walkdir::{DirEntry, WalkDir};
 
-use crate::config;
-
 use super::StateSnd;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub(super) struct Cache {
     files: Vec<CacheEntry>,
     updated: Option<SystemTime>,
+    roots: Vec<String>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub(super) struct CacheEntry {
     path: String,
     root: usize,
+    root_len: usize,
 }
 
 impl CacheEntry {
-    fn new(path: String, root: usize) -> Self {
-        Self { path, root }
+    fn new(path: String, root: usize, root_len: usize) -> Self {
+        Self {
+            path,
+            root,
+            root_len,
+        }
     }
 
-    pub(super) fn path(&self) -> &str {
+    pub(super) fn full_path(&self) -> &str {
         &self.path
     }
 
     pub(super) fn root(&self) -> usize {
         self.root
     }
+
+    pub(super) fn path_relative_root(&self) -> &str {
+        &self.path[self.root_len..]
+    }
 }
 
 impl AsRef<str> for CacheEntry {
     fn as_ref(&self) -> &str {
-        self.path()
+        self.path_relative_root()
     }
 }
 
@@ -49,15 +57,17 @@ impl Default for Cache {
         Self {
             files: Vec::new(),
             updated: None,
+            roots: Vec::new(),
         }
     }
 }
 
 impl Cache {
-    pub(super) fn new(files: Vec<CacheEntry>) -> Self {
+    pub(super) fn new(files: Vec<CacheEntry>, roots: Vec<String>) -> Self {
         Self {
             files,
             updated: Some(SystemTime::now()),
+            roots,
         }
     }
 
@@ -67,6 +77,10 @@ impl Cache {
 
     pub(super) fn files(&self) -> &[CacheEntry] {
         &self.files
+    }
+
+    pub(super) fn is_outdated(&self, roots: &[String]) -> bool {
+        self.roots != roots
     }
 }
 
@@ -121,20 +135,27 @@ fn explode(
     }
 }
 
-pub(super) fn refresh_cache(tx: &StateSnd) -> Cache {
+pub(super) fn refresh_cache(tx: &StateSnd, roots: Vec<String>) -> Cache {
     let mut dirs: Vec<(usize, DirEntry)> = Vec::new();
     let mut files: Vec<CacheEntry> = Vec::new();
 
     let mut on_file =
         |de: DirEntry, i: usize| match de.into_path().into_os_string().into_string() {
             // TODO: extension whitelist
-            Ok(path) => files.push(CacheEntry::new(path, i)),
+            Ok(path) => files.push(CacheEntry::new(
+                path,
+                i,
+                roots
+                    .get(i)
+                    .expect("i is from enumerate, i.e. always in range")
+                    .len(),
+            )),
             Err(path) => log::error!("Failed to convert '{:?} to a String", path),
         };
 
     {
-        let total_roots = config::root_dirs().len();
-        for (i, root) in config::root_dirs().iter().enumerate() {
+        let total_roots = roots.len();
+        for (i, root) in roots.iter().enumerate() {
             send_refreshing(tx, i, total_roots, true);
             explode(root.as_ref(), |de| on_file(de, i), |de| dirs.push((i, de)));
         }
@@ -150,7 +171,7 @@ pub(super) fn refresh_cache(tx: &StateSnd) -> Cache {
         send_refreshing(tx, total_dirs, total_dirs, false);
     }
 
-    Cache::new(files)
+    Cache::new(files, roots)
 }
 
 fn send_refreshing(tx: &StateSnd, i: usize, total: usize, exploding: bool) {

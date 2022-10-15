@@ -25,6 +25,10 @@ pub(super) fn run_filer(mut rx: MultiplexReceiver<String, ()>, tx: StateSnd) {
     let cache_file = config::cache_dir().join("files_cache");
 
     let mut cache = match read_cache(&cache_file) {
+        Ok(c) if c.is_outdated(config::root_dirs()) => {
+            log::info!("Saved cache is outdated");
+            Cache::default()
+        }
         Ok(c) => c,
         Err(e) => {
             log::error!("Could not read cache file since: {:?}", e);
@@ -42,7 +46,7 @@ pub(super) fn run_filer(mut rx: MultiplexReceiver<String, ()>, tx: StateSnd) {
             }
             Some(Either::Left(query)) => search(query, &cache, &tx),
             Some(Either::Right(())) => {
-                cache = refresh_cache(&tx);
+                cache = refresh_cache(&tx, config::root_dirs().to_vec());
                 if let Err(e) = write_cache(&cache_file, &cache) {
                     log::error!("Failed to write cache cuz: {:?}", e)
                 }
@@ -83,7 +87,7 @@ fn search(query: String, cache: &Cache, tx: &StateSnd) {
                 .map(|r| {
                     let c_entry = cache.files().get(r.get_index()).unwrap();
                     filesearch::SearchResult {
-                        path: c_entry.path().to_string(),
+                        path: c_entry.path_relative_root().to_string(),
                         root: c_entry.root(),
                         indices: r.get_match().indices().to_vec(),
                     }
