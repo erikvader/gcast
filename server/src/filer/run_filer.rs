@@ -31,7 +31,12 @@ pub(super) fn run_filer(mut rx: MultiplexReceiver<String, ()>, tx: StateSnd) {
         }
         Ok(c) => c,
         Err(e) => {
-            log::error!("Could not read cache file since: {:?}", e);
+            match e.downcast_ref::<std::io::Error>() {
+                Some(ioe) if ioe.kind() == ErrorKind::NotFound => {
+                    log::info!("There is no cache yet")
+                }
+                _ => log::error!("Could not read cache file since: {:?}", e),
+            }
             Cache::default()
         }
     };

@@ -85,12 +85,7 @@ impl Cache {
 }
 
 pub(super) fn read_cache(path: &Path) -> anyhow::Result<Cache> {
-    let file = match File::open(path) {
-        Ok(f) => f,
-        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(Cache::default()),
-        Err(e) => return Err(e.into()),
-    };
-
+    let file = File::open(path)?;
     bincode::deserialize_from(file).map_err(|e| e.into())
 }
 
