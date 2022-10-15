@@ -9,11 +9,11 @@ message! {
 
 message! {
     struct Mpv, PlayState {
-        pub pause: bool,
-        pub progress: NotNan<f64>,
-        pub length: NotNan<f64>,
-        pub volume: NotNan<f64>,
-        pub chapter: Option<(i64, i64)>,
+        pause: bool,
+        progress: NotNan<f64>,
+        length: NotNan<f64>,
+        volume: NotNan<f64>,
+        chapter: Option<(i64, i64)>,
     }
 }
 

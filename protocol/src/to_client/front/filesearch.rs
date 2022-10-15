@@ -10,30 +10,30 @@ message! {
 
 message! {
     struct FileSearch, Refreshing {
-        pub progress: u8,
-        pub exploding: bool,
+        progress: u8,
+        exploding: bool,
     }
 }
 
 message! {
     struct FileSearch, Results {
-        pub results: Vec<SearchResult>,
-        pub query: String,
-        pub query_valid: bool,
+        results: Vec<SearchResult>,
+        query: String,
+        query_valid: bool,
     }
 }
 
 message_part! {
     struct SearchResult {
-        pub path: String,
-        pub root: usize,
-        pub indices: Vec<usize>
+        path: String,
+        root: usize,
+        indices: Vec<usize>,
     }
 }
 
 message! {
     struct FileSearch, Init {
-        pub last_cache_date: Option<SystemTime>,
+        last_cache_date: Option<SystemTime>,
     }
 }
 

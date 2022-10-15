@@ -1,7 +1,17 @@
 macro_rules! message_part {
-    ($($rest:tt)+) => {
+    (enum $($rest:tt)+) => {
         #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
-        pub $($rest)+
+        pub enum $($rest)+
+    };
+    (struct $name:ident;) => {
+        #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
+        pub struct $name;
+    };
+    (struct $name:ident { $($id:ident : $type:ty,)* }) => {
+        #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
+        pub struct $name {
+            $(pub $id : $type ,)*
+        }
     };
 }
 
