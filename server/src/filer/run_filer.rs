@@ -51,11 +51,13 @@ pub(super) fn run_filer(mut rx: MultiplexReceiver<String, ()>, tx: StateSnd) {
             }
             Some(Either::Left(query)) => search(query, &cache, &tx),
             Some(Either::Right(())) => {
+                log::info!("Refreshing cache");
                 cache = refresh_cache(&tx, config::root_dirs().to_vec());
                 if let Err(e) = write_cache(&cache_file, &cache) {
                     log::error!("Failed to write cache cuz: {:?}", e)
                 }
                 send_init(&cache, &tx);
+                log::info!("Refreshing cache done");
             }
         }
     }

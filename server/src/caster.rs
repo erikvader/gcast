@@ -50,6 +50,7 @@ pub async fn caster_actor(
             },
             _ = front.wait() => {
                 log::info!("Application '{}' exited", front.name());
+                // TODO: check whether this was caused by an error and switch to an error front or something
                 front.kill().await;
             }
         }
