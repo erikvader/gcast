@@ -2,7 +2,7 @@ use std::io;
 
 use protocol::{
     to_client::front,
-    to_server::{fscontrol::FsControl, mpvcontrol::MpvControl},
+    to_server::{fscontrol::FsControl, mpvcontrol::MpvControl, mpvstart},
     ToMessage,
 };
 use tokio::{select, sync::mpsc};
@@ -182,11 +182,22 @@ impl FrontJob {
             .await;
     }
 
-    pub async fn start_mpv_file(&mut self, file: String) {
+    pub async fn start_mpv_file(&mut self, file: mpvstart::File) {
         start_check!(self, self.is_none() || self.is_filer());
-        log::info!("Starting mpv with file");
-        self.transition(|to_conn| Variant::mpv_job(to_conn, file))
-            .await;
+        log::info!("Starting mpv with file: {:?}", file);
+
+        let roots = crate::config::root_dirs();
+        match roots.get(file.root) {
+            None => log::error!("Root {} out of range of 0..{}", file.root, roots.len()),
+            Some(r) => {
+                assert!(file.path.starts_with("/"));
+                assert!(!r.ends_with("/"));
+                self.transition(|to_conn| {
+                    Variant::mpv_job(to_conn, r.to_string() + &file.path)
+                })
+                .await
+            }
+        }
     }
 
     pub async fn stop_mpv(&mut self) {

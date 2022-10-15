@@ -22,7 +22,8 @@ enum Commands {
     FilerStop,
     FilerRefreshCache,
     FilerSearch { query: String },
-    MpvPlay { file: String },
+    MpvPlayUrl { url: String },
+    MpvPlayFile { root: usize, path: String },
     MpvStop,
     MpvPause,
 }
@@ -67,7 +68,12 @@ fn main() {
         Commands::FilerSearch { query } => {
             fscontrol::Search(query.to_string()).to_message()
         }
-        Commands::MpvPlay { file } => mpvstart::Url(file.clone()).to_message(),
+        Commands::MpvPlayUrl { url } => mpvstart::Url(url.clone()).to_message(),
+        Commands::MpvPlayFile { root, path } => mpvstart::File {
+            root: *root,
+            path: path.to_string(),
+        }
+        .to_message(),
         Commands::MpvStop => mpvstart::Stop.to_message(),
         Commands::MpvPause => mpvcontrol::TogglePause.to_message(),
     };
