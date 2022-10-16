@@ -55,11 +55,12 @@ impl Process {
             if let Ok(res) =
                 timeout(Duration::from_secs(SIGTERM_TIMEOUT), &mut wait).await
             {
+                log::debug!("Process terminated within timeout");
                 return res;
             }
 
             let kill_succ = sigkill(pid);
-            log::debug!("Sending SIGKILL, success={}", kill_succ);
+            log::debug!("Process took too long, sent SIGKILL, success={}", kill_succ);
             wait.await
         });
 
