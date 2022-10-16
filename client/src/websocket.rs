@@ -2,7 +2,7 @@ use futures::{channel::mpsc, SinkExt, StreamExt};
 use gloo_net::websocket::{futures::WebSocket, Message as GlooMsg, WebSocketError};
 use std::{collections::HashSet, rc::Rc};
 use wasm_bindgen_futures::spawn_local;
-use yew_agent::{use_bridge, Agent, UseBridgeHandle};
+use yew_agent::{use_bridge, Agent, Bridged, UseBridgeHandle};
 
 pub struct WS {
     tx: mpsc::Sender<protocol::Message>,
@@ -146,6 +146,20 @@ where
     use_bridge(move |wsout| {
         if let WSOutput::Msg(toclient) = wsout {
             on_output(toclient)
+        }
+    })
+}
+
+pub fn use_websocket_send<F>(on_output: F) -> UseBridgeHandle<WS>
+where
+    F: Fn(Rc<protocol::Message>) -> Option<protocol::Message> + 'static,
+{
+    use_bridge(move |wsout| {
+        if let WSOutput::Msg(toclient) = wsout {
+            if let Some(resp) = on_output(toclient) {
+                let mut sender = WS::bridge(yew::Callback::noop());
+                sender.send(resp);
+            }
         }
     })
 }
