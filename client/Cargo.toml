@@ -7,15 +7,15 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-yew = "0.19"
-yew-agent = "0.1"
-wasm-bindgen = "0.2"
+yew.workspace = true
+yew-agent.workspace = true
+wasm-bindgen.workspace = true
 
-wasm-logger = "0.2"
-log = "0.4"
+wasm-logger.workspace = true
+log.workspace = true
 
 protocol = {path="../protocol"}
-gloo-net = {version="0.2", features=["websocket"]}
-wasm-bindgen-futures = "0.4"
-futures = "0.3"
+gloo-net.workspace = true
+wasm-bindgen-futures.workspace = true
+futures.workspace = true
 

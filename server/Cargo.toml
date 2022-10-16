@@ -4,27 +4,27 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio = {version="1.21", features=["full"]} #TODO: scale down on features
-tokio-util = "0.7"
-tokio-tungstenite = "0.17"
-futures-util = "0.3"
-async-trait = "0.1"
+tokio.workspace = true
+tokio-util.workspace = true
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
+async-trait.workspace = true
 
-libc = "0.2"
-dirs = "4.0"
+libc.workspace = true
+dirs.workspace = true
 
-log = "0.4"
-simplelog = "0.12"
-atty = "0.2"
+log.workspace = true
+simplelog.workspace = true
+atty.workspace = true
 
 protocol = {path="../protocol"}
-thiserror="1.0"
-anyhow = "1.0"
+thiserror.workspace = true
+anyhow.workspace = true
 
-libmpv = "2.0"
-derive_builder = "0.11"
+libmpv.workspace = true
+derive_builder.workspace = true
 
 searcher = {path="../searcher"}
-walkdir = "2.3"
-serde = {version="1.0", features=["derive"]}
-bincode = "1.3"
+walkdir.workspace = true
+serde.workspace = true
+bincode.workspace = true

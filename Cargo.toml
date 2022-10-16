@@ -6,3 +6,49 @@ members = [
   "client",
   "protocol",
 ]
+
+[workspace.dependencies]
+#TODO: scale down on features on tokio
+tokio = {version="1.21", features=["full"]} # server: async runtime
+tokio-util = "0.7" # server: cancellation token
+tokio-tungstenite = "0.17" # server: websocket
+futures-util = "0.3" # server: streams and sinks
+async-trait = "0.1" # server: FutureCancel trait
+
+libc = "0.2" # server: signal handlers
+dirs = "4.0" # server: access .config etc
+
+log = "0.4" # all: log interface
+simplelog = "0.12" # server, cli: log to stderr
+atty = "0.2" # server: check if running on terminal
+
+thiserror="1.0" # server, protocol, searcher: create custom error types
+anyhow = "1.0" # server: nice error handling
+
+libmpv = "2.0" # server: mpv support
+derive_builder = "0.11" # server: create builder used for mpv
+
+walkdir = "2.3" # server: visit all files in directories
+serde = {version="1.0", features=["derive"]} # server, protocol: serialize
+bincode = "1.3" # server, protocol: serialize implemention
+
+colored = "2" # cli: terminal colors
+tungstenite = "0.17" # cli: websockets blocking
+clap = {version="4.0", features=["derive"]} # cli: commandline arguments
+
+yew = "0.19" # client: react
+yew-agent = "0.1" # client: websocket background job
+wasm-bindgen = "0.2" # client: wasm stuff
+wasm-logger = "0.2" # client: log to web browser console
+
+gloo-net = {version="0.2", features=["websocket"]} # client: wasm websockets
+wasm-bindgen-futures = "0.4" # client: async integration between rust and js
+futures = "0.3" # client: streams and sinks (futures_util didn't work)
+
+ordered-float = {version="3.1", features=["serde"]} # protocol: NotNan
+
+itertools = "0.10" # searcher: tuple_windows
+#TODO: scale down on features on regex
+regex = "1" # searcher: primary search tool
+regex-syntax = "0.6" # searcher: escape strings
+rayon = "1" # searcher: search in parallel

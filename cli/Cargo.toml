@@ -4,16 +4,16 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-colored = "2"
+colored.workspace = true
 searcher = {path="../searcher"}
 
 protocol = {path="../protocol"}
-tungstenite = "0.17"
+tungstenite.workspace = true
 
-log = "0.4"
-simplelog = "0.12"
+log.workspace = true
+simplelog.workspace = true
 
-clap = {version="4.0", features=["derive"]}
+clap.workspace = true
 
 [[bin]]
 name = "lcs-test"
