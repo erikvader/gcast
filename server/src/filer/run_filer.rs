@@ -21,6 +21,7 @@ use super::{
 
 const NUM_SEARCH_RESULTS: usize = 20;
 
+// TODO: terminate as soon as an error occurs?
 pub(super) fn run_filer(mut rx: MultiplexReceiver<String, ()>, tx: StateSnd) {
     let cache_file = config::cache_dir().join("files_cache");
 

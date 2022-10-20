@@ -1,27 +1,22 @@
 use std::ops::Range;
 
-pub fn compact_to_ranges<T, It>(verbose: It, one: T) -> Vec<Range<T>>
-where
-    T: PartialOrd<T> + Copy + std::ops::Add<Output = T>,
-    It: IntoIterator<Item = T>,
-{
-    assert!(one + one > one, "unexpected behaviour of 'one'");
-    let mut iter = verbose.into_iter();
-    if let Some(first) = iter.next() {
+fn compact_to_ranges(indices: &[usize]) -> Vec<Range<usize>> {
+    let mut iter = indices.into_iter();
+    if let Some(&first) = iter.next() {
         let mut res = vec![Range {
             start: first,
-            end: first + one,
+            end: first + 1,
         }];
 
-        iter.for_each(|x| {
+        iter.for_each(|&x| {
             let end = &mut res.last_mut().unwrap().end;
             assert!(x >= *end, "must be strictly increasing");
             if *end == x {
-                *end = x + one;
+                *end = x + 1;
             } else {
                 res.push(Range {
                     start: x,
-                    end: x + one,
+                    end: x + 1,
                 });
             }
         });
@@ -33,11 +28,11 @@ where
 
 #[test]
 fn test_compact_ranges() {
-    assert_eq!(compact_to_ranges(vec![], 1), vec![]);
-    assert_eq!(compact_to_ranges(vec![1, 2, 3], 1), vec![1..4]);
-    assert_eq!(compact_to_ranges(vec![1, 3, 4], 1), vec![1..2, 3..5]);
+    assert_eq!(compact_to_ranges(&[]), vec![]);
+    assert_eq!(compact_to_ranges(&[1, 2, 3]), vec![1..4]);
+    assert_eq!(compact_to_ranges(&[1, 3, 4]), vec![1..2, 3..5]);
     assert_eq!(
-        compact_to_ranges(vec![1, 3, 7, 9], 1),
+        compact_to_ranges(&[1, 3, 7, 9]),
         vec![1..2, 3..4, 7..8, 9..10]
     );
 }
@@ -45,30 +40,119 @@ fn test_compact_ranges() {
 #[test]
 #[should_panic(expected = "must be strictly increasing")]
 fn test_compact_invalid_input() {
-    compact_to_ranges(vec![1, 1], 1);
+    compact_to_ranges(&[1, 1]);
 }
 
-pub fn get_interspersed<T1, T2, ON, OFF>(
+// Preconditions:
+//   - ranges only contains non-empty ranges
+//   - ranges is non-overlapping
+//   - ranges is increasing
+//   - cover includes all ranges
+fn complement<T>(ranges: &[Range<T>], cover: Range<T>) -> Vec<Range<T>>
+where
+    T: Clone,
+{
+    let mut res = Vec::new();
+    let mut start = cover.start;
+    for r in ranges {
+        res.push(start.clone()..r.start.clone());
+        start = r.end.clone();
+    }
+    res.push(start..cover.end);
+    res
+}
+
+#[test]
+fn test_range_complement() {
+    assert_eq!(complement(&[], 1..6), vec![1..6]);
+    assert_eq!(complement(&[0..2], 0..5), vec![0..0, 2..5]);
+    assert_eq!(complement(&[1..2], 0..5), vec![0..1, 2..5]);
+    assert_eq!(complement(&[1..2, 2..3], 0..5), vec![0..1, 2..2, 3..5]);
+}
+
+pub fn stylize<T, ON, OFF, Res>(
     string: &str,
     indices: &[usize],
     on_lcs: ON,
     off_lcs: OFF,
-) -> String
+) -> Res
 where
-    T1: std::fmt::Display,
-    T2: std::fmt::Display,
-    ON: Fn(char) -> T1,
-    OFF: Fn(char) -> T2,
+    ON: Fn(&str) -> T,
+    OFF: Fn(&str) -> T,
+    Res: FromIterator<T>,
 {
-    let mut res = String::new();
-    for (i, c) in string.chars().enumerate() {
-        if indices.binary_search(&i).is_ok() {
-            res.push_str(&on_lcs(c).to_string());
-        } else {
-            res.push_str(&off_lcs(c).to_string());
+    let colored = compact_to_ranges(indices);
+    let uncolored = complement(&colored, 0..string.len());
+    assert!(colored.len() + 1 == uncolored.len());
+
+    let mut res = Vec::new();
+    let mut uc_iter = uncolored.into_iter();
+    for c in colored {
+        let uc = uc_iter.next().expect("will work if lengths are correct");
+        if !uc.is_empty() {
+            res.push(off_lcs(slice_chars(string, uc)));
+        }
+
+        if !c.is_empty() {
+            res.push(on_lcs(slice_chars(string, c)));
         }
     }
-    res
+
+    let uc = uc_iter.next().expect("should be one more");
+    if !uc.is_empty() {
+        res.push(off_lcs(slice_chars(string, uc)));
+    }
+
+    res.into_iter().collect()
+}
+
+#[test]
+fn test_stylize() {
+    assert_eq!(
+        stylize::<_, _, _, String>("hej", &[1], |_| 'a', |_| 'b'),
+        "bab"
+    );
+
+    assert_eq!(stylize::<_, _, _, String>("", &[], |_| 'a', |_| 'b'), "");
+
+    assert_eq!(
+        stylize::<_, _, _, String>("hej", &[0, 1, 2], |_| 'a', |_| 'b'),
+        "a"
+    );
+    assert_eq!(
+        stylize::<_, _, _, String>("hej", &[], |_| 'a', |_| 'b'),
+        "b"
+    );
+}
+
+// TODO: Use something better. Is there a type from a crate that can operate efficiently
+// on chars?
+fn slice_chars(string: &str, slice: Range<usize>) -> &str {
+    let mut bytes: Vec<_> = string.char_indices().map(|(i, _)| i).collect();
+    bytes.push(string.len());
+    let s = &bytes[slice.start..slice.end + 1];
+    &string[*s.first().unwrap()..*s.last().unwrap()]
+}
+
+#[test]
+fn test_slice_chars() {
+    let s = "åäöÅÄÖ";
+    assert_eq!(s.len(), 2 * s.chars().count());
+    assert_eq!(slice_chars(s, 0..1), "å");
+    assert_eq!(slice_chars(s, 0..2), "åä");
+    assert_eq!(slice_chars(s, 1..2), "ä");
+    assert_eq!(slice_chars(s, 0..6), s);
+    assert_eq!(slice_chars(s, 0..5), "åäöÅÄ");
+
+    assert_eq!(slice_chars("", 0..0), "");
+    assert_eq!(slice_chars(s, 0..0), "");
+    assert_eq!(slice_chars(s, 4..4), "");
+}
+
+#[test]
+#[should_panic]
+fn test_slice_chars_out_of_range() {
+    assert_eq!(slice_chars("", 0..1), "");
 }
 
 pub fn sorted_take<T>(items: &mut [T], len: usize) -> &mut [T]

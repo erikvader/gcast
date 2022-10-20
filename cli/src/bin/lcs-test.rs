@@ -3,7 +3,7 @@
 use colored::*;
 use searcher::searcher::{
     search,
-    util::{get_interspersed, sorted_take},
+    util::{sorted_take, stylize},
 };
 use std::{
     env, fs,
@@ -69,11 +69,11 @@ fn main() {
             for x in first_ten.into_iter() {
                 println!(
                     "{}",
-                    get_interspersed(
+                    stylize::<_, _, _, String>(
                         x.get_string(),
                         x.get_match().indices(),
-                        |c| c.to_string().red(),
-                        |c| c
+                        |c| c.to_string().red().to_string(),
+                        |c| c.to_string()
                     )
                 );
             }
