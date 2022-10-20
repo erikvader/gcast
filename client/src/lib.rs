@@ -4,11 +4,16 @@
 mod websocket;
 
 use protocol::{
-    to_client::{front::Front, seat::Seat, ToClient},
-    to_server::{sendstatus::SendStatus, spotifystart},
+    to_client::{
+        front::{filesearch::SearchResult, Front},
+        seat::Seat,
+        ToClient,
+    },
+    to_server::{fsstart, sendstatus::SendStatus, spotifystart},
     ToMessage,
 };
-use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::{prelude::wasm_bindgen, JsCast};
+use web_sys::HtmlInputElement;
 use websocket::{use_websocket, use_websocket_send, use_websocket_status};
 use yew::{prelude::*, virtual_dom::AttrValue};
 
@@ -50,7 +55,7 @@ fn app() -> Html {
     };
 
     html! {
-        <ContextProvider<bool> context={*ws_ready}>
+        <ContextProvider<bool> context={*ws_ready}> // TODO: don't use a simple bool, use custom enum
             {match (&*accepted, &*front) {
                 (Accepted::Pending, _) | (Accepted::Accepted, None) => html! {<Pending />},
                 (Accepted::Rejected, _) => html! {<Rejected />},
@@ -69,10 +74,45 @@ fn pending() -> Html {
     html! {"pending"}
 }
 
+// TODO: put in own module
 #[rustfmt::skip::macros(html)]
 #[function_component(Filesearch)]
 fn filesearch() -> Html {
-    html! {"filesearch"}
+    let active = use_context::<bool>().expect("no active context found");
+
+    let query = use_state(|| "".to_string());
+    let query_change = {
+        let query_setter = query.setter();
+        Callback::from(move |ie: InputEvent| {
+            let input = ie
+                .target()
+                .and_then(|target| target.dyn_into().ok())
+                .map(|ele: HtmlInputElement| ele.value());
+
+            match input {
+                Some(inp) => query_setter.set(inp),
+                None => log::error!("Could not get value from text input"),
+            }
+        })
+    };
+
+    let results = use_state(|| Vec::new());
+    let results_html: Html = (*results)
+        .iter()
+        .map(|res: &SearchResult| html! {<div>{res.path.clone()}</div>})
+        .collect();
+
+    html! {
+        <>
+            <input type="text"
+                   value={(*query).clone()}
+                   oninput={query_change}
+                   placeholder={"Search query"}
+                   disabled={!active}
+            />
+            {results_html}
+        </>
+    }
 }
 
 #[rustfmt::skip::macros(html)]
@@ -94,8 +134,12 @@ fn nothing() -> Html {
     let ws = use_websocket(|_| {});
     let active = use_context::<bool>().expect("no active context found");
     let to_spotify = send_callback!(ws, spotifystart::Start);
+    let to_filesearch = send_callback!(ws, fsstart::Start);
     html! {
-        <button onclick={to_spotify} disabled={!active}>{"Spotify"}</button>
+        <>
+            <button onclick={to_spotify} disabled={!active}>{"Spotify"}</button>
+            <button onclick={to_filesearch} disabled={!active}>{"File Search"}</button>
+        </>
     }
 }
 
