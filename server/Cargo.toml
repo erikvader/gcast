@@ -24,7 +24,7 @@ anyhow.workspace = true
 libmpv.workspace = true
 derive_builder.workspace = true
 
-searcher = {path="../searcher"}
+searcher = {path="../searcher", features=["search-fun"]}
 walkdir.workspace = true
 serde.workspace = true
 bincode.workspace = true

@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 colored.workspace = true
-searcher = {path="../searcher"}
+searcher = {path="../searcher", features=["search-fun"]}
 
 protocol = {path="../protocol"}
 tungstenite.workspace = true

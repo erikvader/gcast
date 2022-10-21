@@ -1,10 +1,7 @@
 #![allow(dead_code)] // NOTE: this is just quick testing
 
 use colored::*;
-use searcher::searcher::{
-    search,
-    util::{sorted_take, stylize},
-};
+use searcher::{search, sorted_take, stylize};
 use std::{
     env, fs,
     io::{self, Write},

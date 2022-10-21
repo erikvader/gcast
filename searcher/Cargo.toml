@@ -4,8 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-itertools.workspace = true
-regex.workspace = true
-regex-syntax.workspace = true
-rayon.workspace = true
-thiserror.workspace = true
+itertools = {workspace = true, optional = true}
+regex = {workspace = true, optional = true}
+regex-syntax = {workspace = true, optional = true}
+rayon = {workspace = true, optional = true}
+thiserror = {workspace = true, optional = true}
+
+[features]
+default = []
+search-fun = ["itertools", "regex", "regex-syntax", "rayon", "thiserror"]

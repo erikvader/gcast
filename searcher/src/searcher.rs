@@ -10,7 +10,6 @@ use self::{
 
 mod compile;
 mod r#match;
-pub mod util;
 
 pub use compile::CompileError;
 
