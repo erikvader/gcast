@@ -116,28 +116,17 @@ impl Message {
     }
 
     pub fn is_to_server(&self) -> bool {
-        match self.kind {
-            MessageKind::ToServer(_) => true,
-            _ => false,
-        }
+        matches!(self.kind, MessageKind::ToServer(_))
     }
 
     pub fn is_to_client(&self) -> bool {
-        match self.kind {
-            MessageKind::ToClient(_) => true,
-            _ => false,
-        }
+        matches!(self.kind, MessageKind::ToClient(_))
+    }
+
+    pub fn is_newer_than(&self, old: u64) -> bool {
+        self.id() > old
     }
 }
-
-// impl<K> From<K> for Message
-// where
-//     K: Into<MessageKind>,
-// {
-//     fn from(kind: K) -> Self {
-//         Message::new(kind.into())
-//     }
-// }
 
 impl From<MessageKind> for Message {
     fn from(mk: MessageKind) -> Self {
