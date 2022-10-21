@@ -20,3 +20,5 @@ gloo-net.workspace = true
 wasm-bindgen-futures.workspace = true
 futures.workspace = true
 
+chrono = {workspace=true, features=["wasmbind"], default-features=false}
+searcher = {path="../searcher"}

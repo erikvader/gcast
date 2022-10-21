@@ -3,6 +3,7 @@
 
 macro_rules! send_callback {
     ($ws:ident, $send:expr) => {{
+        use protocol::ToMessage;
         let ws2 = $ws.clone();
         Callback::from(move |_| ws2.send($send.to_message()))
     }};
@@ -69,14 +70,14 @@ impl WebSockStatus {
 fn app() -> Html {
     let accepted = use_state_eq(|| Accepted::Pending);
     let ws_ready = use_state_eq(|| WebSockStatus::Disconnected);
-    let front = use_state_eq(|| None);
+    let front = use_state_eq::<Option<(u64, Front)>, _>(|| None);
     let _ws_status = {
         let ws_ready_setter = ws_ready.setter();
         use_websocket_status(move |b| ws_ready_setter.set(b.into()))
     };
     let _ws = {
         let accepted_setter = accepted.setter();
-        let front_setter = front.setter();
+        let front_clone = front.clone();
         use_websocket_send(move |m| match m.borrow_to_client() {
             ToClient::Seat(Seat::Accept) => {
                 accepted_setter.set(Accepted::Accepted);
@@ -87,7 +88,10 @@ fn app() -> Html {
                 None
             }
             ToClient::Front(front) => {
-                front_setter.set(Some(front.clone()));
+                let f = (*front_clone).as_ref();
+                if f.is_none() || m.is_newer_than(f.unwrap().0) {
+                    front_clone.set(Some((m.id(), front.clone())));
+                }
                 None
             }
             ToClient::Notification(_) => todo!(),
@@ -99,10 +103,10 @@ fn app() -> Html {
             {match (&*accepted, &*front) {
                 (Accepted::Pending, _) | (Accepted::Accepted, None) => html! {<Pending />},
                 (Accepted::Rejected, _) => html! {<Rejected />},
-                (Accepted::Accepted, Some(Front::None)) => html! {<Nothing />},
-                (Accepted::Accepted, Some(Front::Spotify)) => html! {<Spotify />},
-                (Accepted::Accepted, Some(Front::Mpv(_mpv))) => html! {<Mpv />},
-                (Accepted::Accepted, Some(Front::FileSearch(_fs))) => html! {<Filesearch />},
+                (Accepted::Accepted, Some((_, Front::None))) => html! {<Nothing />},
+                (Accepted::Accepted, Some((_, Front::Spotify))) => html! {<Spotify />},
+                (Accepted::Accepted, Some((_, Front::Mpv(_mpv)))) => html! {<Mpv />},
+                (Accepted::Accepted, Some((_, Front::FileSearch(fs)))) => html! {<Filesearch front={fs.clone()} />},
             }}
         </ContextProvider<WebSockStatus>>
     }

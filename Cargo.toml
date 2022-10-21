@@ -46,6 +46,8 @@ gloo-net = {version="0.2", features=["websocket"]} # client: wasm websockets
 wasm-bindgen-futures = "0.4" # client: async integration between rust and js
 futures = "0.3" # client: streams and sinks (futures_util didn't work)
 
+chrono = "0.4" # client: to format cache date nicely
+
 ordered-float = {version="3.1", features=["serde"]} # protocol: NotNan
 
 itertools = "0.10" # searcher: tuple_windows

@@ -25,6 +25,7 @@ impl Agent for WS {
 
     fn create(link: yew_agent::AgentLink<Self>) -> Self {
         log::info!("Opening websocket connection");
+        // TODO: make this configurable somehow
         let ws =
             WebSocket::open("ws://localhost:1337").expect("only errors if url is bad?");
 
