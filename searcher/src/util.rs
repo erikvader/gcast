@@ -82,7 +82,7 @@ where
     Res: FromIterator<T>,
 {
     let colored = compact_to_ranges(indices);
-    let uncolored = complement(&colored, 0..string.len());
+    let uncolored = complement(&colored, 0..string.chars().count());
     assert!(colored.len() + 1 == uncolored.len());
 
     let mut res = Vec::new();
@@ -123,6 +123,12 @@ fn test_stylize() {
         stylize::<_, _, _, String>("hej", &[], |_| 'a', |_| 'b'),
         "b"
     );
+
+    let path = "/ständiga frågan  www.instagram.com_uumemes-461225481079299.mp4";
+    assert_eq!(
+        stylize::<_, _, _, String>(path, &[], |x| x.to_string(), |x| x.to_string()),
+        path
+    );
 }
 
 // TODO: Use something better. Is there a type from a crate that can operate efficiently
@@ -130,7 +136,12 @@ fn test_stylize() {
 fn slice_chars(string: &str, slice: Range<usize>) -> &str {
     let mut bytes: Vec<_> = string.char_indices().map(|(i, _)| i).collect();
     bytes.push(string.len());
-    let s = &bytes[slice.start..slice.end + 1];
+    let s = bytes.get(slice.start..slice.end + 1).unwrap_or_else(|| {
+        panic!(
+            "slice out of bounds in slice_chars, string: '{}', slice: {:?}",
+            string, slice
+        )
+    });
     &string[*s.first().unwrap()..*s.last().unwrap()]
 }
 
