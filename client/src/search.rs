@@ -4,10 +4,12 @@ use wasm_bindgen::JsCast;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
+use crate::WebSockStatus;
+
 #[rustfmt::skip::macros(html)]
 #[function_component(Filesearch)]
 pub fn filesearch() -> Html {
-    let active = use_context::<bool>().expect("no active context found");
+    let active = use_context::<WebSockStatus>().expect("no active context found");
 
     let query = use_state(|| "".to_string());
     let query_change = {
@@ -37,7 +39,7 @@ pub fn filesearch() -> Html {
                    value={(*query).clone()}
                    oninput={query_change}
                    placeholder={"Search query"}
-                   disabled={!active}
+                   disabled={active.is_disconnected()}
             />
             {results_html}
         </>

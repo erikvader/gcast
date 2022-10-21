@@ -33,21 +33,46 @@ use websocket::{use_websocket_send, use_websocket_status};
 use yew::prelude::*;
 
 #[derive(PartialEq)]
-pub enum Accepted {
+enum Accepted {
     Pending,
     Accepted,
     Rejected,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum WebSockStatus {
+    Connected,
+    Disconnected,
+}
+
+impl From<bool> for WebSockStatus {
+    fn from(b: bool) -> Self {
+        if b {
+            Self::Connected
+        } else {
+            Self::Disconnected
+        }
+    }
+}
+
+impl WebSockStatus {
+    fn is_connected(self) -> bool {
+        matches!(self, WebSockStatus::Connected)
+    }
+    fn is_disconnected(self) -> bool {
+        !self.is_connected()
+    }
 }
 
 #[rustfmt::skip::macros(html)]
 #[function_component(App)]
 fn app() -> Html {
     let accepted = use_state_eq(|| Accepted::Pending);
-    let ws_ready = use_state_eq(|| false);
+    let ws_ready = use_state_eq(|| WebSockStatus::Disconnected);
     let front = use_state_eq(|| None);
     let _ws_status = {
         let ws_ready_setter = ws_ready.setter();
-        use_websocket_status(move |b| ws_ready_setter.set(b))
+        use_websocket_status(move |b| ws_ready_setter.set(b.into()))
     };
     let _ws = {
         let accepted_setter = accepted.setter();
@@ -70,7 +95,7 @@ fn app() -> Html {
     };
 
     html! {
-        <ContextProvider<bool> context={*ws_ready}> // TODO: don't use a simple bool, use custom enum
+        <ContextProvider<WebSockStatus> context={*ws_ready}>
             {match (&*accepted, &*front) {
                 (Accepted::Pending, _) | (Accepted::Accepted, None) => html! {<Pending />},
                 (Accepted::Rejected, _) => html! {<Rejected />},
@@ -79,7 +104,7 @@ fn app() -> Html {
                 (Accepted::Accepted, Some(Front::Mpv(_mpv))) => html! {<Mpv />},
                 (Accepted::Accepted, Some(Front::FileSearch(_fs))) => html! {<Filesearch />},
             }}
-        </ContextProvider<bool>>
+        </ContextProvider<WebSockStatus>>
     }
 }
 
