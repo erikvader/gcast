@@ -102,7 +102,7 @@ fn app() -> Html {
                 (Accepted::Rejected, _) => html! {<Rejected />},
                 (Accepted::Accepted, Some((_, Front::None))) => html! {<Nothing />},
                 (Accepted::Accepted, Some((_, Front::Spotify))) => html! {<Spotify />},
-                (Accepted::Accepted, Some((_, Front::Mpv(_mpv)))) => html! {<Mpv />},
+                (Accepted::Accepted, Some((_, Front::Mpv(mpv)))) => html! {<Mpv front={mpv.clone()} />},
                 (Accepted::Accepted, Some((_, Front::FileSearch(fs)))) => html! {<Filesearch front={fs.clone()} />},
             }}
         </ContextProvider<WebSockStatus>>
