@@ -7,10 +7,7 @@ use wasm_bindgen::JsCast;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
-use crate::{
-    websocket::{use_websocket, websocket_send},
-    WebSockStatus,
-};
+use crate::{websocket::websocket_send, WebSockStatus};
 
 #[derive(Properties, PartialEq)]
 pub struct FilesearchProps {
@@ -20,10 +17,10 @@ pub struct FilesearchProps {
 #[rustfmt::skip::macros(html)]
 #[function_component(Filesearch)]
 pub fn filesearch(props: &FilesearchProps) -> Html {
-    let on_click = Callback::from(|_| websocket_send(fsstart::Stop));
+    let active = use_context::<WebSockStatus>().expect("no active context found");
     html! {
         <>
-            <button onclick={on_click}>{"Go back"}</button>
+            <button onclick={click_send!(fsstart::Stop)} disabled={active.is_disconnected()}>{"Go back"}</button>
             {match &props.front {
                 prot::FileSearch::Init(init) => html!{<Init front={init.clone()} />},
                 prot::FileSearch::Refreshing(refr) => html!{<Refreshing front={refr.clone()} />},
@@ -110,6 +107,7 @@ fn search_result(props: &SearchResultProps) -> Html {
         })
     };
 
+    // TODO: handle disconnection from server
     html! {
         <div onclick={on_click}>{contents}</div>
     }
@@ -141,20 +139,19 @@ struct InitProps {
 #[function_component(Init)]
 fn init(props: &InitProps) -> Html {
     let active = use_context::<WebSockStatus>().expect("no active context found");
-    let to_refresh = Callback::from(|_| websocket_send(fscontrol::RefreshCache));
-    let to_search = Callback::from(|_| websocket_send(fscontrol::Search("".to_string())));
 
     html! {
         <>
             <div>{cache_date(props.front.last_cache_date)}</div>
             <button disabled={active.is_disconnected()}
-                    onclick={to_refresh}>
+                    onclick={click_send!(fscontrol::RefreshCache)}>
                 {"Refresh cache"}
             </button>
             <button disabled={active.is_disconnected() || props.front.last_cache_date.is_none()}
-                    onclick={to_search}>
+                    onclick={click_send!(fscontrol::Search("".to_string()))}>
                 {"Search"}
             </button>
+            // TODO: button for youtube links here?
         </>
     }
 }

@@ -6,17 +6,15 @@ use yew::prelude::*;
 #[function_component(Nothing)]
 pub fn nothing() -> Html {
     let active = use_context::<WebSockStatus>().expect("no active context found");
-    let to_spotify = Callback::from(|_| websocket_send(spotifystart::Start));
-    let to_filesearch = Callback::from(|_| websocket_send(fsstart::Start));
     html! {
         <>
-            <button onclick={to_spotify}
+            <button onclick={click_send!(spotifystart::Start)}
                     disabled={active.is_disconnected()}>
                 {"Spotify"}
             </button>
-            <button onclick={to_filesearch}
+            <button onclick={click_send!(fsstart::Start)}
                     disabled={active.is_disconnected()}>
-                {"File Search"}
+                {"Play video"}
             </button>
         </>
     }

@@ -1,6 +1,13 @@
 // Remove annoying warning from wasm_bindgen
 #![allow(non_snake_case, non_upper_case_globals)]
 
+macro_rules! click_send {
+    ($send:expr) => {{
+        use $crate::websocket::websocket_send;
+        Callback::from(|_| websocket_send($send))
+    }};
+}
+
 mod mpv;
 mod nothing;
 mod pending;
