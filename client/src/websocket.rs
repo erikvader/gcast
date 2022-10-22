@@ -25,9 +25,15 @@ impl Agent for WS {
 
     fn create(link: yew_agent::AgentLink<Self>) -> Self {
         log::info!("Opening websocket connection");
+        let hostname = web_sys::window()
+            .expect("could not access window")
+            .location()
+            .hostname()
+            .unwrap_or_else(|e| panic!("could not get hostname: {:?}", e));
+
         // TODO: make this configurable somehow
-        let ws =
-            WebSocket::open("ws://localhost:1337").expect("only errors if url is bad?");
+        let ws = WebSocket::open(&format!("ws://{}:1337", hostname))
+            .expect("only errors if url is bad?");
 
         let (mut tx, mut rx) = ws.split();
         let link2 = link.clone();
