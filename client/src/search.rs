@@ -4,7 +4,10 @@ use wasm_bindgen::JsCast;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
-use crate::{websocket::use_websocket, WebSockStatus};
+use crate::{
+    websocket::{use_websocket, websocket_send},
+    WebSockStatus,
+};
 
 #[derive(Properties, PartialEq)]
 pub struct FilesearchProps {
@@ -31,12 +34,10 @@ struct ResultsProps {
 #[function_component(Results)]
 fn results(props: &ResultsProps) -> Html {
     let active = use_context::<WebSockStatus>().expect("no active context found");
-    let ws = use_websocket(|_| {});
 
     let query = use_state(|| "".to_string());
     let query_change = {
         let query_setter = query.setter();
-        let ws_clone = ws.clone();
 
         Callback::from(move |ie: InputEvent| {
             let input = ie
@@ -47,8 +48,7 @@ fn results(props: &ResultsProps) -> Html {
             match input {
                 Some(inp) => {
                     query_setter.set(inp.clone());
-                    // TODO: create a one-shot send function instead of this hook
-                    ws_clone.send(fscontrol::Search(inp).into());
+                    websocket_send(fscontrol::Search(inp).into());
                 }
                 None => log::error!("Could not get value from text input"),
             }

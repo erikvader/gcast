@@ -30,7 +30,7 @@ use search::Filesearch;
 use spotify::Spotify;
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use websocket::{use_websocket_send, use_websocket_status};
+use websocket::{use_websocket, use_websocket_status, websocket_send};
 use yew::prelude::*;
 
 #[derive(PartialEq)]
@@ -78,21 +78,19 @@ fn app() -> Html {
     let _ws = {
         let accepted_setter = accepted.setter();
         let front_clone = front.clone();
-        use_websocket_send(move |m| match m.borrow_to_client() {
+        use_websocket(move |m| match m.borrow_to_client() {
             ToClient::Seat(Seat::Accept) => {
                 accepted_setter.set(Accepted::Accepted);
-                Some(SendStatus.to_message())
+                websocket_send(SendStatus.to_message());
             }
             ToClient::Seat(Seat::Reject) => {
                 accepted_setter.set(Accepted::Rejected);
-                None
             }
             ToClient::Front(front) => {
                 let f = (*front_clone).as_ref();
                 if f.is_none() || m.is_newer_than(f.unwrap().0) {
                     front_clone.set(Some((m.id(), front.clone())));
                 }
-                None
             }
             ToClient::Notification(_) => todo!(),
         })

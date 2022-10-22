@@ -151,18 +151,8 @@ where
     })
 }
 
-pub fn use_websocket_send<F>(on_output: F) -> UseBridgeHandle<WS>
-where
-    F: Fn(Rc<protocol::Message>) -> Option<protocol::Message> + 'static,
-{
-    use_bridge(move |wsout| {
-        if let WSOutput::Msg(toclient) = wsout {
-            if let Some(resp) = on_output(toclient) {
-                let mut sender = WS::bridge(yew::Callback::noop());
-                sender.send(resp);
-            }
-        }
-    })
+pub fn websocket_send(msg: protocol::Message) {
+    WS::bridge(yew::Callback::noop()).send(msg);
 }
 
 pub fn use_websocket_status<F>(on_change: F) -> UseBridgeHandle<WS>

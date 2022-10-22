@@ -5,6 +5,7 @@ use std::{
 
 use tokio::sync::OnceCell;
 
+// TODO: use a toml file instead for all sorts of config
 pub const ROOT_DIRS_FILENAME: &str = "root_dirs";
 pub const PROGNAME: &str = "gcast";
 
