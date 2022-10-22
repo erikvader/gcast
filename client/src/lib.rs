@@ -1,14 +1,6 @@
 // Remove annoying warning from wasm_bindgen
 #![allow(non_snake_case, non_upper_case_globals)]
 
-macro_rules! send_callback {
-    ($ws:ident, $send:expr) => {{
-        use protocol::ToMessage;
-        let ws2 = $ws.clone();
-        Callback::from(move |_| ws2.send($send.to_message()))
-    }};
-}
-
 mod mpv;
 mod nothing;
 mod pending;

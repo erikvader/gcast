@@ -1,4 +1,7 @@
-use protocol::{to_client::front::filesearch as prot, to_server::fscontrol};
+use protocol::{
+    to_client::front::filesearch as prot,
+    to_server::{fscontrol, fsstart, mpvstart},
+};
 
 use wasm_bindgen::JsCast;
 use web_sys::HtmlInputElement;
@@ -17,11 +20,16 @@ pub struct FilesearchProps {
 #[rustfmt::skip::macros(html)]
 #[function_component(Filesearch)]
 pub fn filesearch(props: &FilesearchProps) -> Html {
-    // TODO: A stop button here? Or in every sub component?
-    match &props.front {
-        prot::FileSearch::Init(init) => html!{<Init front={init.clone()} />},
-        prot::FileSearch::Refreshing(refr) => html!{<Refreshing front={refr.clone()} />},
-        prot::FileSearch::Results(res) => html!(<Results front={res.clone()} />),
+    let on_click = Callback::from(|_| websocket_send(fsstart::Stop));
+    html! {
+        <>
+            <button onclick={on_click}>{"Go back"}</button>
+            {match &props.front {
+                prot::FileSearch::Init(init) => html!{<Init front={init.clone()} />},
+                prot::FileSearch::Refreshing(refr) => html!{<Refreshing front={refr.clone()} />},
+                prot::FileSearch::Results(res) => html!(<Results front={res.clone()} />),
+            }}
+        </>
     }
 }
 
@@ -48,7 +56,7 @@ fn results(props: &ResultsProps) -> Html {
             match input {
                 Some(inp) => {
                     query_setter.set(inp.clone());
-                    websocket_send(fscontrol::Search(inp).into());
+                    websocket_send(fscontrol::Search(inp));
                 }
                 None => log::error!("Could not get value from text input"),
             }
@@ -59,7 +67,7 @@ fn results(props: &ResultsProps) -> Html {
         .front
         .results
         .iter()
-        .map(|res| stylize_result(&res.path, &res.indices))
+        .map(|res| html! {<SearchResult front={res.clone()} />})
         .collect();
 
     html! {
@@ -76,16 +84,34 @@ fn results(props: &ResultsProps) -> Html {
     }
 }
 
-// TODO: make into a real component for SearchResult with callbacks and properties and stuffs
-fn stylize_result(path: &str, indices: &[usize]) -> Html {
+#[derive(Properties, PartialEq)]
+struct SearchResultProps {
+    front: prot::SearchResult,
+}
+
+#[rustfmt::skip::macros(html)]
+#[function_component(SearchResult)]
+fn search_result(props: &SearchResultProps) -> Html {
     let contents: Html = searcher::stylize(
-        path,
-        indices,
+        &props.front.path,
+        &props.front.indices,
         |on| html! {<span style="color: red">{on}</span>},
         |off| html! {off},
     );
+
+    let on_click = {
+        let root = props.front.root;
+        let path = props.front.path.clone();
+        Callback::from(move |_| {
+            websocket_send(mpvstart::File {
+                root,
+                path: path.clone(),
+            })
+        })
+    };
+
     html! {
-        <div>{contents}</div>
+        <div onclick={on_click}>{contents}</div>
     }
 }
 
@@ -115,9 +141,8 @@ struct InitProps {
 #[function_component(Init)]
 fn init(props: &InitProps) -> Html {
     let active = use_context::<WebSockStatus>().expect("no active context found");
-    let ws = use_websocket(|_| {});
-    let to_refresh = send_callback!(ws, fscontrol::RefreshCache);
-    let to_search = send_callback!(ws, fscontrol::Search("".to_string()));
+    let to_refresh = Callback::from(|_| websocket_send(fscontrol::RefreshCache));
+    let to_search = Callback::from(|_| websocket_send(fscontrol::Search("".to_string())));
 
     html! {
         <>

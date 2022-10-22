@@ -151,8 +151,11 @@ where
     })
 }
 
-pub fn websocket_send(msg: protocol::Message) {
-    WS::bridge(yew::Callback::noop()).send(msg);
+pub fn websocket_send<T>(msg: T)
+where
+    T: protocol::ToMessage,
+{
+    WS::bridge(yew::Callback::noop()).send(msg.to_message());
 }
 
 pub fn use_websocket_status<F>(on_change: F) -> UseBridgeHandle<WS>
