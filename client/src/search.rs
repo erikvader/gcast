@@ -7,6 +7,7 @@ use wasm_bindgen::JsCast;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
+use crate::progressbar::Progressbar;
 use crate::{websocket::websocket_send, WebSockStatus};
 
 #[derive(Properties, PartialEq)]
@@ -19,14 +20,18 @@ pub struct FilesearchProps {
 pub fn filesearch(props: &FilesearchProps) -> Html {
     let active = use_context::<WebSockStatus>().expect("no active context found");
     html! {
-        <>
-            <button onclick={click_send!(fsstart::Stop)} disabled={active.is_disconnected()}>{"Go back"}</button>
+        <article class={classes!("stacker")}>
+            <button onclick={click_send!(fsstart::Stop)}
+                    class={classes!("left", "icon-back-arrow", "icon-right", "icon")}
+                    disabled={active.is_disconnected()}>
+                {"Go back"}
+            </button>
             {match &props.front {
                 prot::FileSearch::Init(init) => html!{<Init front={init.clone()} />},
                 prot::FileSearch::Refreshing(refr) => html!{<Refreshing front={refr.clone()} />},
                 prot::FileSearch::Results(res) => html!(<Results front={res.clone()} />),
             }}
-        </>
+        </article>
     }
 }
 
@@ -40,6 +45,7 @@ struct ResultsProps {
 fn results(props: &ResultsProps) -> Html {
     let active = use_context::<WebSockStatus>().expect("no active context found");
 
+    // TODO: somehow reset the query to the one from the server on mount
     let query = use_state(|| "".to_string());
     let query_change = {
         let query_setter = query.setter();
@@ -67,16 +73,23 @@ fn results(props: &ResultsProps) -> Html {
         .map(|res| html! {<SearchResult front={res.clone()} />})
         .collect();
 
+    let invalid_class = (!props.front.query_valid).then_some("invalid");
+
+    // TODO: show a loading icon when props.front.query != *query
+    // TODO: handle scrolling
     html! {
         <>
             <input type="text"
                    value={(*query).clone()}
+                   class={classes!(invalid_class)}
                    oninput={query_change}
                    placeholder={"Search query"}
+                   autocapitalize={"none"}
                    disabled={active.is_disconnected()}
             />
-            <div>{format!("Query: '{}', valid: {}", props.front.query, props.front.query_valid)}</div>
-            {results_html}
+            <div class={classes!("rows")}>
+                {results_html}
+            </div>
         </>
     }
 }
@@ -92,7 +105,7 @@ fn search_result(props: &SearchResultProps) -> Html {
     let contents: Html = searcher::stylize(
         &props.front.path,
         &props.front.indices,
-        |on| html! {<span style="color: red">{on}</span>},
+        |on| html! {<span class={classes!("search-hl")}>{on}</span>},
         |off| html! {off},
     );
 
@@ -107,9 +120,9 @@ fn search_result(props: &SearchResultProps) -> Html {
         })
     };
 
-    // TODO: handle disconnection from server
+    // TODO: handle disconnection from server. Remove all results?
     html! {
-        <div onclick={on_click}>{contents}</div>
+        <div class={classes!("mono", "search-res")} onclick={on_click}>{contents}</div>
     }
 }
 
@@ -121,12 +134,30 @@ struct RefreshingProps {
 #[rustfmt::skip::macros(html)]
 #[function_component(Refreshing)]
 fn refreshing(props: &RefreshingProps) -> Html {
+    let (upper, lower) = match props.front {
+        prot::Refreshing {
+            progress,
+            exploding: true,
+        } => (progress, 0),
+        prot::Refreshing {
+            progress,
+            exploding: false,
+        } => (100, progress),
+    };
+
     html! {
-        <>
-            <div>{"Refreshing cache..."}</div>
-            <div>{format!("Exploding: {}", props.front.exploding)}</div>
-            <div>{format!("{}%", props.front.progress)}</div>
-        </>
+        <article class={classes!("stacker", "pad")}>
+            <header>
+                <h3>{"Refreshing cache..."}</h3>
+            </header>
+            <Progressbar progress={upper}
+                         outer_class={classes!("progressbar-outer")}
+                         inner_class={classes!("progressbar-inner")}/>
+            <div class={classes!("pad")} />
+            <Progressbar progress={lower}
+                         outer_class={classes!("progressbar-outer")}
+                         inner_class={classes!("progressbar-inner")}/>
+        </article>
     }
 }
 
@@ -142,12 +173,14 @@ fn init(props: &InitProps) -> Html {
 
     html! {
         <>
-            <div>{cache_date(props.front.last_cache_date)}</div>
+            <div class={classes!("pad")}>{cache_date(props.front.last_cache_date)}</div>
             <button disabled={active.is_disconnected()}
+                    class={classes!("icon-refresh", "icon")}
                     onclick={click_send!(fscontrol::RefreshCache)}>
                 {"Refresh cache"}
             </button>
             <button disabled={active.is_disconnected() || props.front.last_cache_date.is_none()}
+                    class={classes!("icon-search", "icon")}
                     onclick={click_send!(fscontrol::Search("".to_string()))}>
                 {"Search"}
             </button>
@@ -156,12 +189,18 @@ fn init(props: &InitProps) -> Html {
     }
 }
 
-fn cache_date(time: Option<std::time::SystemTime>) -> String {
+#[rustfmt::skip::macros(html)]
+fn cache_date(time: Option<std::time::SystemTime>) -> Html {
     match time {
         Some(st) => {
             let local: chrono::DateTime<chrono::Local> = st.into();
-            format!("Cache last updated on: {}", local.format("%Y-%m-%d %H:%M"))
+            html! {
+                <>
+                    <span class={classes!("bold")}>{"Cache last updated on: "}</span>
+                    <span>{local.format("%Y-%m-%d %H:%M")}</span>
+                </>
+            }
         }
-        None => "There is no cache yet".to_string(),
+        None => html! {<span class={classes!("bold")}>{"There is no cache yet"}</span>},
     }
 }

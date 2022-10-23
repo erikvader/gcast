@@ -1,0 +1,61 @@
+.big {
+    font-size: 3em;
+}
+
+.center {
+    text-align: center;
+}
+
+.bold {
+    font-weight: bold;
+}
+
+.pad {
+    padding: 0.3em 0.9em;
+}
+
+.mono {
+    font-family: monospace;
+}
+
+.error {
+    background: #8b0000;
+}
+
+.left {
+    text-align: left;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(359deg);
+    }
+}
+
+.spin::after {
+    animation: spin 2s infinite linear;
+    display: inline-block;
+}
+
+.center-page {
+    margin: 0;
+    width: 100%;
+    text-align: center;
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translate(0, -50%);
+}
+
+.leckerli {
+    font-family: "Leckerli One", cursive;
+}
+
+.embellishment {
+    font-size: 1.3em;
+    color: #0074d9;
+    font-weight: bold;
+}

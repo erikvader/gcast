@@ -1,0 +1,47 @@
+.icon-back-arrow::after {
+    content: "arrow_back";
+}
+
+.icon-refresh::after {
+    content: "refresh";
+}
+
+.icon-right::after {
+    float: right;
+}
+
+.icon-search::after {
+    content: "search";
+}
+
+.icon-renew::after {
+    content: "autorenew";
+}
+
+.icon-front-hand::after {
+    content: "front_hand";
+}
+
+.icon-camera::after {
+    content: "video_library";
+}
+
+.icon-radio::after {
+    content: "radio";
+}
+
+.icon-close::after {
+    content: "close";
+}
+
+.icon::after {
+    font-family: "Material Icons";
+    font-size: 1.5em;
+    line-height: 1;
+    vertical-align: middle;
+    margin-left: 0.2em;
+}
+
+.icon-error::after {
+    color: red;
+}

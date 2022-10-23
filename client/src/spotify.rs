@@ -7,6 +7,15 @@ use yew::prelude::*;
 pub fn spotify() -> Html {
     let active = use_context::<WebSockStatus>().expect("no active context found");
     html! {
-        <button onclick={click_send!(spotifystart::Stop)} disabled={active.is_disconnected()}>{"Close"}</button>
+        <article class={classes!("stacker")}>
+            <header class={classes!("center")}>
+                <h1>{"Spotify"}</h1>
+            </header>
+            <button onclick={click_send!(spotifystart::Stop)}
+                    class={classes!("error")}
+                    disabled={active.is_disconnected()}>
+                {"Close"}
+            </button>
+        </article>
     }
 }

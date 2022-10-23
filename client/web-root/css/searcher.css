@@ -1,0 +1,22 @@
+.search-hl {
+    color: red;
+}
+
+.search-res {
+    word-break: break-all;
+    cursor: pointer;
+    transition: all .3s;
+}
+
+.search-res:hover, .rows > *:nth-child(odd):hover {
+    background: gray;
+}
+
+.rows > *:nth-child(odd) {
+    background: lightgray;
+}
+
+.invalid, .invalid:focus {
+    color: red;
+    border-color: red;
+}

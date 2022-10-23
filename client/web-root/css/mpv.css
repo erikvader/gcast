@@ -1,0 +1,34 @@
+.mpv-progress-outer {
+    position: relative;
+}
+
+.mpv-progress-outer::after {
+    content: "";
+    background: black;
+    width: 100%;
+    height: 0.2em;
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translate(0, -50%);
+}
+
+.mpv-progress-inner {
+    height: 1em;
+    transition: width 0.3s;
+    position: relative;
+    line-height: 1em;
+}
+
+.mpv-progress-inner::after {
+    content: "";
+    background: black;
+    border-radius: 50%;
+    width: 1em;
+    height: 1em;
+    display: inline-block;
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translate(50%, -50%);
+}

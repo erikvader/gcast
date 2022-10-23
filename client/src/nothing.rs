@@ -1,4 +1,4 @@
-use crate::{websocket::websocket_send, WebSockStatus};
+use crate::WebSockStatus;
 use protocol::to_server::{fsstart, spotifystart};
 use yew::prelude::*;
 
@@ -7,15 +7,22 @@ use yew::prelude::*;
 pub fn nothing() -> Html {
     let active = use_context::<WebSockStatus>().expect("no active context found");
     html! {
-        <>
+        <article class={classes!("stacker")}>
+            <header class={classes!("center")}>
+                <h1>
+                    <span class={classes!("leckerli", "embellishment")}>{"g"}</span>{"cast"}
+                </h1>
+            </header>
             <button onclick={click_send!(spotifystart::Start)}
+                    class={classes!("icon", "icon-radio")}
                     disabled={active.is_disconnected()}>
                 {"Spotify"}
             </button>
             <button onclick={click_send!(fsstart::Start)}
+                    class={classes!("icon", "icon-camera")}
                     disabled={active.is_disconnected()}>
                 {"Play video"}
             </button>
-        </>
+        </article>
     }
 }

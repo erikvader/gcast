@@ -11,6 +11,7 @@ macro_rules! click_send {
 mod mpv;
 mod nothing;
 mod pending;
+mod progressbar;
 mod rejected;
 mod search;
 mod spotify;

@@ -4,6 +4,7 @@ use protocol::{
 };
 use yew::prelude::*;
 
+use crate::progressbar::Progressbar;
 use crate::WebSockStatus;
 
 #[derive(Properties, PartialEq)]
@@ -17,15 +18,34 @@ pub fn mpv(props: &MpvProps) -> Html {
     let active = use_context::<WebSockStatus>().expect("no active context found");
     let clickable = active.is_connected() && !matches!(props.front, prot::Mpv::Load);
 
+    let (progress_min, length_min) = match props.front {
+        prot::Load => ("0".to_string(), "0".to_string()),
+        prot::PlayState(prot::PlayState {
+            progress, length, ..
+        }) => (
+            timestamp(progress.into_inner()),
+            timestamp(length.into_inner()),
+        ),
+    };
+
     html! {
-        <>
+        <article class={classes!("stacker")}>
             if matches!(props.front, prot::Mpv::Load) {
                 <div>{"Loading"}</div>
             }
             <button onclick={click_send!(mpvstart::Stop)}
-                    disabled={active.is_disconnected()}>
+                    disabled={active.is_disconnected()}
+                    class={classes!("icon", "icon-close", "icon-right", "left", "error")}>
                 {"Exit"}
             </button>
+            <div class={classes!("left", "pad")}>
+                {progress_min}{"/"}{length_min}
+            </div>
+            <div class={classes!("pad")}>
+                <Progressbar progress={progress(props)}
+                             outer_class={classes!("mpv-progress-outer")}
+                             inner_class={classes!("mpv-progress-inner")}/>
+            </div>
             <button onclick={click_send!(mpvcontrol::TogglePause)}
                     disabled={!clickable}>
                 {"Pause/play"}
@@ -98,6 +118,34 @@ pub fn mpv(props: &MpvProps) -> Html {
                     disabled={!clickable}>
                 {"SubMoveDown"}
             </button>
-        </>
+        </article>
+    }
+}
+
+fn progress(props: &MpvProps) -> u8 {
+    let p = match props.front {
+        prot::PlayState(prot::PlayState {
+            progress, length, ..
+        }) if length != 0.0 => ((progress / length) * 100.0).into_inner(),
+        _ => 0.0,
+    }
+    .trunc() as u8;
+
+    if p > 100 {
+        100
+    } else {
+        p
+    }
+}
+
+fn timestamp(seconds: f64) -> String {
+    if seconds.is_nan() || seconds.is_infinite() || seconds < 0.0 {
+        log::warn!("Got weird value as seconds: {}", seconds);
+        "??:??:??".to_string()
+    } else {
+        let hours = seconds / 3600.0;
+        let minutes = (seconds % 3600.0) / 60.0;
+        let s = seconds % 60.0;
+        format!("{:02.0}:{:02.0}:{:02.0}", hours, minutes, s)
     }
 }
