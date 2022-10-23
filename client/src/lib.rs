@@ -22,7 +22,7 @@ use pending::Pending;
 use protocol::{
     to_client::{front::Front, seat::Seat, ToClient},
     to_server::sendstatus::SendStatus,
-    ToMessage,
+    Id, ToMessage,
 };
 use rejected::Rejected;
 use search::Filesearch;
@@ -32,7 +32,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use websocket::{use_websocket, use_websocket_status, websocket_send};
 use yew::prelude::*;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Copy, Clone, Debug)]
 enum Accepted {
     Pending,
     Accepted,
@@ -64,12 +64,36 @@ impl WebSockStatus {
     }
 }
 
+#[derive(PartialEq, Properties)]
+struct AppProps {
+    ws_ready: WebSockStatus,
+    accepted: Accepted,
+    front: Option<Front>,
+}
+
 #[rustfmt::skip::macros(html)]
 #[function_component(App)]
-fn app() -> Html {
+fn app(props: &AppProps) -> Html {
+    html! {
+        <ContextProvider<WebSockStatus> context={props.ws_ready}>
+            {match (props.accepted, &props.front) {
+                (Accepted::Pending, _) | (Accepted::Accepted, None) => html! {<Pending />},
+                (Accepted::Rejected, _) => html! {<Rejected />},
+                (Accepted::Accepted, Some(Front::None)) => html! {<Nothing />},
+                (Accepted::Accepted, Some(Front::Spotify)) => html! {<Spotify />},
+                (Accepted::Accepted, Some(Front::Mpv(mpv))) => html! {<Mpv front={mpv.clone()} />},
+                (Accepted::Accepted, Some(Front::FileSearch(fs))) => html! {<Filesearch front={fs.clone()} />},
+            }}
+        </ContextProvider<WebSockStatus>>
+    }
+}
+
+#[rustfmt::skip::macros(html)]
+#[function_component(LiveApp)]
+fn live_app() -> Html {
     let accepted = use_state_eq(|| Accepted::Pending);
     let ws_ready = use_state_eq(|| WebSockStatus::Disconnected);
-    let front = use_state_eq::<Option<(u64, Front)>, _>(|| None);
+    let front = use_state_eq::<Option<(Id, Front)>, _>(|| None);
     let _ws_status = {
         let ws_ready_setter = ws_ready.setter();
         use_websocket_status(move |b| ws_ready_setter.set(b.into()))
@@ -96,21 +120,20 @@ fn app() -> Html {
     };
 
     html! {
-        <ContextProvider<WebSockStatus> context={*ws_ready}>
-            {match (&*accepted, &*front) {
-                (Accepted::Pending, _) | (Accepted::Accepted, None) => html! {<Pending />},
-                (Accepted::Rejected, _) => html! {<Rejected />},
-                (Accepted::Accepted, Some((_, Front::None))) => html! {<Nothing />},
-                (Accepted::Accepted, Some((_, Front::Spotify))) => html! {<Spotify />},
-                (Accepted::Accepted, Some((_, Front::Mpv(mpv)))) => html! {<Mpv front={mpv.clone()} />},
-                (Accepted::Accepted, Some((_, Front::FileSearch(fs)))) => html! {<Filesearch front={fs.clone()} />},
-            }}
-        </ContextProvider<WebSockStatus>>
+        <App ws_ready={*ws_ready}
+             accepted={*accepted}
+             front={front.as_ref().map(|(_, f)| f.clone())}
+         />
     }
 }
 
 #[wasm_bindgen(start)]
 pub fn main() {
     wasm_logger::init(wasm_logger::Config::default());
-    yew::start_app::<App>();
+    yew::start_app::<LiveApp>();
+    // yew::start_app_with_props::<App>(AppProps {
+    //     ws_ready: WebSockStatus::Connected,
+    //     accepted: Accepted::Pending,
+    //     front: None,
+    // });
 }

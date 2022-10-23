@@ -47,6 +47,8 @@ pub mod to_server;
 
 use std::sync::atomic::AtomicU64;
 
+pub type Id = u64;
+
 static MESSAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 message_part! {
@@ -58,7 +60,7 @@ message_part! {
 
 message_part! {
     struct Message {
-        id: u64,
+        id: Id,
         kind: MessageKind,
     }
 }
@@ -111,7 +113,7 @@ impl Message {
         }
     }
 
-    pub fn id(&self) -> u64 {
+    pub fn id(&self) -> Id {
         self.id
     }
 
@@ -123,7 +125,7 @@ impl Message {
         matches!(self.kind, MessageKind::ToClient(_))
     }
 
-    pub fn is_newer_than(&self, old: u64) -> bool {
+    pub fn is_newer_than(&self, old: Id) -> bool {
         self.id() > old
     }
 }

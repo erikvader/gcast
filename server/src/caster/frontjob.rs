@@ -177,6 +177,7 @@ impl FrontJob {
 
     pub async fn start_mpv_url(&mut self, url: String) {
         start_check!(self, self.is_none());
+        // TODO: verify that the string looks like an URL, send notification otherwise?
         log::info!("Starting mpv with url");
         self.transition(|to_conn| Variant::mpv_job(to_conn, url))
             .await;
