@@ -41,7 +41,6 @@ impl Agent for WS {
             while let Some(msg) = rx.next().await {
                 match msg {
                     Ok(m) => {
-                        log::info!("Received: {:?}", m);
                         if let Some(toclient) = try_to_client(&m) {
                             link2.send_message(WSOutput::Msg(Rc::new(toclient)));
                         }
@@ -72,7 +71,6 @@ impl Agent for WS {
                     }
                 };
 
-                log::debug!("Trying to send something over websocket");
                 match tx.send(GlooMsg::Bytes(bytes)).await {
                     Ok(()) => {
                         // NOTE: This branch is taken if websocket is already closed for
@@ -117,12 +115,10 @@ impl Agent for WS {
     }
 
     fn connected(&mut self, id: yew_agent::HandlerId) {
-        log::debug!("An agent connected {:?}", id);
         self.clients.insert(id);
     }
 
     fn disconnected(&mut self, id: yew_agent::HandlerId) {
-        log::debug!("An agent disconnected {:?}", id);
         self.clients.remove(&id);
     }
 }
