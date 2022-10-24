@@ -2,6 +2,14 @@
     font-size: 3em;
 }
 
+.kinda-big {
+    font-size: 1.5em;
+}
+
+.small {
+    font-size: 0.8em;
+}
+
 .center {
     text-align: center;
 }
@@ -58,4 +66,52 @@
     font-size: 1.3em;
     color: #0074d9;
     font-weight: bold;
+}
+
+.float-right {
+    float: right;
+}
+
+.round {
+    border-radius: 50%;
+    width: 2em;
+    height: 2em;
+    position: relative;
+    background: black;
+}
+
+.round::after {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.space-evenly {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: space-evenly;
+    align-items: center;
+}
+
+.section {
+    position: relative;
+}
+
+.section > span {
+    background: white;
+    position: relative;
+    z-index: 5;
+}
+
+.section::after {
+    content: "";
+    background: black;
+    width: 100%;
+    height: 0.1em;
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translate(0, -50%);
+    z-index: 4;
 }

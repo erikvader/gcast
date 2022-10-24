@@ -2,7 +2,7 @@ use yew::prelude::*;
 
 #[derive(Properties, PartialEq)]
 pub struct ProgressProps {
-    pub progress: u8,
+    pub progress: u8, // TODO: take an f64, ints to hacky
     pub outer_class: Classes,
     pub inner_class: Classes,
 }

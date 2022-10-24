@@ -117,8 +117,8 @@ fn control_string(ctrl: &MpvControl) -> Command {
         SeekBack => "seek -5",
         SeekForward => "seek 5",
         CycleSub => "cycle sub",
-        SeekBackLong => "seek -90",
-        SeekForwardLong => "seek 90",
+        SeekBackLong => "seek -30",
+        SeekForwardLong => "seek 30",
         SubLarger => "add sub-scale 0.1",
         SubSmaller => "add sub-scale -0.1",
         SubMoveUp => "add sub-pos -1",
@@ -146,6 +146,7 @@ impl MpvHandle {
         self.command_str("quit").await
     }
 
+    // TODO: throttle the amount of messages
     pub async fn next(&mut self) -> MpvResult<MpvState> {
         self.rx.recv().await.unwrap_or(Err(MpvError::Exited))
     }

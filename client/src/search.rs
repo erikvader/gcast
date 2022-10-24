@@ -175,12 +175,12 @@ fn init(props: &InitProps) -> Html {
         <>
             <div class={classes!("pad")}>{cache_date(props.front.last_cache_date)}</div>
             <button disabled={active.is_disconnected()}
-                    class={classes!("icon-refresh", "icon")}
+                    class={classes!("icon-refresh", "icon", "icon-hspace")}
                     onclick={click_send!(fscontrol::RefreshCache)}>
                 {"Refresh cache"}
             </button>
             <button disabled={active.is_disconnected() || props.front.last_cache_date.is_none()}
-                    class={classes!("icon-search", "icon")}
+                    class={classes!("icon-search", "icon", "icon-hspace")}
                     onclick={click_send!(fscontrol::Search("".to_string()))}>
                 {"Search"}
             </button>

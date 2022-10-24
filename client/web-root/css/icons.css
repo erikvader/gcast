@@ -2,6 +2,10 @@
     content: "arrow_back";
 }
 
+.icon-forward-arrow::after {
+    content: "arrow_forward";
+}
+
 .icon-refresh::after {
     content: "refresh";
 }
@@ -34,11 +38,82 @@
     content: "close";
 }
 
+.icon-pause::after {
+    content: "pause";
+}
+
+.icon-play::after {
+    content: "play_arrow";
+}
+
+.icon-backward5::after {
+    content: "replay_5";
+}
+
+.icon-forward5::after {
+    content: "forward_5";
+}
+
+.icon-backward30::after {
+    content: "replay_30";
+}
+
+.icon-forward30::after {
+    content: "forward_30";
+}
+
+.icon-skip-fwd::after {
+    content: "skip_next";
+}
+
+.icon-skip-back::after {
+    content: "skip_previous";
+}
+
+.icon-volume-up::after {
+    content: "volume_up";
+}
+
+.icon-volume-down::after {
+    content: "volume_down";
+}
+
+.icon-volume-mute::after {
+    content: "volume_off";
+}
+
+.icon-audio-file::after {
+    content: "audio_file";
+}
+
+.icon-subtitles::after {
+    content: "subtitles";
+}
+
+.icon-up-arrow::after {
+    content: "arrow_upward";
+}
+
+.icon-down-arrow::after {
+    content: "arrow_downward";
+}
+
+.icon-remove::after {
+    content: "remove";
+}
+
+.icon-add::after {
+    content: "add";
+}
+
 .icon::after {
     font-family: "Material Icons";
     font-size: 1.5em;
     line-height: 1;
     vertical-align: middle;
+}
+
+.icon-hspace::after {
     margin-left: 0.2em;
 }
 

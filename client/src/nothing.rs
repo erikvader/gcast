@@ -14,12 +14,12 @@ pub fn nothing() -> Html {
                 </h1>
             </header>
             <button onclick={click_send!(spotifystart::Start)}
-                    class={classes!("icon", "icon-radio")}
+                    class={classes!("icon", "icon-radio", "icon-hspace")}
                     disabled={active.is_disconnected()}>
                 {"Spotify"}
             </button>
             <button onclick={click_send!(fsstart::Start)}
-                    class={classes!("icon", "icon-camera")}
+                    class={classes!("icon", "icon-camera", "icon-hspace")}
                     disabled={active.is_disconnected()}>
                 {"Play video"}
             </button>
