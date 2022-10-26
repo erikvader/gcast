@@ -14,6 +14,7 @@ tokio-util = "0.7" # server: cancellation token
 tokio-tungstenite = "0.17" # server: websocket
 futures-util = "0.3" # server: streams and sinks
 async-trait = "0.1" # server: FutureCancel trait
+toml = "0.5" # server: config file
 
 libc = "0.2" # server: signal handlers
 dirs = "4.0" # server: access .config etc

@@ -3,43 +3,32 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use anyhow::Context;
 use tokio::sync::OnceCell;
 
-// TODO: use a toml file instead for all sorts of config
-pub const ROOT_DIRS_FILENAME: &str = "root_dirs";
 pub const PROGNAME: &str = "gcast";
+pub const CONFIG_NAME: &str = "config.toml";
 
 static CONF: OnceCell<Config> = OnceCell::const_new();
 
-#[derive(Debug)]
+#[derive(Debug, serde::Deserialize)]
 struct Config {
     root_dirs: Vec<String>,
-    conf_dir: PathBuf,
-    cache_dir: PathBuf,
+    port: u16,
+    mpv: toml::value::Table,
 }
 
-pub fn init_config() {
-    let conf_dir = dirs::config_dir()
-        .expect("could not get config dir")
-        .join(PROGNAME);
-    let cache_dir = dirs::cache_dir()
-        .expect("could not get cache dir")
-        .join(PROGNAME);
+pub fn init_config() -> anyhow::Result<()> {
+    let conts = fs::read_to_string(conf_dir().join(CONFIG_NAME))
+        .context("reading config file to a string")?;
+    let conf: Config = toml::from_str(&conts).context("parsing config file as TOML")?;
 
-    let root_dirs = match read_root_dirs(&conf_dir.join(ROOT_DIRS_FILENAME)) {
-        Ok(dirs) => dirs,
-        Err(e) => {
-            log::error!("Failed to read root dirs config file: '{}'", e);
-            Vec::new()
-        }
-    };
+    if conf.mpv.iter().any(|(_, v)| !v.is_str()) {
+        anyhow::bail!("Mpv values must be strings");
+    }
 
-    CONF.set(Config {
-        root_dirs,
-        conf_dir,
-        cache_dir,
-    })
-    .expect("Failed to init config");
+    CONF.set(conf).context("setting the global conf variable")?;
+    Ok(())
 }
 
 fn get_instance() -> &'static Config {
@@ -50,12 +39,35 @@ pub fn root_dirs() -> &'static [String] {
     &get_instance().root_dirs
 }
 
-pub fn conf_dir() -> &'static Path {
-    &get_instance().conf_dir
+pub fn port() -> u16 {
+    get_instance().port
 }
 
-pub fn cache_dir() -> &'static Path {
-    &get_instance().cache_dir
+pub fn mpv_options() -> Vec<(String, String)> {
+    get_instance()
+        .mpv
+        .iter()
+        .map(|(k, v)| {
+            (
+                k.clone(),
+                v.as_str()
+                    .expect("has been checked while reading the config")
+                    .to_string(),
+            )
+        })
+        .collect()
+}
+
+pub fn conf_dir() -> PathBuf {
+    dirs::config_dir()
+        .expect("could not get config dir")
+        .join(PROGNAME)
+}
+
+pub fn cache_dir() -> PathBuf {
+    dirs::cache_dir()
+        .expect("could not get cache dir")
+        .join(PROGNAME)
 }
 
 fn read_root_dirs(path: &Path) -> io::Result<Vec<String>> {

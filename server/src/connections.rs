@@ -11,11 +11,10 @@ use tokio_tungstenite::tungstenite::Message as TungMsg;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
+    config,
     util::{join_handle_wait_take, FutureCancel},
     Receiver, Sender,
 };
-
-const PORT: u16 = 1337;
 
 async fn ws_send<T, S>(msg: T, ws: &mut S) -> anyhow::Result<()>
 where
@@ -136,7 +135,7 @@ pub async fn connections_actor(
     mut from_cast: Receiver,
     canceltoken: CancellationToken,
 ) -> anyhow::Result<()> {
-    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), PORT);
+    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), config::port());
     let mut listener = TcpListener::bind(addr).await?;
     log::info!("Listening on: {}", addr);
 

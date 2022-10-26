@@ -10,6 +10,8 @@ mod process;
 mod repeatable_oneshot;
 mod signal;
 
+use std::process::ExitCode;
+
 use futures_util::future::maybe_done;
 use protocol::Message;
 use tokio::{join, select, spawn, sync::mpsc, task::JoinError};
@@ -47,10 +49,13 @@ fn log_actor_error(res: Result<Result<(), anyhow::Error>, JoinError>, name: &str
 }
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() {
+async fn main() -> ExitCode {
     init_logger();
     log::info!("Welcome");
-    config::init_config();
+    if let Err(e) = config::init_config() {
+        log::error!("Failed to read config: {:?}", e);
+        return ExitCode::FAILURE;
+    }
 
     let (to_cast, from_conn) = mpsc::channel(CHANNEL_SIZE);
     let (to_conn, from_cast) = mpsc::channel(CHANNEL_SIZE);
@@ -92,4 +97,5 @@ async fn main() {
     }
 
     log::info!("Goodbye");
+    ExitCode::SUCCESS
 }
