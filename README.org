@@ -1,0 +1,41 @@
+* Introduction
+todo
+* Installation
+The missing values in =deploy-config.mk.default= needs to be filled in
+first and the file saved as =deploy-config.mk=.
+** Client web server
+Basically run ~make -C client deploy~.
+
+Some manual work needs to be performed the first time the web server
+is deployed.
+
+First, build and sync:
+#+BEGIN_SRC sh
+make -C client deploy-build deploy-sync
+#+END_SRC
+
+Then, on the server, make the service file known to systemd:
+#+BEGIN_SRC sh
+systemctl --user link ~/gcast/client/gcast-client.service
+#+END_SRC
+
+Then enable it by adding a ~wants~ to some target, e.g. one that is
+started by your window manager ([[https://superuser.com/a/1128905][source]]):
+#+BEGIN_SRC sh
+systemctl --user add-wants xmonad.target gcast-client.service
+#+END_SRC
+*** Port 80 without root
+Non-root processes can't create a socket on any port below 1024.
+
+Create a rule with iptables to redirect all tcp traffic to port 80 to
+port 8080 ([[https://serverfault.com/a/112798][source]]):
+#+BEGIN_SRC sh
+sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8080
+#+END_SRC
+
+Save it and enable a systemd service that will restore this
+configuration ([[https://wiki.archlinux.org/title/iptables#Configuration_and_usage][source]]):
+#+BEGIN_SRC sh
+sudo iptables-save -f /etc/iptables/iptables.rules
+sudo systemctl enable iptables.service
+#+END_SRC
