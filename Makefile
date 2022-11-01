@@ -1,4 +1,6 @@
-export CARGOFLAGS :=
+# export CARGOFLAGS :=
+
+#TODO: keep this makefile?
 
 .PHONY: all
 all: server client cli
@@ -15,17 +17,17 @@ client:
 cli:
 	cargo build -p cli $(CARGOFLAGS)
 
-ifneq ($(filter deploy deploy-server deploy-client,$(MAKECMDGOALS)),)
-include deploy-config.mk
+# ifneq ($(filter deploy deploy-server deploy-client,$(MAKECMDGOALS)),)
+# include deploy-config.mk
 
-CARGOFLAGS += --release
+# CARGOFLAGS += --release
 
-.PHONY: deploy deploy-server deploy-client
-deploy: deploy-server deploy-client
+# .PHONY: deploy deploy-server deploy-client
+# deploy: deploy-server deploy-client
 
-deploy-client:
-	$(MAKE) -C client deploy
+# deploy-client:
+# 	$(MAKE) -C client deploy
 
-deploy-server:
-	$(MAKE) -C server deploy
-endif
+# deploy-server:
+# 	$(MAKE) -C server deploy
+# endif
