@@ -1,3 +1,4 @@
+import sys
 from http.server import SimpleHTTPRequestHandler
 from socketserver import TCPServer
 
@@ -12,8 +13,13 @@ class Handler(SimpleHTTPRequestHandler):
         super().end_headers()
 
 def main():
-    with TCPServer(("", 8080), Handler) as httpd:
-        print("Serving...")
+    if len(sys.argv) == 2:
+        port = int(sys.argv[1])
+    else:
+        port = 8080
+
+    with TCPServer(("", port), Handler) as httpd:
+        print(f"Serving on {port}...")
         httpd.serve_forever()
 
 if __name__ == "__main__":
