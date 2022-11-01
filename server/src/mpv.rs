@@ -146,7 +146,7 @@ impl MpvHandle {
         self.command_str("quit").await
     }
 
-    // TODO: throttle the amount of messages
+    // TODO: throttle the messages to make it a little easier on the client?
     pub async fn next(&mut self) -> MpvResult<MpvState> {
         self.rx.recv().await.unwrap_or(Err(MpvError::Exited))
     }
@@ -178,6 +178,8 @@ pub fn mpv(path: &str) -> MpvResult<MpvHandle> {
     let (h_tx, h_rx): (HandleSnd, _) = mpsc::channel(crate::CHANNEL_SIZE);
     let (s_tx, s_rx): (_, StateRcv) = mpsc::channel(crate::CHANNEL_SIZE);
 
+    // TODO: put all these in the global config toml
+    // TODO: pulse-latency-hacks=yes
     let mpv = Mpv::with_initializer(|x| {
         x.set_property("force-window", "immediate")?;
         x.set_property("idle", "once")?;

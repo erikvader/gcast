@@ -132,9 +132,14 @@ fn live_app() -> Html {
 pub fn main() {
     wasm_logger::init(wasm_logger::Config::default());
     yew::start_app::<LiveApp>();
+
+    // use protocol::to_client::front::filesearch as fs;
+    // use protocol::to_client::front::mpv as m;
     // yew::start_app_with_props::<App>(AppProps {
     //     ws_ready: WebSockStatus::Connected,
-    //     accepted: Accepted::Pending,
-    //     front: None,
+    //     accepted: Accepted::Accepted,
+    //     front: Some(
+    //         m::Mpv::from(m::PlayState::new(false, 4.2, 5000.0, 20.0, 5, 2)).into(),
+    //     ),
     // });
 }
