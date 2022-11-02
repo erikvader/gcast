@@ -1,13 +1,36 @@
+CARGOFLAGS :=
+SERVICE := gcast-server.service
+SOURCES = ../target/$(DEPLOY_TARGET)/release/server $(SERVICE) config-default.toml
+
 .PHONY: build
 build:
 	cargo build $(CARGOFLAGS)
 
-ifneq ($(filter deploy,$(MAKECMDGOALS)),)
-ifndef DEPLOY_TARGET
-$(error DEPLOY_TARGET not defined while deploying)
-endif
+include ../common.mk
+
+ifneq ($(filter deploy%,$(MAKECMDGOALS)),)
+include ../deploy-config.mk
+
+.PHONY: deploy-build
+deploy-build: build
+deploy-build: CARGOFLAGS += --target $(DEPLOY_TARGET) --release
+
+.PHONY: deploy-stop
+deploy-stop:
+	$(SSH) $(DEPLOY_HOST) $(SERVICESTOP) $(SERVICE)
+
+.PHONY: deploy-start
+deploy-start:
+	$(SSH) $(DEPLOY_HOST) $(SERVICESTART) $(SERVICE)
+
+.PHONY: deploy-status
+deploy-status:
+	$(SSH) $(DEPLOY_HOST) $(SERVICESTATUS) $(SERVICE)
+
+.PHONY: deploy-sync
+deploy-sync:
+	$(RSYNC) $(SOURCES) $(DEPLOY_SERVER_PATH)
 
 .PHONY: deploy
-deploy: build
-deploy: CARGOFLAGS += --target $(DEPLOY_TARGET)
+deploy: deploy-build deploy-stop deploy-sync deploy-start
 endif

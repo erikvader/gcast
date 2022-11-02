@@ -1,0 +1,7 @@
+[Unit]
+Description=server for gcast
+
+[Service]
+ExecStart=%h/gcast/server/server
+#TODO: make the %h/gcast/server path configurable somehow
+WorkingDirectory=%h/gcast/server

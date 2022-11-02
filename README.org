@@ -2,29 +2,34 @@
 todo
 * Installation
 The missing values in =deploy-config.mk.default= needs to be filled in
-first and the file saved as =deploy-config.mk=.
-** Client web server
-Basically run ~make -C client deploy~.
+first and the file saved as =deploy-config.mk=. Then basically run
+~make -C client deploy~ and ~make -C server deploy~.
 
-Some manual work needs to be performed the first time the web server
-is deployed.
+Some manual work needs to be performed the first time this is deployed.
 
 First, build and sync:
 #+BEGIN_SRC sh
 make -C client deploy-build deploy-sync
+make -C server deploy-build deploy-sync
 #+END_SRC
 
 Then, on the server, make the service file known to systemd:
 #+BEGIN_SRC sh
 systemctl --user link ~/gcast/client/gcast-client.service
+systemctl --user link ~/gcast/server/gcast-server.service
 #+END_SRC
 
 Then enable it by adding a ~wants~ to some target, e.g. one that is
 started by your window manager ([[https://superuser.com/a/1128905][source]]):
 #+BEGIN_SRC sh
 systemctl --user add-wants xmonad.target gcast-client.service
+systemctl --user add-wants xmonad.target gcast-server.service
 #+END_SRC
-*** Port 80 without root
+
+The server also has a config that needs to be placed at
+=~/.config/gcast/config.toml=.
+
+** Port 80 without root
 Non-root processes can't create a socket on any port below 1024.
 
 Create a rule with iptables to redirect all tcp traffic to port 80 to
