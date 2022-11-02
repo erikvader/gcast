@@ -1,0 +1,15 @@
+# Absolute paths to directories with videos in them
+root_dirs = [
+  "/home/blah/Videos",
+  ]
+
+# Port number to await websocket connections on
+port = 1337
+
+# Key value pairs of properties for mpv
+[mpv.properties]
+# fullscreen = "true"
+
+[spotify]
+# The executable to run to start spotify
+executable = "spotify"

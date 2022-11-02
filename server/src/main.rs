@@ -28,6 +28,8 @@ type Receiver = mpsc::Receiver<Message>;
 fn init_logger() {
     use simplelog::*;
 
+    // TODO: tiderna är en timme fel
+    // TODO: detect if from systemd and inte skriva ut tider då
     let level = LevelFilter::Debug;
     let config = ConfigBuilder::new().add_filter_allow_str("server").build();
     let colors = if atty::is(atty::Stream::Stdout) {

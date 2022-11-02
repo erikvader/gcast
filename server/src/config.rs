@@ -15,15 +15,28 @@ static CONF: OnceCell<Config> = OnceCell::const_new();
 struct Config {
     root_dirs: Vec<String>,
     port: u16,
-    mpv: toml::value::Table,
+    mpv: Mpv,
+    spotify: Spotify,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct Spotify {
+    executable: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct Mpv {
+    properties: toml::value::Table,
 }
 
 pub fn init_config() -> anyhow::Result<()> {
-    let conts = fs::read_to_string(conf_dir().join(CONFIG_NAME))
-        .context("reading config file to a string")?;
+    let conf_file = conf_dir().join(CONFIG_NAME);
+    let conts = fs::read_to_string(&conf_file)
+        .with_context(|| format!("reading config file at {:?}", conf_file))?;
+
     let conf: Config = toml::from_str(&conts).context("parsing config file as TOML")?;
 
-    if conf.mpv.iter().any(|(_, v)| !v.is_str()) {
+    if conf.mpv.properties.iter().any(|(_, v)| !v.is_str()) {
         anyhow::bail!("Mpv values must be strings");
     }
 
@@ -43,9 +56,11 @@ pub fn port() -> u16 {
     get_instance().port
 }
 
+// TODO: use
 pub fn mpv_options() -> Vec<(String, String)> {
     get_instance()
         .mpv
+        .properties
         .iter()
         .map(|(k, v)| {
             (
@@ -56,6 +71,11 @@ pub fn mpv_options() -> Vec<(String, String)> {
             )
         })
         .collect()
+}
+
+// TODO: use
+pub fn spotify_exe() -> &'static str {
+    &get_instance().spotify.executable
 }
 
 pub fn conf_dir() -> PathBuf {
