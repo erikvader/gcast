@@ -25,22 +25,31 @@ const CHANNEL_SIZE: usize = 1024;
 type Sender = mpsc::Sender<Message>;
 type Receiver = mpsc::Receiver<Message>;
 
+fn started_by_systemd() -> bool {
+    // TODO: use https://docs.rs/systemd-journal-logger/latest/systemd_journal_logger/index.html instead?
+    // NOTE: man 5 systemd.exec
+    match std::env::var("JOURNAL_STREAM") {
+        Ok(_) | Err(std::env::VarError::NotUnicode(_)) => true,
+        Err(std::env::VarError::NotPresent) => false,
+    }
+}
+
 fn init_logger() {
     use simplelog::*;
 
-    // TODO: detect if from systemd and inte skriva ut tider då
-    // NOTE: set_time_offset_to_local can only be run when there is only on thread active.
-    let config = match ConfigBuilder::new().set_time_offset_to_local() {
-        Ok(builder) => builder,
-        Err(builder) => {
+    let mut builder = ConfigBuilder::new();
+    builder.add_filter_allow_str("server");
+
+    if started_by_systemd() {
+        builder.set_time_level(LevelFilter::Off);
+    } else {
+        // NOTE: set_time_offset_to_local can only be run when there is only on thread active.
+        if builder.set_time_offset_to_local().is_err() {
             eprintln!(
                 "Failed to set time zone for the logger, using UTC instead (I think)"
             );
-            builder
         }
     }
-    .add_filter_allow_str("server")
-    .build();
 
     let level = LevelFilter::Debug;
     let colors = if atty::is(atty::Stream::Stdout) {
@@ -49,7 +58,7 @@ fn init_logger() {
         ColorChoice::Never
     };
 
-    TermLogger::init(level, config, TerminalMode::Stdout, colors)
+    TermLogger::init(level, builder.build(), TerminalMode::Stdout, colors)
         .expect("could not init logger");
 }
 
