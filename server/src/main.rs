@@ -28,10 +28,21 @@ type Receiver = mpsc::Receiver<Message>;
 fn init_logger() {
     use simplelog::*;
 
-    // TODO: tiderna är en timme fel
     // TODO: detect if from systemd and inte skriva ut tider då
+    // NOTE: set_time_offset_to_local can only be run when there is only on thread active.
+    let config = match ConfigBuilder::new().set_time_offset_to_local() {
+        Ok(builder) => builder,
+        Err(builder) => {
+            eprintln!(
+                "Failed to set time zone for the logger, using UTC instead (I think)"
+            );
+            builder
+        }
+    }
+    .add_filter_allow_str("server")
+    .build();
+
     let level = LevelFilter::Debug;
-    let config = ConfigBuilder::new().add_filter_allow_str("server").build();
     let colors = if atty::is(atty::Stream::Stdout) {
         ColorChoice::Auto
     } else {
@@ -51,14 +62,7 @@ fn log_actor_error(res: Result<Result<(), anyhow::Error>, JoinError>, name: &str
 }
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() -> ExitCode {
-    init_logger();
-    log::info!("Welcome");
-    if let Err(e) = config::init_config() {
-        log::error!("Failed to read config: {:?}", e);
-        return ExitCode::FAILURE;
-    }
-
+async fn async_main() -> ExitCode {
     let (to_cast, from_conn) = mpsc::channel(CHANNEL_SIZE);
     let (to_conn, from_cast) = mpsc::channel(CHANNEL_SIZE);
     let canceltoken = CancellationToken::new();
@@ -100,4 +104,16 @@ async fn main() -> ExitCode {
 
     log::info!("Goodbye");
     ExitCode::SUCCESS
+}
+
+fn main() -> ExitCode {
+    init_logger();
+    log::info!("Welcome");
+
+    if let Err(e) = config::init_config() {
+        log::error!("Failed to read config: {:?}", e);
+        return ExitCode::FAILURE;
+    }
+
+    async_main()
 }
