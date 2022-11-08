@@ -44,6 +44,7 @@ macro_rules! message {
 
 pub mod to_client;
 pub mod to_server;
+pub mod util;
 
 use std::sync::atomic::AtomicU64;
 

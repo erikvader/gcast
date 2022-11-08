@@ -2,7 +2,7 @@ use yew::prelude::*;
 
 #[derive(Properties, PartialEq)]
 pub struct ProgressProps {
-    pub progress: u8, // TODO: take an f64, ints to hacky
+    pub progress: f64,
     pub outer_class: Classes,
     pub inner_class: Classes,
 }
@@ -10,6 +10,7 @@ pub struct ProgressProps {
 #[rustfmt::skip::macros(html)]
 #[function_component(Progressbar)]
 pub fn progressbar(props: &ProgressProps) -> Html {
+    assert!(props.progress >= 0.0 && props.progress <= 100.0);
     let style = format!("width: {}%;", props.progress);
     html! {
         <div class={props.outer_class.clone()}>

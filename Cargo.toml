@@ -50,6 +50,7 @@ futures = "0.3" # client: streams and sinks (futures_util didn't work)
 chrono = "0.4" # client: to format cache date nicely
 
 ordered-float = {version="3.1", features=["serde"]} # protocol: NotNan
+num-traits = "0.2" # protocol: NotNan
 
 itertools = "0.10" # searcher: tuple_windows
 #TODO: scale down on features on regex

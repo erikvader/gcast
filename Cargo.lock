@@ -1067,6 +1067,7 @@ name = "protocol"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "num-traits",
  "ordered-float",
  "serde",
  "thiserror",

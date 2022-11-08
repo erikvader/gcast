@@ -132,17 +132,16 @@ fn chapters(front: &prot::Mpv) -> (i64, i64) {
     }
 }
 
-fn progress(front: &prot::Mpv) -> u8 {
+fn progress(front: &prot::Mpv) -> f64 {
     let p = match *front {
         prot::PlayState(prot::PlayState {
             progress, length, ..
         }) if length != 0.0 => ((progress / length) * 100.0).into_inner(),
         _ => 0.0,
-    }
-    .trunc() as u8;
+    };
 
-    if p > 100 {
-        100
+    if p > 100.0 {
+        100.0
     } else {
         p
     }

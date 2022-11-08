@@ -1,5 +1,7 @@
 use ordered_float::NotNan;
 
+use crate::util::not_nan_or_zero;
+
 message! {
     enum super::Front, Mpv {
         Load,
@@ -28,9 +30,9 @@ impl PlayState {
     ) -> Self {
         Self {
             pause,
-            progress: NotNan::new(progress).or(NotNan::new(0.0)).unwrap(),
-            length: NotNan::new(length).or(NotNan::new(0.0)).unwrap(),
-            volume: NotNan::new(volume).or(NotNan::new(0.0)).unwrap(),
+            progress: not_nan_or_zero(progress),
+            length: not_nan_or_zero(length),
+            volume: not_nan_or_zero(volume),
             chapter: if num_chapters > 0 {
                 Some((chapter, num_chapters))
             } else {

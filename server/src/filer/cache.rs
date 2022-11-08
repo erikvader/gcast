@@ -176,29 +176,28 @@ fn has_whitelisted_extension(path: &str) -> bool {
 
 fn send_refreshing(tx: &StateSnd, i: usize, total: usize, exploding: bool) {
     let progress = progress(i, total);
-    let msg = Ok(filesearch::FileSearch::Refreshing(filesearch::Refreshing {
-        exploding,
-        progress,
-    }));
+    let msg = Ok(filesearch::FileSearch::Refreshing(
+        filesearch::Refreshing::new(progress, exploding),
+    ));
 
     tx.blocking_send(msg).ok();
 }
 
-fn progress(i: usize, total: usize) -> u8 {
+fn progress(i: usize, total: usize) -> f64 {
     if total == 0 && i != 0 {
-        0u8
+        0.0
     } else if i >= total {
-        100u8
+        100.0
     } else {
-        (100.0 * (i as f64 / total as f64)) as u8
+        100.0 * (i as f64 / total as f64)
     }
 }
 
 #[test]
 fn test_progress() {
-    assert_eq!(progress(0, 0), 100);
-    assert_eq!(progress(1, 0), 0);
-    assert_eq!(progress(1, 1), 100);
-    assert_eq!(progress(0, 1), 0);
-    assert_eq!(progress(5, 10), 50);
+    assert_eq!(progress(0, 0), 100.0);
+    assert_eq!(progress(1, 0), 0.0);
+    assert_eq!(progress(1, 1), 100.0);
+    assert_eq!(progress(0, 1), 0.0);
+    assert_eq!(progress(5, 10), 50.0);
 }

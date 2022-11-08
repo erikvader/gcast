@@ -138,11 +138,11 @@ fn refreshing(props: &RefreshingProps) -> Html {
         prot::Refreshing {
             progress,
             exploding: true,
-        } => (progress, 0),
+        } => (progress.into(), 0.0),
         prot::Refreshing {
             progress,
             exploding: false,
-        } => (100, progress),
+        } => (100.0, progress.into()),
     };
 
     html! {
