@@ -15,7 +15,6 @@
 
 .mpv-progress-inner {
     height: 1em;
-    transition: width 0.3s;
     position: relative;
     line-height: 1em;
 }

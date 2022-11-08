@@ -103,5 +103,4 @@ input[disabled] {
 .progressbar-inner {
     height: 1em;
     background: green;
-    transition: width 0.3s;
 }
