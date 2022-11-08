@@ -19,7 +19,7 @@ use super::{
     StateSnd,
 };
 
-const NUM_SEARCH_RESULTS: usize = 20;
+const NUM_SEARCH_RESULTS: usize = 30;
 
 // TODO: terminate as soon as an error occurs?
 pub(super) fn run_filer(mut rx: MultiplexReceiver<String, ()>, tx: StateSnd) {

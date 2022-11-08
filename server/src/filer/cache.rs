@@ -167,6 +167,7 @@ pub(super) fn refresh_cache(tx: &StateSnd, roots: Vec<String>) -> Cache {
         send_refreshing(tx, total_dirs, total_dirs, false);
     }
 
+    files.sort_unstable_by(|e1, e2| e1.path_relative_root().cmp(e2.path_relative_root()));
     Cache::new(files, roots)
 }
 
