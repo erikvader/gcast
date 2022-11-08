@@ -79,21 +79,6 @@
     float: right;
 }
 
-.round {
-    border-radius: 50%;
-    width: 2em;
-    height: 2em;
-    position: relative;
-    background: black;
-}
-
-.round::after {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-}
-
 .space-evenly {
     display: flex;
     flex-wrap: nowrap;
