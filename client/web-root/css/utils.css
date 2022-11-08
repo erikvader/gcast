@@ -23,7 +23,14 @@
 }
 
 .mono {
-    font-family: monospace;
+    /* Can't use monospace alone: https://github.com/necolas/normalize.css/issues/519 */
+    /* Some browsers set a smaller font size if they see 'font-family: monospace'. */
+    /* font-family: monospace, monospace; */
+
+    /* What python.org uses for code samples */
+    font-family: Consolas, 'Lucida Console',
+                 'Liberation Mono', 'DejaVu Sans Mono',
+                 'Bitstream Vera Sans Mono', 'Courier New', monospace, sans-serif;
 }
 
 .error {
