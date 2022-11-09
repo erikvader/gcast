@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>gcast</title>
 
-
     <link rel="stylesheet" href="css/overall.css" />
     <link rel="stylesheet" href="css/mpv.css" />
     <link rel="stylesheet" href="css/searcher.css" />
@@ -15,7 +14,21 @@
     <link rel="stylesheet" href="deps/normalize.css" />
     <link rel="stylesheet" href="deps/material-icons/material-icons.css" />
     <link rel="stylesheet" href="css/leckerlione.css" />
+  </head>
+  <body>
+    <noscript>Javascript is not enabled</noscript>
+    <script type="text/javascript">
+      function isTouchDevice() {
+          // https://stackoverflow.com/a/4819886
+          return (('ontouchstart' in window) ||
+                  (navigator.maxTouchPoints > 0) ||
+                  (navigator.msMaxTouchPoints > 0));
+      }
 
+      if (!isTouchDevice()) {
+          document.body.classList.add("no-touch");
+      }
+    </script>
     <script type="module">
       import init from "./pkg/client.js"
       init().catch(e => {
@@ -23,8 +36,5 @@
           document.body.innerHTML = "Failed to init website, is this browser supported?"
       })
     </script>
-  </head>
-  <body>
-    <noscript>Javascript is not enabled</noscript>
   </body>
 </html>

@@ -49,7 +49,7 @@ button {
     width: auto;
 }
 
-button:hover {
+body.no-touch button:hover {
     box-shadow: inset 0 0 0 99em rgba(255,255,255,.2);
     border: 0;
 }

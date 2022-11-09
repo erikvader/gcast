@@ -9,7 +9,7 @@
     user-select: none;
 }
 
-.search-res:hover, .rows > *:nth-child(odd):hover {
+body.no-touch .search-res:hover, body.no-touch .rows > *:nth-child(odd):hover {
     background: gray;
 }
 
