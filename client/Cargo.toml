@@ -22,5 +22,5 @@ gloo-events.workspace = true
 wasm-bindgen-futures.workspace = true
 futures.workspace = true
 
-chrono = {workspace=true, features=["wasmbind"], default-features=false}
+chrono = {workspace=true, features=["wasmbind", "clock"]}
 searcher = {path="../searcher"}
