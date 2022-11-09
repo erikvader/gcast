@@ -197,6 +197,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "futures",
+ "gloo-events",
  "gloo-net",
  "log",
  "protocol",

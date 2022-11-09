@@ -10,13 +10,15 @@ crate-type = ["cdylib", "rlib"]
 yew.workspace = true
 yew-agent.workspace = true
 wasm-bindgen.workspace = true
-web-sys.workspace = true
+
+web-sys = {workspace = true, features = ["VisibilityState"]}
 
 wasm-logger.workspace = true
 log.workspace = true
 
 protocol = {path="../protocol"}
 gloo-net.workspace = true
+gloo-events.workspace = true
 wasm-bindgen-futures.workspace = true
 futures.workspace = true
 
