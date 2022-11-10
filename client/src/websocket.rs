@@ -55,19 +55,17 @@ impl Connection {
         // TODO: make the port configurable somehow
         let ws = WebSocket::open(&format!("ws://{}:1337", hostname))
             .expect("only errors if url is bad?");
-        let (mut tx, mut rx) = ws.split();
+        let (mut tx, rx) = ws.split();
 
         let link2 = link.clone();
         let (close_rx, mut should_close) = oneshot::channel();
         let (one_tx, rx_end) = oneshot::channel();
         spawn_local(async move {
+            let mut fused_rx = rx.fuse();
             loop {
                 select! {
-                    // TODO: this gives an error if this first branch is taken
-                    // is it the fuse's fault?
-                    // try tokio select instead?
                     _ = &mut should_close => break,
-                    opt_msg = rx.next().fuse() => {
+                    opt_msg = fused_rx.next() => {
                         match opt_msg {
                             None => break,
                             Some(msg) =>
@@ -92,7 +90,7 @@ impl Connection {
             }
 
             link2.send_message(WSOutput::Conn(false));
-            if one_tx.send(rx).is_err() {
+            if one_tx.send(fused_rx.into_inner()).is_err() {
                 log::error!("rx_end failed to send back rx");
             }
             log::info!("Websocket rx_end closed");
@@ -142,6 +140,8 @@ impl Connection {
     }
 
     fn close(mut self) {
+        // TODO: Closing emits an ugly error message in the log, everything seems to work anyway
+        // https://github.com/rustwasm/gloo/pull/264
         self.ctx.disconnect();
         self.close_rx.send(()).ok();
 
