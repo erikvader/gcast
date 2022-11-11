@@ -25,7 +25,7 @@ pub fn mpv(props: &MpvProps) -> Html {
     html! {
         <article class={classes!("stacker")}>
             if matches!(props.front, prot::Mpv::Load) {
-                <div>{"Loading"}</div>
+                <div>{"Loading"}</div> // TODO: add a spinning thingy instead of this text
             }
             <button onclick={click_send!(mpvstart::Stop)}
                     disabled={active.is_disconnected()}
