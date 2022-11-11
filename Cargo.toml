@@ -43,7 +43,7 @@ wasm-bindgen = "0.2" # client: wasm stuff
 wasm-logger = "0.2" # client: log to web browser console
 web-sys = "0.3" # client: access HtmlInputElement
 
-gloo-net = {version="0.2", features=["websocket"], default-features=false} # client: wasm websockets
+gloo-net = {version="0.2", default-features=false} # client: wasm websockets
 gloo-events = "0.1" # client: check for visibility
 wasm-bindgen-futures = "0.4" # client: async integration between rust and js
 futures = "0.3" # client: streams and sinks (futures_util didn't work)

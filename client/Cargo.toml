@@ -17,7 +17,7 @@ wasm-logger.workspace = true
 log.workspace = true
 
 protocol = {path="../protocol"}
-gloo-net.workspace = true
+gloo-net = {workspace = true, features = ["websocket"]}
 gloo-events.workspace = true
 wasm-bindgen-futures.workspace = true
 futures.workspace = true
