@@ -266,7 +266,7 @@ impl Variant {
 
 async fn spotify(mut rx: mpsc::Receiver<JobMsg<()>>, to_conn: Sender) -> io::Result<()> {
     send_to_conn(&to_conn, front::Spotify).await;
-    let mut proc = Process::start("spotify")?;
+    let mut proc = Process::start(crate::config::spotify_exe())?;
 
     loop {
         select! {

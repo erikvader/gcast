@@ -6,8 +6,8 @@ use std::{
 use anyhow::Context;
 use tokio::sync::OnceCell;
 
-pub const PROGNAME: &str = "gcast";
-pub const CONFIG_NAME: &str = "config.toml";
+const PROGNAME: &str = "gcast";
+const CONFIG_NAME: &str = "config.toml";
 
 static CONF: OnceCell<Config> = OnceCell::const_new();
 
@@ -56,7 +56,6 @@ pub fn port() -> u16 {
     get_instance().port
 }
 
-// TODO: use
 pub fn mpv_options() -> Vec<(String, String)> {
     get_instance()
         .mpv
@@ -73,7 +72,6 @@ pub fn mpv_options() -> Vec<(String, String)> {
         .collect()
 }
 
-// TODO: use
 pub fn spotify_exe() -> &'static str {
     &get_instance().spotify.executable
 }

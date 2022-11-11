@@ -31,6 +31,7 @@ type HandleResp = oneshot::Sender<MpvResult<()>>;
 type HandleSnd = mpsc::Sender<(Command, HandleResp)>;
 
 const EV_CTX_WAIT: f64 = 5.0;
+const BANNED_PROPERTIES: &[&str] = &["idle"];
 
 static MPV_THREAD_ON: AtomicBool = AtomicBool::new(false);
 
@@ -178,12 +179,23 @@ pub fn mpv(path: &str) -> MpvResult<MpvHandle> {
     let (h_tx, h_rx): (HandleSnd, _) = mpsc::channel(crate::CHANNEL_SIZE);
     let (s_tx, s_rx): (_, StateRcv) = mpsc::channel(crate::CHANNEL_SIZE);
 
-    // TODO: put all these in the global config toml
-    // TODO: pulse-latency-hacks=yes
     let mpv = Mpv::with_initializer(|x| {
-        x.set_property("force-window", "immediate")?;
-        x.set_property("idle", "once")?;
-        // x.set_property("fullscreen", true)?;
+        x.set_property("idle", "once")?; // NOTE: needed for the correct events to appear
+        for (key, value) in crate::config::mpv_options() {
+            if BANNED_PROPERTIES.contains(&key.as_str()) {
+                log::warn!("It is not allowed to change '{}'", key);
+                continue;
+            }
+
+            if let Err(e) = x.set_property(&key, &*value) {
+                log::error!(
+                    "Failed to set mpv property '{}' to '{}' because '{}'",
+                    key,
+                    value,
+                    e
+                );
+            }
+        }
         Ok(())
     })?;
 

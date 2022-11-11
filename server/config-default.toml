@@ -8,7 +8,8 @@ port = 1337
 
 # Key value pairs of properties for mpv
 [mpv.properties]
-# fullscreen = "true"
+fullscreen = "yes"
+force-window = "immediate"
 
 [spotify]
 # The executable to run to start spotify
