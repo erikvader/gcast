@@ -7,6 +7,7 @@
     cursor: pointer;
     transition: all .3s;
     user-select: none;
+    font-size: 0.8em;
 }
 
 body.no-touch .search-res:hover, body.no-touch .rows > *:nth-child(odd):hover {
