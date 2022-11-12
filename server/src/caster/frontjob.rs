@@ -1,7 +1,7 @@
-use std::io;
+use std::{convert::Infallible, io};
 
 use protocol::{
-    to_client::front,
+    to_client::front::{self, errormsg},
     to_server::{fscontrol::FsControl, mpvcontrol::MpvControl, mpvstart},
     ToMessage,
 };
@@ -21,11 +21,11 @@ pub struct FrontJob {
 }
 
 enum Variant {
-    Spotify(Job<()>),
-    Mpv(Job<MpvControl>),
-    Filer(Job<FsControl>),
-    None(Job<()>),
-    // TODO: View that display all logs? Or send every log message to the client if one is connected?
+    Spotify(Job<(), io::Error>),
+    Mpv(Job<MpvControl, MpvError>),
+    Filer(Job<FsControl, FilerError>),
+    ErrorMsg(Job<(), Infallible>),
+    None(Job<(), Infallible>),
 }
 
 macro_rules! start_check {
@@ -77,23 +77,29 @@ impl FrontJob {
         log::debug!("Transitioning, waiting for {} to terminate", self.name());
         use Variant::*;
         match &mut self.var {
-            Spotify(j) => j.terminate_wait().await,
-            Mpv(j) => j.terminate_wait().await,
-            Filer(j) => j.terminate_wait().await,
-            None(j) => j.terminate_wait().await,
+            Spotify(j) => j.terminate(),
+            Mpv(j) => j.terminate(),
+            Filer(j) => j.terminate(),
+            ErrorMsg(j) => j.terminate(),
+            None(j) => j.terminate(),
+        }
+        if let Err(e) = self.wait().await {
+            log::warn!("Error while terminating job in transition: {:?}", e);
         }
         self.var = next_state(self.to_conn.clone());
         log::debug!("Transitioned into {}", self.name());
     }
 
-    pub async fn wait(&mut self) {
+    pub async fn wait(&mut self) -> anyhow::Result<()> {
         use Variant::*;
         match &mut self.var {
-            Spotify(j) => j.wait().await,
-            Mpv(j) => j.wait().await,
-            Filer(j) => j.wait().await,
-            None(j) => j.wait().await,
+            Spotify(j) => j.wait().await?,
+            Mpv(j) => j.wait().await?,
+            Filer(j) => j.wait().await?,
+            ErrorMsg(j) => j.wait().await?,
+            None(j) => j.wait().await?,
         }
+        Ok(())
     }
 
     pub fn name(&self) -> &'static str {
@@ -105,12 +111,37 @@ impl FrontJob {
         self.transition(Variant::none_job).await;
     }
 
+    pub async fn error_message_err<E>(&mut self, header: String, error: &E)
+    where
+        E: std::fmt::Debug,
+    {
+        log::info!(
+            "Showing error message '{}', from an error: '{:?}'",
+            header,
+            error
+        );
+        let body = format!("{:?}", error);
+        self.transition(|to_conn| Variant::error_job(to_conn, header, body))
+            .await;
+    }
+
+    pub async fn error_message_str(&mut self, header: String, body: String) {
+        log::info!(
+            "Showing error message '{}', with a message: '{}'",
+            header,
+            body
+        );
+        self.transition(|to_conn| Variant::error_job(to_conn, header, body))
+            .await;
+    }
+
     pub async fn send_status(&self) {
         use Variant::*;
         let res = match &self.var {
             None(j) => j.send_status().await,
             Spotify(j) => j.send_status().await,
             Mpv(j) => j.send_status().await,
+            ErrorMsg(j) => j.send_status().await,
             Filer(j) => j.send_status().await,
         };
         if res.is_err() {
@@ -162,6 +193,10 @@ impl FrontJob {
         matches!(self.var, Variant::Filer(_))
     }
 
+    pub fn is_error_message(&self) -> bool {
+        matches!(self.var, Variant::ErrorMsg(_))
+    }
+
     pub async fn start_spotify(&mut self) {
         start_check!(self, self.is_none());
         log::info!("Starting spotify");
@@ -175,10 +210,14 @@ impl FrontJob {
 
     pub async fn start_mpv_url(&mut self, url: String) {
         start_check!(self, self.is_none());
-        // TODO: verify that the string looks like an URL, send notification otherwise?
         log::info!("Starting mpv with url");
-        self.transition(|to_conn| Variant::mpv_job(to_conn, url))
-            .await;
+        if !url.starts_with("http") {
+            self.error_message_str("Not a valid URL".to_string(), "".to_string())
+                .await;
+        } else {
+            self.transition(|to_conn| Variant::mpv_job(to_conn, url))
+                .await;
+        }
     }
 
     pub async fn start_mpv_file(&mut self, file: mpvstart::File) {
@@ -187,7 +226,14 @@ impl FrontJob {
 
         let roots = crate::config::root_dirs();
         match roots.get(file.root) {
-            None => log::error!("Root {} out of range of 0..{}", file.root, roots.len()),
+            None => {
+                log::error!("Root {} out of range of 0..{}", file.root, roots.len());
+                self.error_message_str(
+                    "Could not find file to play".to_string(),
+                    "Root dir is out of range, try to refresh the cache".to_string(),
+                )
+                .await;
+            }
             Some(r) => {
                 assert!(file.path.starts_with("/"));
                 assert!(!r.ends_with("/"));
@@ -214,6 +260,11 @@ impl FrontJob {
         stop_check!("Filer", self.is_filer());
         self.kill().await;
     }
+
+    pub async fn close_error_message(&mut self) {
+        stop_check!("Error message", self.is_error_message());
+        self.kill().await;
+    }
 }
 
 impl Variant {
@@ -221,34 +272,41 @@ impl Variant {
         Self::None(Job::start(|mut rx| async move {
             send_to_conn(&to_conn, front::None).await;
             while let Some(jm) = rx.recv().await {
-                assert!(jm.is_send_status(), "there is no way to send Ctrl(T) here");
+                assert!(
+                    jm.is_send_status(),
+                    "the received message must be a SendStatus"
+                );
                 send_to_conn(&to_conn, front::None).await;
             }
+            Ok(())
+        }))
+    }
+
+    fn error_job(to_conn: Sender, header: String, body: String) -> Self {
+        Self::ErrorMsg(Job::start(|mut rx| async move {
+            let state = errormsg::ErrorMsg { header, body };
+            send_to_conn(&to_conn, state.clone()).await;
+            while let Some(jm) = rx.recv().await {
+                assert!(
+                    jm.is_send_status(),
+                    "the received message must be a SendStatus"
+                );
+                send_to_conn(&to_conn, state.clone()).await;
+            }
+            Ok(())
         }))
     }
 
     fn mpv_job(to_conn: Sender, file: String) -> Self {
-        Variant::Mpv(Job::start(|rx| async move {
-            if let Err(e) = mpv(rx, &file, to_conn).await {
-                log::error!("Starting mpv failed with: {}", e);
-            }
-        }))
+        Variant::Mpv(Job::start(move |rx| mpv(rx, file, to_conn)))
     }
 
     fn filer_job(to_conn: Sender) -> Self {
-        Variant::Filer(Job::start(|rx| async move {
-            if let Err(e) = filer(rx, to_conn).await {
-                log::error!("Starting filer failed with: {}", e);
-            }
-        }))
+        Variant::Filer(Job::start(move |rx| filer(rx, to_conn)))
     }
 
     fn spotify_job(to_conn: Sender) -> Self {
-        Variant::Spotify(Job::start(|rx| async move {
-            if let Err(e) = spotify(rx, to_conn).await {
-                log::error!("Starting spotify failed with: {}", e);
-            }
-        }))
+        Variant::Spotify(Job::start(move |rx| spotify(rx, to_conn)))
     }
 
     pub fn name(&self) -> &'static str {
@@ -257,6 +315,7 @@ impl Variant {
             Spotify(_) => "spotify",
             Mpv(_) => "mpv",
             Filer(_) => "filesearch",
+            ErrorMsg(_) => "error message",
             None(_) => "nothing",
         }
     }
@@ -293,7 +352,7 @@ async fn spotify(mut rx: mpsc::Receiver<JobMsg<()>>, to_conn: Sender) -> io::Res
 
 async fn mpv(
     mut rx: mpsc::Receiver<JobMsg<MpvControl>>,
-    file: &str,
+    file: String,
     to_conn: Sender,
 ) -> MpvResult<()> {
     let mut handle = mpv::mpv(&file)?;

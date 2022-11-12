@@ -2,7 +2,7 @@ use futures::{
     channel::{mpsc, oneshot},
     join, select,
     stream::{SplitSink, SplitStream},
-    FutureExt, SinkExt, StreamExt,
+    SinkExt, StreamExt,
 };
 use gloo_events::EventListener;
 use gloo_net::websocket::{futures::WebSocket, Message as GlooMsg, WebSocketError};

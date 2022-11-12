@@ -8,6 +8,7 @@ macro_rules! click_send {
     }};
 }
 
+mod errormessage;
 mod mpv;
 mod nothing;
 mod pending;
@@ -17,6 +18,7 @@ mod search;
 mod spotify;
 mod websocket;
 
+use errormessage::ErrorMessage;
 use mpv::Mpv;
 use nothing::Nothing;
 use pending::Pending;
@@ -84,6 +86,7 @@ fn app(props: &AppProps) -> Html {
                 (Accepted::Accepted, Some(Front::Spotify)) => html! {<Spotify />},
                 (Accepted::Accepted, Some(Front::Mpv(mpv))) => html! {<Mpv front={mpv.clone()} />},
                 (Accepted::Accepted, Some(Front::FileSearch(fs))) => html! {<Filesearch front={fs.clone()} />},
+                (Accepted::Accepted, Some(Front::ErrorMsg(em))) => html! {<ErrorMessage front={em.clone()} />},
             }}
         </ContextProvider<WebSockStatus>>
     }
@@ -116,7 +119,6 @@ fn live_app() -> Html {
                     front_clone.set(Some((m.id(), front.clone())));
                 }
             }
-            ToClient::Notification(_) => todo!(),
         })
     };
 

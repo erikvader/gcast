@@ -1,3 +1,4 @@
+pub mod errormsgctrl;
 pub mod fscontrol;
 pub mod fsstart;
 pub mod mpvcontrol;
@@ -13,5 +14,6 @@ message! {
         SpotifyStart(spotifystart::SpotifyStart),
         FsStart(fsstart::FsStart),
         FsControl(fscontrol::FsControl),
+        ErrorMsgCtrl(errormsgctrl::ErrorMsgCtrl),
     }
 }

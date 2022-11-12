@@ -1,7 +1,7 @@
 mod frontjob;
 
 use protocol::{
-    to_server::{fsstart, mpvstart, spotifystart, ToServer},
+    to_server::{errormsgctrl, fsstart, mpvstart, spotifystart, ToServer},
     Message,
 };
 use tokio::select;
@@ -31,6 +31,8 @@ async fn handle_msg(msg: Message, front: &mut FrontJob) {
         FsStart(fsstart::Start) => front.start_filer().await,
         FsStart(fsstart::Stop) => front.stop_filer().await,
         FsControl(ctrl) => front.send_filer_ctrl(ctrl).await,
+
+        ErrorMsgCtrl(errormsgctrl::Close) => front.close_error_message().await,
     }
 }
 
@@ -48,10 +50,15 @@ pub async fn caster_actor(
                 log::debug!("Caster got cancelled");
                 break;
             },
-            _ = front.wait() => {
+            res = front.wait() => {
                 log::info!("Application '{}' exited", front.name());
-                // TODO: check whether this was caused by an error and switch to an error front or something
-                front.kill().await;
+                match res {
+                    Ok(()) => front.kill().await,
+                    Err(e) => {
+                        log::error!("'{}' exited with an error: {:?}", front.name(), e);
+                        front.error_message_err(format!("{} exited with an error", front.name()), &e).await;
+                    }
+                }
             }
         }
     }

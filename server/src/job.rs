@@ -14,8 +14,8 @@ use crate::util::join_handle_wait;
 //     fn
 // }
 
-pub struct Job<T> {
-    handle: Option<JoinHandle<()>>,
+pub struct Job<T, E> {
+    handle: Option<JoinHandle<Result<(), E>>>,
     tx: Option<JobSender<T>>,
 }
 
@@ -31,41 +31,34 @@ pub enum JobMsg<T> {
 #[error("Job exited, can't send")]
 pub struct JobExited;
 
-impl<T> Job<T> {
-    fn new(tx: JobSender<T>, handle: JoinHandle<()>) -> Self {
+impl<T, E> Job<T, E> {
+    fn new(tx: JobSender<T>, handle: JoinHandle<Result<(), E>>) -> Self {
         Job {
             tx: Some(tx),
             handle: Some(handle),
         }
     }
 
-    pub async fn terminate_wait(&mut self) {
-        self.terminate();
-        Self::impl_wait(&mut self.handle).await;
-    }
-
     pub fn terminate(&mut self) {
         drop(self.tx.take());
     }
 
-    pub async fn wait(&mut self) {
-        Self::impl_wait(&mut self.handle).await;
-    }
-
-    async fn impl_wait(handle: &mut Option<JoinHandle<()>>) {
-        match handle {
-            None => (),
+    pub async fn wait(&mut self) -> Result<(), E> {
+        match &mut self.handle {
+            None => Ok(()),
             Some(hand) => {
-                join_handle_wait(hand).await;
-                handle.take();
+                let res = join_handle_wait(hand).await;
+                self.handle.take();
+                res
             }
         }
     }
 
     pub fn start<F, O>(task: O) -> Self
     where
-        F: Future<Output = ()> + Send + 'static,
+        F: Future<Output = Result<(), E>> + Send + 'static,
         O: FnOnce(JobReceiver<T>) -> F,
+        E: Send + 'static,
     {
         let (tx, rx) = mpsc::channel(crate::CHANNEL_SIZE);
         Self::new(tx, task::spawn(task(rx)))
