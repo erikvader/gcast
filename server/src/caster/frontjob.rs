@@ -9,7 +9,7 @@ use tokio::{select, sync::mpsc};
 
 use crate::{
     filer::{self, FilerError, FilerResult},
-    job::{JobMpsc, JobMsg},
+    job::{Job, JobMsg},
     mpv::{self, MpvError, MpvResult},
     process::Process,
     Sender,
@@ -21,10 +21,10 @@ pub struct FrontJob {
 }
 
 enum Variant {
-    Spotify(JobMpsc<()>),
-    Mpv(JobMpsc<MpvControl>),
-    Filer(JobMpsc<FsControl>),
-    None(JobMpsc<()>),
+    Spotify(Job<()>),
+    Mpv(Job<MpvControl>),
+    Filer(Job<FsControl>),
+    None(Job<()>),
     // TODO: View that display all logs? Or send every log message to the client if one is connected?
 }
 
@@ -43,10 +43,8 @@ macro_rules! start_check {
 macro_rules! stop_check {
     ($me:expr, $continueif:expr) => {
         if !$continueif {
-            if !$continueif {
-                log::warn!("{} is not running, ignoring stop request", $me);
-                return;
-            }
+            log::warn!("{} is not running, ignoring stop request", $me);
+            return;
         }
     };
 }
@@ -220,7 +218,7 @@ impl FrontJob {
 
 impl Variant {
     fn none_job(to_conn: Sender) -> Self {
-        Self::None(JobMpsc::start(|mut rx| async move {
+        Self::None(Job::start(|mut rx| async move {
             send_to_conn(&to_conn, front::None).await;
             while let Some(jm) = rx.recv().await {
                 assert!(jm.is_send_status(), "there is no way to send Ctrl(T) here");
@@ -230,7 +228,7 @@ impl Variant {
     }
 
     fn mpv_job(to_conn: Sender, file: String) -> Self {
-        Variant::Mpv(JobMpsc::start(|rx| async move {
+        Variant::Mpv(Job::start(|rx| async move {
             if let Err(e) = mpv(rx, &file, to_conn).await {
                 log::error!("Starting mpv failed with: {}", e);
             }
@@ -238,7 +236,7 @@ impl Variant {
     }
 
     fn filer_job(to_conn: Sender) -> Self {
-        Variant::Filer(JobMpsc::start(|rx| async move {
+        Variant::Filer(Job::start(|rx| async move {
             if let Err(e) = filer(rx, to_conn).await {
                 log::error!("Starting filer failed with: {}", e);
             }
@@ -246,7 +244,7 @@ impl Variant {
     }
 
     fn spotify_job(to_conn: Sender) -> Self {
-        Variant::Spotify(JobMpsc::start(|rx| async move {
+        Variant::Spotify(Job::start(|rx| async move {
             if let Err(e) = spotify(rx, to_conn).await {
                 log::error!("Starting spotify failed with: {}", e);
             }

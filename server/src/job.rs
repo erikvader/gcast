@@ -6,10 +6,21 @@ use tokio::{
 
 use crate::util::join_handle_wait;
 
+// pub trait Job {
+//     type State;
+//     type Error;
+
+//     fn next(&mut self) -> Result<State, Error>;
+//     fn
+// }
+
 pub struct Job<T> {
     handle: Option<JoinHandle<()>>,
-    tx: Option<T>,
+    tx: Option<JobSender<T>>,
 }
+
+type JobSender<T> = mpsc::Sender<JobMsg<T>>;
+type JobReceiver<T> = mpsc::Receiver<JobMsg<T>>;
 
 pub enum JobMsg<T> {
     SendStatus,
@@ -20,10 +31,8 @@ pub enum JobMsg<T> {
 #[error("Job exited, can't send")]
 pub struct JobExited;
 
-pub type JobMpsc<M> = Job<mpsc::Sender<JobMsg<M>>>;
-
 impl<T> Job<T> {
-    fn new(tx: T, handle: JoinHandle<()>) -> Self {
+    fn new(tx: JobSender<T>, handle: JoinHandle<()>) -> Self {
         Job {
             tx: Some(tx),
             handle: Some(handle),
@@ -52,19 +61,17 @@ impl<T> Job<T> {
             }
         }
     }
-}
 
-impl<M> JobMpsc<M> {
     pub fn start<F, O>(task: O) -> Self
     where
         F: Future<Output = ()> + Send + 'static,
-        O: FnOnce(mpsc::Receiver<JobMsg<M>>) -> F,
+        O: FnOnce(JobReceiver<T>) -> F,
     {
         let (tx, rx) = mpsc::channel(crate::CHANNEL_SIZE);
         Self::new(tx, task::spawn(task(rx)))
     }
 
-    pub async fn send_ctrl(&self, msg: M) -> Result<(), JobExited> {
+    pub async fn send_ctrl(&self, msg: T) -> Result<(), JobExited> {
         self.tx
             .as_ref()
             .ok_or(JobExited)?
