@@ -111,21 +111,29 @@ impl FrontJob {
         self.transition(Variant::none_job).await;
     }
 
-    pub async fn error_message_err<E>(&mut self, header: String, error: &E)
+    pub async fn error_message_err<E, H>(&mut self, header: H, error: E)
     where
         E: std::fmt::Debug,
+        H: ToString,
     {
+        let header = header.to_string();
+        let body = format!("{:?}", error);
         log::info!(
             "Showing error message '{}', from an error: '{:?}'",
             header,
             error
         );
-        let body = format!("{:?}", error);
         self.transition(|to_conn| Variant::error_job(to_conn, header, body))
             .await;
     }
 
-    pub async fn error_message_str(&mut self, header: String, body: String) {
+    pub async fn error_message_str<H, B>(&mut self, header: H, body: B)
+    where
+        H: ToString,
+        B: ToString,
+    {
+        let header = header.to_string();
+        let body = body.to_string();
         log::info!(
             "Showing error message '{}', with a message: '{}'",
             header,
@@ -212,8 +220,7 @@ impl FrontJob {
         start_check!(self, self.is_none());
         log::info!("Starting mpv with url");
         if !url.starts_with("http") {
-            self.error_message_str("Not a valid URL".to_string(), "".to_string())
-                .await;
+            self.error_message_str("Not a valid URL", "").await;
         } else {
             self.transition(|to_conn| Variant::mpv_job(to_conn, url))
                 .await;
@@ -229,8 +236,8 @@ impl FrontJob {
             None => {
                 log::error!("Root {} out of range of 0..{}", file.root, roots.len());
                 self.error_message_str(
-                    "Could not find file to play".to_string(),
-                    "Root dir is out of range, try to refresh the cache".to_string(),
+                    "Could not find file to play",
+                    "Root dir is out of range, try to refresh the cache",
                 )
                 .await;
             }
