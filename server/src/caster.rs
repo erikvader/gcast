@@ -1,4 +1,5 @@
 mod frontjob;
+mod mpvjob;
 
 use protocol::{
     to_server::{errormsgctrl, fsstart, mpvstart, spotifystart, ToServer},

@@ -6,13 +6,7 @@ use tokio::{
 
 use crate::util::join_handle_wait;
 
-// pub trait Job {
-//     type State;
-//     type Error;
-
-//     fn next(&mut self) -> Result<State, Error>;
-//     fn
-// }
+pub mod handlejob;
 
 pub struct Job<T, E> {
     handle: Option<JoinHandle<Result<(), E>>>,

@@ -3,15 +3,15 @@ use std::{convert::Infallible, io};
 use protocol::{
     to_client::front::{self, errormsg},
     to_server::{fscontrol::FsControl, mpvcontrol::MpvControl, mpvstart},
-    ToMessage,
 };
 use tokio::{select, sync::mpsc};
 
 use crate::{
     filer::{self, FilerError, FilerResult},
-    job::{Job, JobMsg},
+    job::{handlejob::handle_job_start, Job, JobMsg},
     mpv::{self, MpvError, MpvResult},
     process::Process,
+    util::send_to_conn,
     Sender,
 };
 
@@ -305,7 +305,7 @@ impl Variant {
     }
 
     fn mpv_job(to_conn: Sender, file: String) -> Self {
-        Variant::Mpv(Job::start(move |rx| mpv(rx, file, to_conn)))
+        Variant::Mpv(handle_job_start(to_conn, move || mpv::mpv(&file)))
     }
 
     fn filer_job(to_conn: Sender) -> Self {
@@ -357,55 +357,15 @@ async fn spotify(mut rx: mpsc::Receiver<JobMsg<()>>, to_conn: Sender) -> io::Res
     }
 }
 
-async fn mpv(
-    mut rx: mpsc::Receiver<JobMsg<MpvControl>>,
-    file: String,
-    to_conn: Sender,
-) -> MpvResult<()> {
-    let mut handle = mpv::mpv(&file)?;
-
-    let mut last_state = front::mpv::Load;
-    let retval = loop {
-        select! {
-            msg = rx.recv() => {
-                match msg {
-                    None => {
-                        log::debug!("Mpv exit signal received");
-                        handle.quit().await.ok();
-                        break Ok(());
-                    },
-                    Some(JobMsg::SendStatus) => send_to_conn(&to_conn, last_state.clone()).await,
-                    Some(JobMsg::Ctrl(ctrl)) => break_err!(handle.command(&ctrl).await),
-                }
-            },
-            state = handle.next() => {
-                match state.map(|s| s.to_client_state()) {
-                    Ok(Some(s)) => {
-                        last_state = s.clone();
-                        send_to_conn(&to_conn, s).await;
-                    }
-                    Ok(None) => (),
-                    Err(MpvError::Exited) => break Ok(()),
-                    Err(e) => {
-                        break Err(e);
-                    }
-                }
-            }
-        }
-    };
-
-    log::debug!("Waiting for mpv handle to exit");
-    handle.wait_until_closed().await;
-    retval
-}
-
 async fn filer(
     mut rx: mpsc::Receiver<JobMsg<FsControl>>,
     to_conn: Sender,
 ) -> FilerResult<()> {
     let mut handle = filer::filer()?;
 
-    let mut last_state = front::filesearch::FileSearch::default();
+    let mut last_state = front::filesearch::Init(front::filesearch::Init {
+        last_cache_date: None,
+    });
     let retval = loop {
         select! {
             msg = rx.recv() => {
@@ -436,10 +396,4 @@ async fn filer(
     log::debug!("Waiting for filer handle to exit");
     handle.wait_until_closed().await;
     retval
-}
-
-async fn send_to_conn(to_conn: &Sender, msg: impl ToMessage) {
-    if to_conn.send(msg.to_message()).await.is_err() {
-        log::warn!("Seems like connections is down");
-    }
 }

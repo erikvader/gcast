@@ -41,14 +41,6 @@ message! {
     }
 }
 
-impl Default for FileSearch {
-    fn default() -> Self {
-        Self::Init(Init {
-            last_cache_date: None,
-        })
-    }
-}
-
 impl Refreshing {
     pub fn new(progress: f64, exploding: bool) -> Self {
         Self {
