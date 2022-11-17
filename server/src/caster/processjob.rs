@@ -1,16 +1,24 @@
-use std::io;
+use std::{io, process::ExitStatus};
 
-use protocol::{to_client::front, to_server::fscontrol::FsControl};
+use protocol::to_client::front;
 
 use crate::{
     job::handlejob::{HandleJob, HandleJobError},
-    process::Process,
+    process::{Process, ProcessError},
 };
+
+#[derive(thiserror::Error, Debug)]
+pub enum ProcessHandleJobError {
+    #[error("Process error: {0}")]
+    Proc(#[from] ProcessError),
+    #[error("Process exited early with: {0}")]
+    EarlyExit(ExitStatus),
+}
 
 #[async_trait::async_trait]
 impl HandleJob for Process {
     type State = front::Front;
-    type Error = io::Error;
+    type Error = ProcessHandleJobError;
     type Ctrl = ();
 
     fn initial_state(&self) -> Self::State {
@@ -22,19 +30,26 @@ impl HandleJob for Process {
     }
 
     async fn next(&mut self) -> Result<Self::State, Self::Error> {
-        let res = self.wait().await;
-        log::warn!("Process '{}' exited early with: {}", self.name(), res?);
-        Ok(self.initial_state())
+        let res = self.wait().await.expect("not allowed to be called twice")?;
+        Err(ProcessHandleJobError::EarlyExit(res))
     }
 
     async fn wait_until_closed(mut self) {
         match self.wait().await {
-            Ok(status) => {
-                log::debug!("Process '{}' exited with: {}", self.name(), status)
+            Some(Ok(status)) if status.success() => {
+                log::info!("Process '{}' exited with: {}", self.name(), status)
             }
-            Err(err) => {
-                log::error!("Process '{}' exited with error: {}", self.name(), err)
+            Some(Ok(status)) => {
+                log::warn!("Process '{}' exited with error: {}", self.name(), status)
             }
+            Some(Err(err)) => {
+                log::error!(
+                    "Error while waiting for process '{}' to exit: {}",
+                    self.name(),
+                    err
+                )
+            }
+            None => log::warn!("Process '{}' exited on its own", self.name()),
         }
     }
 
@@ -44,11 +59,11 @@ impl HandleJob for Process {
     }
 
     async fn control(&mut self, _ctrl: Self::Ctrl) -> Result<(), Self::Error> {
-        panic!("there is no way to send Ctrl(T) here");
+        panic!("the received message must be a SendStatus");
     }
 }
 
-impl HandleJobError for io::Error {
+impl HandleJobError for ProcessHandleJobError {
     fn is_normal_exit(&self) -> bool {
         false
     }

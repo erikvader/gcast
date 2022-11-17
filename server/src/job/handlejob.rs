@@ -21,16 +21,17 @@ pub trait HandleJobError {
     fn is_normal_exit(&self) -> bool;
 }
 
-pub fn handle_job_start<T, F>(
+pub fn handle_job_start<T, F, E>(
     to_conn: Sender,
     create_handle: F,
 ) -> super::Job<T::Ctrl, T::Error>
 where
-    F: FnOnce() -> Result<T, T::Error> + Send + 'static,
+    F: FnOnce() -> Result<T, E> + Send + 'static,
+    E: Into<T::Error>,
     T: HandleJob + Send,
 {
     super::Job::start(|mut rx| async move {
-        let mut handle = create_handle()?;
+        let mut handle = create_handle().map_err(|e| e.into())?;
 
         let mut last_state = handle.initial_state();
         send_to_conn(&to_conn, last_state.clone()).await;

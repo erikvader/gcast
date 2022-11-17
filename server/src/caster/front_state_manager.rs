@@ -10,10 +10,12 @@ use crate::{
     filer::{self, FilerError, FilerResult},
     job::{handlejob::handle_job_start, Job, JobMsg},
     mpv::{self, MpvError, MpvResult},
-    process::Process,
+    process::{Process, ProcessError},
     util::send_to_conn,
     Sender,
 };
+
+use super::processjob::ProcessHandleJobError;
 
 pub struct FrontJob {
     to_conn: Sender,
@@ -21,7 +23,7 @@ pub struct FrontJob {
 }
 
 enum Variant {
-    Spotify(Job<(), io::Error>),
+    Spotify(Job<(), ProcessHandleJobError>),
     Mpv(Job<MpvControl, MpvError>),
     Filer(Job<FsControl, FilerError>),
     ErrorMsg(Job<(), Infallible>),

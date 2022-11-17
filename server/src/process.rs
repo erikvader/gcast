@@ -1,7 +1,7 @@
 use std::{
     env::temp_dir,
     fs::File,
-    io::Result as IOResult,
+    io,
     process::{ExitStatus, Stdio},
     time::Duration,
 };
@@ -11,14 +11,22 @@ use crate::util::join_handle_wait;
 
 const SIGTERM_TIMEOUT: u64 = 5;
 
+pub type ProcResult<T> = Result<T, ProcessError>;
+
 pub struct Process {
     exe: String,
-    proc_done: JoinHandle<IOResult<ExitStatus>>,
+    proc_done: Option<JoinHandle<ProcResult<ExitStatus>>>,
     kill: Option<oneshot::Sender<()>>,
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum ProcessError {
+    #[error(transparent)]
+    IoError(#[from] io::Error),
+}
+
 impl Process {
-    pub fn start(exe: String) -> IOResult<Self> {
+    pub fn start(exe: String) -> ProcResult<Self> {
         assert!(!exe.is_empty());
         // TODO: use progname in config?
         let outfile = temp_dir().join(format!("gcast_{}.stdout", exe));
@@ -42,7 +50,7 @@ impl Process {
             tokio::select! {
                 w = &mut wait => {
                     log::debug!("Process with pid {} exited by itself", pid);
-                    return w;
+                    return Ok(w?);
                 },
                 _ = kill_rx => (),
             }
@@ -58,24 +66,31 @@ impl Process {
                 timeout(Duration::from_secs(SIGTERM_TIMEOUT), &mut wait).await
             {
                 log::debug!("Process terminated within timeout");
-                return res;
+                return Ok(res?);
             }
 
             let kill_succ = sigkill(pid);
             log::debug!("Process took too long, sent SIGKILL, success={}", kill_succ);
-            wait.await
+            Ok(wait.await?)
         });
 
         Ok(Process {
             exe,
-            proc_done: handle,
+            proc_done: Some(handle),
             kill: Some(kill_tx),
         })
     }
 
     // cancel safe wait
-    pub async fn wait(&mut self) -> IOResult<ExitStatus> {
-        join_handle_wait(&mut self.proc_done).await
+    pub async fn wait(&mut self) -> Option<ProcResult<ExitStatus>> {
+        match &mut self.proc_done {
+            None => None,
+            Some(pd) => {
+                let res = join_handle_wait(pd).await;
+                self.proc_done.take();
+                Some(res)
+            }
+        }
     }
 
     pub fn kill(&mut self) -> bool {
