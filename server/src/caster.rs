@@ -1,6 +1,7 @@
 mod filerjob;
 mod front_state_manager;
 mod mpvjob;
+mod processjob;
 
 use protocol::{
     to_server::{errormsgctrl, fsstart, mpvstart, spotifystart, ToServer},

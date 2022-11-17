@@ -315,7 +315,9 @@ impl Variant {
     }
 
     fn spotify_job(to_conn: Sender) -> Self {
-        Variant::Spotify(Job::start(move |rx| spotify(rx, to_conn)))
+        Variant::Spotify(handle_job_start(to_conn, move || {
+            Process::start(crate::config::spotify_exe().to_string())
+        }))
     }
 
     pub fn name(&self) -> &'static str {
@@ -326,35 +328,6 @@ impl Variant {
             Filer(_) => "filesearch",
             ErrorMsg(_) => "error message",
             None(_) => "nothing",
-        }
-    }
-}
-
-async fn spotify(mut rx: mpsc::Receiver<JobMsg<()>>, to_conn: Sender) -> io::Result<()> {
-    send_to_conn(&to_conn, front::Spotify).await;
-    let mut proc = Process::start(crate::config::spotify_exe())?;
-
-    loop {
-        select! {
-            msg = rx.recv() => {
-                match msg {
-                    None => {
-                        log::debug!("Signal to terminate spotify received");
-                        proc.kill();
-                        let status = proc.wait().await?;
-                        log::debug!("Spotify process exited with: {}", status);
-                        break Ok(());
-                    }
-                    Some(jm) => {
-                        assert!(jm.is_send_status(), "there is no way to send Ctrl(T) here");
-                        send_to_conn(&to_conn, front::Spotify).await;
-                    }
-                }
-            },
-            res = proc.wait() => {
-                log::warn!("Spotify process exited early with: {}", res?);
-                break Ok(());
-            },
         }
     }
 }
