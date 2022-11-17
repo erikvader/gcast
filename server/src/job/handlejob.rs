@@ -33,6 +33,8 @@ where
         let mut handle = create_handle()?;
 
         let mut last_state = handle.initial_state();
+        send_to_conn(&to_conn, last_state.clone()).await;
+
         let retval = loop {
             select! {
                 msg = rx.recv() => {
