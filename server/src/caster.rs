@@ -1,5 +1,5 @@
 mod filerjob;
-mod frontjob;
+mod front_state_manager;
 mod mpvjob;
 
 use protocol::{
@@ -11,7 +11,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{Receiver, Sender};
 
-use self::frontjob::FrontJob;
+use self::front_state_manager::FrontJob;
 
 async fn handle_msg(msg: Message, front: &mut FrontJob) {
     log::info!("Handling message: {:?}", msg);
