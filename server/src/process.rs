@@ -12,17 +12,19 @@ use crate::util::join_handle_wait;
 const SIGTERM_TIMEOUT: u64 = 5;
 
 pub struct Process {
+    exe: String,
     proc_done: JoinHandle<IOResult<ExitStatus>>,
     kill: Option<oneshot::Sender<()>>,
 }
 
 impl Process {
-    pub fn start(exe: &str) -> IOResult<Self> {
+    pub fn start(exe: String) -> IOResult<Self> {
         assert!(!exe.is_empty());
+        // TODO: use progname in config?
         let outfile = temp_dir().join(format!("gcast_{}.stdout", exe));
         let errfile = temp_dir().join(format!("gcast_{}.stderr", exe));
 
-        let mut child = Command::new(exe)
+        let mut child = Command::new(&exe)
             .stdin(Stdio::null())
             .stdout(File::create(outfile)?)
             .stderr(File::create(errfile)?)
@@ -65,6 +67,7 @@ impl Process {
         });
 
         Ok(Process {
+            exe,
             proc_done: handle,
             kill: Some(kill_tx),
         })
@@ -80,6 +83,10 @@ impl Process {
             None => false,
             Some(sender) => sender.send(()).is_ok(),
         }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.exe
     }
 }
 
