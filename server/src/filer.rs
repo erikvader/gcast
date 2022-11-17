@@ -67,7 +67,7 @@ impl Handle {
         join_handle_wait_take(self.joinhandle).await;
     }
 
-    pub fn kill(&mut self) {
+    pub fn quit(&mut self) {
         // TODO: set an atomicbool to tell the thread to exit ASAP?
     }
 }

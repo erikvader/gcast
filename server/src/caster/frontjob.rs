@@ -290,6 +290,8 @@ impl Variant {
     }
 
     fn error_job(to_conn: Sender, header: String, body: String) -> Self {
+        // TODO: create some kind of StaticJob abstraction that just resends the same
+        // state over and over
         Self::ErrorMsg(Job::start(|mut rx| async move {
             let state = errormsg::ErrorMsg { header, body };
             send_to_conn(&to_conn, state.clone()).await;
@@ -309,7 +311,7 @@ impl Variant {
     }
 
     fn filer_job(to_conn: Sender) -> Self {
-        Variant::Filer(Job::start(move |rx| filer(rx, to_conn)))
+        Variant::Filer(handle_job_start(to_conn, move || filer::filer()))
     }
 
     fn spotify_job(to_conn: Sender) -> Self {
@@ -355,45 +357,4 @@ async fn spotify(mut rx: mpsc::Receiver<JobMsg<()>>, to_conn: Sender) -> io::Res
             },
         }
     }
-}
-
-async fn filer(
-    mut rx: mpsc::Receiver<JobMsg<FsControl>>,
-    to_conn: Sender,
-) -> FilerResult<()> {
-    let mut handle = filer::filer()?;
-
-    let mut last_state = front::filesearch::Init(front::filesearch::Init {
-        last_cache_date: None,
-    });
-    let retval = loop {
-        select! {
-            msg = rx.recv() => {
-                match msg {
-                    None => {
-                        log::debug!("Filer exit signal receiver");
-                        handle.kill();
-                        break Ok(());
-                    },
-                    Some(JobMsg::SendStatus) => send_to_conn(&to_conn, last_state.clone()).await,
-                    Some(JobMsg::Ctrl(FsControl::Search(s))) => break_err!(handle.search(s).await),
-                    Some(JobMsg::Ctrl(FsControl::RefreshCache)) => break_err!(handle.refresh_cache().await),
-                }
-            },
-            state = handle.next() => {
-                match state {
-                    Ok(s) => {
-                        last_state = s.clone();
-                        send_to_conn(&to_conn, s).await;
-                    }
-                    Err(FilerError::Exited) => break Ok(()),
-                    Err(e) => break Err(e),
-                }
-            }
-        }
-    };
-
-    log::debug!("Waiting for filer handle to exit");
-    handle.wait_until_closed().await;
-    retval
 }

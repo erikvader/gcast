@@ -1,3 +1,4 @@
+mod filerjob;
 mod frontjob;
 mod mpvjob;
 
