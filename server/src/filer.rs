@@ -28,9 +28,9 @@ pub enum FilerError {
     #[error("Filer::Exited: thread is not running anymore")]
     Exited,
     #[error("Failed to read the cache cuz: {0:?}")]
-    CacheRead(anyhow::Error),
+    IoError(#[from] io::Error),
     #[error("Failed to write to the cache cuz: {0:?}")]
-    CacheWrite(anyhow::Error),
+    Bincode(#[from] bincode::Error),
     #[error("Interrupted by user")]
     Interrupted,
 }
@@ -105,7 +105,7 @@ fn run(rx: TaskRcv, tx: StateSnd) -> FilerResult<()> {
 fn refresh_cache(tx: &StateSnd, cache_file: &Path) -> FilerResult<Cache> {
     log::info!("Refreshing cache");
     let newcache = cache::refresh_cache(tx, config::root_dirs().to_vec())?;
-    cache::write_cache(cache_file, &newcache).map_err(|e| FilerError::CacheWrite(e))?;
+    cache::write_cache(cache_file, &newcache)?;
     send_init(&newcache, tx)?;
     log::info!("Refreshing cache done");
     Ok(newcache)
@@ -118,13 +118,11 @@ fn read_cache(tx: &StateSnd, cache_file: &Path) -> FilerResult<Cache> {
             Ok(Cache::default())
         }
         Ok(c) => Ok(c),
-        Err(e) => match e.downcast_ref::<io::Error>() {
-            Some(ioe) if ioe.kind() == io::ErrorKind::NotFound => {
-                log::info!("There is no cache yet");
-                Ok(Cache::default())
-            }
-            _ => Err(FilerError::CacheRead(e)),
-        },
+        Err(FilerError::IoError(ioe)) if ioe.kind() == io::ErrorKind::NotFound => {
+            log::info!("There is no cache yet");
+            Ok(Cache::default())
+        }
+        Err(e) => Err(e),
     }?;
     send_init(&cache, &tx)?;
     Ok(cache)
