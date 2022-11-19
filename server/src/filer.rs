@@ -31,6 +31,8 @@ pub enum FilerError {
     CacheRead(anyhow::Error),
     #[error("Failed to write to the cache cuz: {0:?}")]
     CacheWrite(anyhow::Error),
+    #[error("Interrupted by user")]
+    Interrupted,
 }
 
 #[derive(Debug)]
@@ -82,16 +84,9 @@ impl Handle {
         drop(self.tx);
         join_handle_wait_take(self.joinhandle).await;
     }
-
-    pub fn quit(&mut self) {
-        // TODO: set an atomicbool to tell the thread to exit ASAP?
-        // or simply remove this function and have every send to self.tx check if it
-        // succeded. If it failed, then abort since the handle has dropped, i.e., aborted.
-        // Fail with Exited? or something else?
-    }
 }
 
-fn run(rx: TaskRcv, tx: StateSnd) -> Result<(), FilerError> {
+fn run(rx: TaskRcv, tx: StateSnd) -> FilerResult<()> {
     let cache_file = config::cache_dir().join("files_cache");
     let mut cache = read_cache(&tx, &cache_file)?;
 
@@ -99,25 +94,24 @@ fn run(rx: TaskRcv, tx: StateSnd) -> Result<(), FilerError> {
         match rx.blocking_recv() {
             Err(_) => {
                 log::info!("Filer task received exit signal");
-                break;
+                return Err(FilerError::Interrupted);
             }
-            Ok(TaskMsg::Search(query)) => search::search(query, &cache, &tx),
+            Ok(TaskMsg::Search(query)) => search::search(query, &cache, &tx)?,
             Ok(TaskMsg::Cache) => cache = refresh_cache(&tx, &cache_file)?,
         }
     }
-    Ok(())
 }
 
-fn refresh_cache(tx: &StateSnd, cache_file: &Path) -> Result<Cache, FilerError> {
+fn refresh_cache(tx: &StateSnd, cache_file: &Path) -> FilerResult<Cache> {
     log::info!("Refreshing cache");
-    let newcache = cache::refresh_cache(tx, config::root_dirs().to_vec());
+    let newcache = cache::refresh_cache(tx, config::root_dirs().to_vec())?;
     cache::write_cache(cache_file, &newcache).map_err(|e| FilerError::CacheWrite(e))?;
-    send_init(&newcache, tx);
+    send_init(&newcache, tx)?;
     log::info!("Refreshing cache done");
     Ok(newcache)
 }
 
-fn read_cache(tx: &StateSnd, cache_file: &Path) -> Result<Cache, FilerError> {
+fn read_cache(tx: &StateSnd, cache_file: &Path) -> FilerResult<Cache> {
     let cache = match cache::read_cache(cache_file) {
         Ok(c) if c.is_outdated(config::root_dirs()) => {
             log::info!("Saved cache is outdated");
@@ -132,15 +126,16 @@ fn read_cache(tx: &StateSnd, cache_file: &Path) -> Result<Cache, FilerError> {
             _ => Err(FilerError::CacheRead(e)),
         },
     }?;
-    send_init(&cache, &tx);
+    send_init(&cache, &tx)?;
     Ok(cache)
 }
 
-fn send_init(cache: &Cache, tx: &StateSnd) {
+fn send_init(cache: &Cache, tx: &StateSnd) -> FilerResult<()> {
     let init = filesearch::Init {
         last_cache_date: cache.updated(),
     };
-    tx.blocking_send(Ok(init.into())).ok();
+    tx.blocking_send(Ok(init.into()))
+        .map_err(|_| FilerError::Interrupted)
 }
 
 pub fn filer() -> FilerResult<Handle> {

@@ -1,26 +1,25 @@
 use protocol::to_client::front::filesearch;
 
-use crate::filer::cache::Cache;
+use crate::filer::{cache::Cache, FilerError, FilerResult};
 
 use super::StateSnd;
 
 const NUM_SEARCH_RESULTS: usize = 30;
 
-pub(super) fn search(query: String, cache: &Cache, tx: &StateSnd) {
+pub(super) fn search(query: String, cache: &Cache, tx: &StateSnd) -> FilerResult<()> {
     log::info!("Searching for: {}", query);
-    match searcher::search(&query, cache.files()) {
+    let state = match searcher::search(&query, cache.files()) {
         Err(e) => {
             log::debug!(
                 "failed to search, '{}' could not be compiled cuz: {}",
                 query,
                 e
             );
-            let res = filesearch::Results {
+            filesearch::Results {
                 results: Vec::new(),
                 query,
                 query_valid: false,
-            };
-            tx.blocking_send(Ok(res.into())).ok();
+            }
         }
         Ok(mut res) => {
             let top = searcher::sorted_take(&mut res, NUM_SEARCH_RESULTS);
@@ -37,12 +36,14 @@ pub(super) fn search(query: String, cache: &Cache, tx: &StateSnd) {
                 })
                 .collect();
 
-            let res = filesearch::Results {
+            filesearch::Results {
                 results: searchres,
                 query,
                 query_valid: true,
-            };
-            tx.blocking_send(Ok(res.into())).ok();
+            }
         }
-    }
+    };
+
+    tx.blocking_send(Ok(state.into()))
+        .map_err(|_| FilerError::Interrupted)
 }

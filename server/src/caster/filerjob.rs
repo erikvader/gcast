@@ -30,7 +30,6 @@ impl HandleJob for Handle {
     }
 
     async fn quit(&mut self) -> Result<(), Self::Error> {
-        Self::quit(self);
         Ok(())
     }
 
@@ -44,6 +43,6 @@ impl HandleJob for Handle {
 
 impl HandleJobError for FilerError {
     fn is_normal_exit(&self) -> bool {
-        matches!(self, FilerError::Exited)
+        matches!(self, FilerError::Interrupted)
     }
 }

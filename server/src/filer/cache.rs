@@ -7,7 +7,7 @@ use std::{
 use protocol::to_client::front::filesearch;
 use walkdir::{DirEntry, WalkDir};
 
-use super::StateSnd;
+use super::{FilerError, FilerResult, StateSnd};
 
 const EXT_WHITELIST: &[&str] = &[".mp4", ".mkv", ".wmv", ".webm", ".avi"];
 
@@ -132,7 +132,7 @@ fn explode(
     }
 }
 
-pub(super) fn refresh_cache(tx: &StateSnd, roots: Vec<String>) -> Cache {
+pub(super) fn refresh_cache(tx: &StateSnd, roots: Vec<String>) -> FilerResult<Cache> {
     let mut dirs: Vec<(usize, DirEntry)> = Vec::new();
     let mut files: Vec<CacheEntry> = Vec::new();
 
@@ -147,42 +147,47 @@ pub(super) fn refresh_cache(tx: &StateSnd, roots: Vec<String>) -> Cache {
                     .len(),
             )),
             Ok(_) => (),
-            Err(path) => log::error!("Failed to convert '{:?} to a String", path),
+            Err(path) => log::error!("Failed to convert '{:?} to a String", path), // TODO: display this error on client
         };
 
     {
         let total_roots = roots.len();
         for (i, root) in roots.iter().enumerate() {
-            send_refreshing(tx, i, total_roots, true);
+            send_refreshing(tx, i, total_roots, true)?;
             explode(root.as_ref(), |de| on_file(de, i), |de| dirs.push((i, de)));
         }
-        send_refreshing(tx, total_roots, total_roots, true);
+        send_refreshing(tx, total_roots, total_roots, true)?;
     }
 
     {
         let total_dirs = dirs.len();
         for (i, (root, dir)) in dirs.into_iter().enumerate() {
-            send_refreshing(tx, i, total_dirs, false);
+            send_refreshing(tx, i, total_dirs, false)?;
             all_files(dir.path()).for_each(|de| on_file(de, root));
         }
-        send_refreshing(tx, total_dirs, total_dirs, false);
+        send_refreshing(tx, total_dirs, total_dirs, false)?;
     }
 
     files.sort_unstable_by(|e1, e2| e1.path_relative_root().cmp(e2.path_relative_root()));
-    Cache::new(files, roots)
+    Ok(Cache::new(files, roots))
 }
 
 fn has_whitelisted_extension(path: &str) -> bool {
     EXT_WHITELIST.iter().any(|ext| path.ends_with(ext))
 }
 
-fn send_refreshing(tx: &StateSnd, i: usize, total: usize, exploding: bool) {
+fn send_refreshing(
+    tx: &StateSnd,
+    i: usize,
+    total: usize,
+    exploding: bool,
+) -> FilerResult<()> {
     let progress = progress(i, total);
     let msg = Ok(filesearch::FileSearch::Refreshing(
         filesearch::Refreshing::new(progress, exploding),
     ));
 
-    tx.blocking_send(msg).ok();
+    tx.blocking_send(msg).map_err(|_| FilerError::Interrupted)
 }
 
 fn progress(i: usize, total: usize) -> f64 {
