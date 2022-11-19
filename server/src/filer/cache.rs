@@ -85,6 +85,7 @@ impl Cache {
     }
 }
 
+// TODO: stop using anyhow
 pub(super) fn read_cache(path: &Path) -> anyhow::Result<Cache> {
     let file = File::open(path)?;
     bincode::deserialize_from(file).map_err(|e| e.into())
