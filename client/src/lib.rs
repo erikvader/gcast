@@ -8,6 +8,7 @@ macro_rules! click_send {
     }};
 }
 
+mod back_button;
 mod errormessage;
 mod mpv;
 mod nothing;
@@ -136,12 +137,27 @@ pub fn main() {
     yew::start_app::<LiveApp>();
 
     // use protocol::to_client::front::filesearch as fs;
-    // use protocol::to_client::front::mpv as m;
+    // // use protocol::to_client::front::mpv as m;
     // yew::start_app_with_props::<App>(AppProps {
     //     ws_ready: WebSockStatus::Connected,
     //     accepted: Accepted::Accepted,
     //     front: Some(
-    //         m::Mpv::from(m::PlayState::new(false, 4.2, 5000.0, 20.0, 5, 2)).into(),
+    //         fs::Refreshing(fs::Refreshing {
+    //             roots: vec![
+    //                 fs::RootInfo {
+    //                     path: "root1".to_string(),
+    //                     status: fs::RootStatus::Loading,
+    //                 },
+    //                 fs::RootInfo {
+    //                     path: "root2".to_string(),
+    //                     status: fs::RootStatus::Pending,
+    //                 },
+    //             ],
+    //             total_dirs: 80,
+    //             done_dirs: 20,
+    //             num_errors: 5,
+    //         })
+    //         .into(),
     //     ),
     // });
 }

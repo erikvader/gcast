@@ -107,3 +107,13 @@
     transform: translate(0, -50%);
     z-index: 4;
 }
+
+.vertical {
+    position: absolute;
+    top: 50%;
+    transform: translate(0, -50%);
+}
+
+.relative {
+    position: relative;
+}

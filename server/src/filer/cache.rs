@@ -9,6 +9,7 @@ use walkdir::{DirEntry, WalkDir};
 
 use super::{FilerError, FilerResult, StateSnd};
 
+// TODO: move to config
 const EXT_WHITELIST: &[&str] = &[".mp4", ".mkv", ".wmv", ".webm", ".avi"];
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -102,69 +103,95 @@ pub(super) fn write_cache(path: &Path, contents: &Cache) -> FilerResult<()> {
     Ok(())
 }
 
-fn all_files(dir: impl AsRef<Path>) -> impl Iterator<Item = DirEntry> {
-    WalkDir::new(dir)
-        .into_iter()
-        .inspect(|res| {
-            if let Err(e) = res {
-                log::error!("Failed to walk: {}", e)
-            }
-        })
-        .filter_map(|res| res.ok())
-        .filter(|entry| entry.file_type().is_file())
-}
-
 fn explode(
     path: &Path,
     mut on_file: impl FnMut(DirEntry),
     mut on_dir: impl FnMut(DirEntry),
-) {
+) -> Result<(), walkdir::Error> {
     for de in WalkDir::new(path).max_depth(1).min_depth(1) {
         match de {
             Ok(e) if e.file_type().is_dir() => on_dir(e),
             Ok(e) if e.file_type().is_file() => on_file(e),
             Ok(e) => log::warn!("Found file of type '{:?}', ignoring...", e.file_type()),
-            Err(e) => {
-                log::error!("Failed to walk '{}' cuz '{}'", path.display(), e);
-            }
+            Err(e) => return Err(e),
         }
     }
+    Ok(())
 }
 
 pub(super) fn refresh_cache(tx: &StateSnd, roots: Vec<String>) -> FilerResult<Cache> {
     let mut dirs: Vec<(usize, DirEntry)> = Vec::new();
     let mut files: Vec<CacheEntry> = Vec::new();
+    let mut num_errors: usize = 0;
+    let mut root_status: Vec<filesearch::RootStatus> = roots
+        .iter()
+        .map(|_| filesearch::RootStatus::Pending)
+        .collect();
 
-    let mut on_file =
-        |de: DirEntry, i: usize| match de.into_path().into_os_string().into_string() {
-            Ok(path) if has_whitelisted_extension(&path) => files.push(CacheEntry::new(
-                path,
-                i,
-                roots
-                    .get(i)
-                    .expect("i is from enumerate, i.e. always in range")
-                    .len(),
-            )),
-            Ok(_) => (),
-            Err(path) => log::error!("Failed to convert '{:?} to a String", path), // TODO: display this error on client
-        };
+    let mut on_file = |de: DirEntry, i: usize, ne: &mut usize| match de
+        .into_path()
+        .into_os_string()
+        .into_string()
+    {
+        Ok(path) if has_whitelisted_extension(&path) => files.push(CacheEntry::new(
+            path,
+            i,
+            roots
+                .get(i)
+                .expect("i is from enumerate, i.e. always in range")
+                .len(),
+        )),
+        Ok(_) => (),
+        Err(path) => {
+            *ne += 1;
+            log::error!("Failed to convert '{:?} to a String", path);
+        }
+    };
 
     {
-        let total_roots = roots.len();
+        assert!(roots.len() == root_status.len());
         for (i, root) in roots.iter().enumerate() {
-            send_refreshing(tx, i, total_roots, true)?;
-            explode(root.as_ref(), |de| on_file(de, i), |de| dirs.push((i, de)));
+            root_status[i] = filesearch::RootStatus::Loading;
+            send_refreshing(tx, 0, dirs.len(), &roots, &root_status, num_errors, false)?;
+            match explode(
+                root.as_ref(),
+                |de| on_file(de, i, &mut num_errors),
+                |de| dirs.push((i, de)),
+            ) {
+                Err(e) => {
+                    root_status[i] = filesearch::RootStatus::Error;
+                    log::error!("Failed to walk '{}' cuz '{}'", root, e);
+                }
+                Ok(()) => root_status[i] = filesearch::RootStatus::Done,
+            }
         }
-        send_refreshing(tx, total_roots, total_roots, true)?;
+        send_refreshing(tx, 0, dirs.len(), &roots, &root_status, num_errors, false)?;
     }
 
     {
         let total_dirs = dirs.len();
         for (i, (root, dir)) in dirs.into_iter().enumerate() {
-            send_refreshing(tx, i, total_dirs, false)?;
-            all_files(dir.path()).for_each(|de| on_file(de, root));
+            send_refreshing(tx, i, total_dirs, &roots, &root_status, num_errors, false)?;
+            for de in WalkDir::new(dir.path()) {
+                match de {
+                    Err(e) => {
+                        log::error!("Failed to walk: {}", e);
+                        num_errors += 1;
+                    }
+                    Ok(e) if e.file_type().is_file() => on_file(e, root, &mut num_errors),
+                    Ok(_) => (),
+                }
+            }
         }
-        send_refreshing(tx, total_dirs, total_dirs, false)?;
+        send_refreshing(
+            tx,
+            total_dirs,
+            total_dirs,
+            &roots,
+            &root_status,
+            num_errors,
+            true,
+        )?;
     }
 
     files.sort_unstable_by(|e1, e2| e1.path_relative_root().cmp(e2.path_relative_root()));
@@ -177,33 +204,28 @@ fn has_whitelisted_extension(path: &str) -> bool {
 
 fn send_refreshing(
     tx: &StateSnd,
-    i: usize,
-    total: usize,
-    exploding: bool,
+    done_dirs: usize,
+    total_dirs: usize,
+    roots: &[String],
+    root_status: &[filesearch::RootStatus],
+    num_errors: usize,
+    is_done: bool,
 ) -> FilerResult<()> {
-    let progress = progress(i, total);
-    let msg = Ok(filesearch::FileSearch::Refreshing(
-        filesearch::Refreshing::new(progress, exploding),
-    ));
+    let msg = filesearch::Refreshing {
+        roots: roots
+            .iter()
+            .zip(root_status)
+            .map(|(path, status)| filesearch::RootInfo {
+                path: path.to_string(),
+                status: status.clone(),
+            })
+            .collect(),
+        total_dirs,
+        done_dirs,
+        num_errors,
+        is_done,
+    };
 
-    tx.blocking_send(msg).map_err(|_| FilerError::Interrupted)
-}
-
-fn progress(i: usize, total: usize) -> f64 {
-    if total == 0 && i != 0 {
-        0.0
-    } else if i >= total {
-        100.0
-    } else {
-        100.0 * (i as f64 / total as f64)
-    }
-}
-
-#[test]
-fn test_progress() {
-    assert_eq!(progress(0, 0), 100.0);
-    assert_eq!(progress(1, 0), 0.0);
-    assert_eq!(progress(1, 1), 100.0);
-    assert_eq!(progress(0, 1), 0.0);
-    assert_eq!(progress(5, 10), 50.0);
+    tx.blocking_send(Ok(msg.into()))
+        .map_err(|_| FilerError::Interrupted)
 }

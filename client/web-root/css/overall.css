@@ -98,9 +98,19 @@ input[disabled] {
 .progressbar-outer {
     position: relative;
     border: 1px solid black;
+    height: 1.5em;
+    background: gray;
 }
 
 .progressbar-inner {
-    height: 1em;
+    height: 100%;
     background: green;
+}
+
+.progressbar-text {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, 0);
+    color: white;
 }

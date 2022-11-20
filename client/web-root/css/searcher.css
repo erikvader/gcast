@@ -22,3 +22,18 @@ body.no-touch .search-res:hover, body.no-touch .rows > *:nth-child(odd):hover {
     color: red;
     border-color: red;
 }
+
+.root-error {
+    color: #8b0000;
+}
+
+.root-pending {
+}
+
+.root-done {
+    color: green;
+}
+
+.root-loading {
+    color: blue;
+}

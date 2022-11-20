@@ -37,6 +37,7 @@ impl HandleJob for Handle {
         match ctrl {
             FsControl::Search(s) => self.search(s).await,
             FsControl::RefreshCache => self.refresh_cache().await,
+            FsControl::BackToTheBeginning => self.back_to_the_beginning().await,
         }
     }
 }

@@ -4,6 +4,7 @@ use protocol::{
 };
 use yew::prelude::*;
 
+use crate::back_button::{BackButton, Type};
 use crate::progressbar::Progressbar;
 use crate::WebSockStatus;
 
@@ -27,11 +28,8 @@ pub fn mpv(props: &MpvProps) -> Html {
             if matches!(props.front, prot::Mpv::Load) {
                 <div>{"Loading"}</div> // TODO: add a spinning thingy instead of this text
             }
-            <button onclick={click_send!(mpvstart::Stop)}
-                    disabled={active.is_disconnected()}
-                    class={classes!("icon", "icon-close", "icon-right", "left", "error")}>
-                {"Exit"}
-            </button>
+            <BackButton button_type={Type::Exit}
+                        onclick={click_send!(mpvstart::Stop)} />
             <div class={classes!("left", "pad")}>
                 <span>{progress_min}{"/"}{length_min}</span>
                 <span class={classes!("float-right")}>{chapter}{"/"}{chapter_total}</span>

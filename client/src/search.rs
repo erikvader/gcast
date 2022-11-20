@@ -7,6 +7,7 @@ use wasm_bindgen::JsCast;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
+use crate::back_button::{BackButton, Type};
 use crate::progressbar::Progressbar;
 use crate::{websocket::websocket_send, WebSockStatus};
 
@@ -18,14 +19,8 @@ pub struct FilesearchProps {
 #[rustfmt::skip::macros(html)]
 #[function_component(Filesearch)]
 pub fn filesearch(props: &FilesearchProps) -> Html {
-    let active = use_context::<WebSockStatus>().expect("no active context found");
     html! {
         <article class={classes!("stacker")}>
-            <button onclick={click_send!(fsstart::Stop)}
-                    class={classes!("left", "icon-back-arrow", "icon-right", "icon")}
-                    disabled={active.is_disconnected()}>
-                {"Go back"}
-            </button>
             {match &props.front {
                 prot::FileSearch::Init(init) => html!{<Init front={init.clone()} />},
                 prot::FileSearch::Refreshing(refr) => html!{<Refreshing front={refr.clone()} />},
@@ -79,6 +74,8 @@ fn results(props: &ResultsProps) -> Html {
     // TODO: handle scrolling
     html! {
         <>
+            <BackButton button_type={Type::Back}
+                        onclick={click_send!(fscontrol::BackToTheBeginning)} />
             <input type="text"
                    value={(*query).clone()}
                    class={classes!(invalid_class)}
@@ -134,30 +131,48 @@ struct RefreshingProps {
 #[rustfmt::skip::macros(html)]
 #[function_component(Refreshing)]
 fn refreshing(props: &RefreshingProps) -> Html {
-    let (upper, lower) = match props.front {
-        prot::Refreshing {
-            progress,
-            exploding: true,
-        } => (progress.into(), 0.0),
-        prot::Refreshing {
-            progress,
-            exploding: false,
-        } => (100.0, progress.into()),
+    let done_dirs = props.front.done_dirs;
+    let total_dirs = props.front.total_dirs;
+    let dirs_progress = if total_dirs == 0 {
+        0.0
+    } else {
+        100.0 * (done_dirs as f64) / (total_dirs as f64)
     };
+    let roots = props.front.roots.iter().map(|rootinfo| {
+        use prot::RootStatus::*;
+        let class = match rootinfo.status {
+            Pending => "root-pending",
+            Loading => "root-loading",
+            Error => "root-error",
+            Done => "root-done",
+        };
+        html! {<div class={classes!(class)}>{rootinfo.path.to_string()}</div>}
+    });
 
     html! {
-        <article class={classes!("stacker", "pad")}>
-            <header>
-                <h3>{"Refreshing cache..."}</h3>
-            </header>
-            <Progressbar progress={upper}
-                         outer_class={classes!("progressbar-outer")}
-                         inner_class={classes!("progressbar-inner")}/>
-            <div class={classes!("pad")} />
-            <Progressbar progress={lower}
-                         outer_class={classes!("progressbar-outer")}
-                         inner_class={classes!("progressbar-inner")}/>
-        </article>
+        <>
+            if props.front.is_done {
+                <BackButton button_type={Type::Back}
+                            onclick={click_send!(fscontrol::BackToTheBeginning)} />
+            } else {
+                <BackButton button_type={Type::Exit}
+                            onclick={click_send!(fsstart::Stop)} />
+            }
+            <article class={classes!("stacker", "pad")}>
+                <header>
+                    <h3>{"Refreshing cache..."}</h3>
+                </header>
+                <div>{format!("Number of errors: {}", props.front.num_errors)}</div>
+                <h4>{"Roots"}</h4>
+                {for roots}
+                <div class={classes!("pad")} />
+                <Progressbar progress={dirs_progress}
+                             text={format!("{}/{}", done_dirs, total_dirs)}
+                             text_class={classes!("progressbar-text")}
+                             outer_class={classes!("progressbar-outer")}
+                             inner_class={classes!("progressbar-inner")}/>
+            </article>
+        </>
     }
 }
 
@@ -173,6 +188,8 @@ fn init(props: &InitProps) -> Html {
 
     html! {
         <>
+            <BackButton button_type={Type::Exit}
+                        onclick={click_send!(fsstart::Stop)} />
             <div class={classes!("pad")}>{cache_date(props.front.last_cache_date)}</div>
             <button disabled={active.is_disconnected()}
                     class={classes!("icon-refresh", "icon", "icon-hspace")}

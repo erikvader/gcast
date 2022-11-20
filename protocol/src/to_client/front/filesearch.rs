@@ -1,9 +1,5 @@
 use std::time::SystemTime;
 
-use ordered_float::NotNan;
-
-use crate::util::not_nan_or_zero;
-
 message! {
     enum super::Front, FileSearch {
         Refreshing(Refreshing),
@@ -14,8 +10,27 @@ message! {
 
 message! {
     struct FileSearch, Refreshing {
-        progress: NotNan<f64>, // [0, 100]
-        exploding: bool,
+        roots: Vec<RootInfo>,
+        total_dirs: usize,
+        done_dirs: usize,
+        is_done: bool,
+        num_errors: usize,
+    }
+}
+
+message_part! {
+    struct RootInfo {
+        path: String,
+        status: RootStatus,
+    }
+}
+
+message_part! {
+    enum RootStatus {
+        Pending,
+        Loading,
+        Error,
+        Done,
     }
 }
 
@@ -38,14 +53,5 @@ message_part! {
 message! {
     struct FileSearch, Init {
         last_cache_date: Option<SystemTime>,
-    }
-}
-
-impl Refreshing {
-    pub fn new(progress: f64, exploding: bool) -> Self {
-        Self {
-            exploding,
-            progress: not_nan_or_zero(progress),
-        }
     }
 }

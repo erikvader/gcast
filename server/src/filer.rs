@@ -39,6 +39,7 @@ pub enum FilerError {
 enum TaskMsg {
     Cache,
     Search(String),
+    BackToTheBeginning,
 }
 
 type StateRcv = mpsc::Receiver<FilerResult<front::filesearch::FileSearch>>;
@@ -61,8 +62,8 @@ impl Handle {
         if self
             .tx
             .send_test_and_set(|old| match old {
-                Some(TaskMsg::Cache) => None,
-                _ => Some(TaskMsg::Search(query)),
+                Some(TaskMsg::Cache) | Some(TaskMsg::BackToTheBeginning) => None,
+                None | Some(TaskMsg::Search(_)) => Some(TaskMsg::Search(query)),
             })
             .await
             .is_err()
@@ -73,7 +74,25 @@ impl Handle {
     }
 
     pub async fn refresh_cache(&self) -> FilerResult<()> {
-        if self.tx.send(TaskMsg::Cache).await.is_err() {
+        if self
+            .tx
+            // TODO: solve this by using a priority number on each enum variant instead
+            .send_test_and_set(|old| match old {
+                Some(TaskMsg::BackToTheBeginning) => None,
+                None | Some(TaskMsg::Search(_)) | Some(TaskMsg::Cache) => {
+                    Some(TaskMsg::Cache)
+                }
+            })
+            .await
+            .is_err()
+        {
+            return Err(FilerError::Exited);
+        }
+        Ok(())
+    }
+
+    pub async fn back_to_the_beginning(&self) -> FilerResult<()> {
+        if self.tx.send(TaskMsg::BackToTheBeginning).await.is_err() {
             return Err(FilerError::Exited);
         }
         Ok(())
@@ -98,6 +117,7 @@ fn run(rx: TaskRcv, tx: StateSnd) -> FilerResult<()> {
             }
             Ok(TaskMsg::Search(query)) => search::search(query, &cache, &tx)?,
             Ok(TaskMsg::Cache) => cache = refresh_cache(&tx, &cache_file)?,
+            Ok(TaskMsg::BackToTheBeginning) => send_init(&cache, &tx)?,
         }
     }
 }
@@ -106,7 +126,6 @@ fn refresh_cache(tx: &StateSnd, cache_file: &Path) -> FilerResult<Cache> {
     log::info!("Refreshing cache");
     let newcache = cache::refresh_cache(tx, config::root_dirs().to_vec())?;
     cache::write_cache(cache_file, &newcache)?;
-    send_init(&newcache, tx)?;
     log::info!("Refreshing cache done");
     Ok(newcache)
 }

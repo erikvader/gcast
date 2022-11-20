@@ -3,6 +3,8 @@ use yew::prelude::*;
 #[derive(Properties, PartialEq)]
 pub struct ProgressProps {
     pub progress: f64,
+    pub text: Option<String>,
+    pub text_class: Option<Classes>,
     pub outer_class: Classes,
     pub inner_class: Classes,
 }
@@ -15,6 +17,9 @@ pub fn progressbar(props: &ProgressProps) -> Html {
     html! {
         <div class={props.outer_class.clone()}>
             <div class={props.inner_class.clone()} style={style}></div>
+            if props.text.is_some() {
+                <div class={props.text_class.clone()}>{props.text.as_ref().unwrap()}</div>
+            }
         </div>
     }
 }
