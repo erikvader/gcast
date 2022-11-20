@@ -12,13 +12,15 @@ pub struct ErrorProps {
 #[function_component(ErrorMessage)]
 pub fn errormessage(props: &ErrorProps) -> Html {
     let active = use_context::<WebSockStatus>().expect("no active context found");
-    // TODO: style this
     html! {
         <article class={classes!("stacker")}>
-            <header class={classes!()}>
-                <h1>{&props.front.header}</h1>
+            <h1 class={classes!("error", "pad", "white-text")}>
+                {"Something Exceptional Happened"}
+            </h1>
+            <header class={classes!("pad")}>
+                <h2>{&props.front.header}</h2>
             </header>
-            <p>{&props.front.body}</p>
+            <p class={classes!("pad")}>{&props.front.body}</p>
             <button onclick={click_send!(Close)}
                     class={classes!()}
                     disabled={active.is_disconnected()}>

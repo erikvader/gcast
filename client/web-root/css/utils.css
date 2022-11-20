@@ -37,6 +37,10 @@
     background: #8b0000;
 }
 
+.white-text {
+    color: white;
+}
+
 .left {
     text-align: left;
 }
