@@ -13,6 +13,7 @@ use libmpv::{
 use protocol::{
     to_client::front::mpv::{Mpv as ClientMpv, PlayState},
     to_server::mpvcontrol::MpvControl,
+    util::not_nan_or_zero,
 };
 use tokio::{
     sync::{mpsc, oneshot},
@@ -91,14 +92,17 @@ impl MpvState {
         match self {
             Load => Some(ClientMpv::Load),
             End(_) => None,
-            Play(state) => Some(ClientMpv::PlayState(PlayState::new(
-                state.pause,
-                state.playback_time,
-                state.duration,
-                state.volume,
-                state.chapters,
-                state.chapter,
-            ))),
+            Play(state) => Some(ClientMpv::PlayState(PlayState {
+                pause: state.pause,
+                progress: not_nan_or_zero(state.playback_time),
+                length: not_nan_or_zero(state.duration),
+                volume: not_nan_or_zero(state.volume),
+                chapter: if state.chapters > 0 {
+                    Some((state.chapter + 1, state.chapters))
+                } else {
+                    None
+                },
+            })),
         }
     }
 }
