@@ -50,3 +50,9 @@
 body.no-touch .round:hover {
     box-shadow: inset 0 0 0 99em rgba(255,255,255,.4);
 }
+
+.mpv-title {
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+}

@@ -22,14 +22,16 @@ pub fn mpv(props: &MpvProps) -> Html {
     let (progress_min, length_min) = progress_timestamps(&props.front);
     let (chapter, chapter_total) = chapters(&props.front);
     let play_icon = play_icon(&props.front);
+    let title = title(&props.front);
 
     html! {
         <article class={classes!("stacker")}>
-            if matches!(props.front, prot::Mpv::Load) {
-                <div>{"Loading"}</div> // TODO: add a spinning thingy instead of this text
-            }
             <BackButton button_type={Type::Exit}
                         onclick={click_send!(mpvstart::Stop)} />
+            // TODO: add a spinning thingy when loading
+            <div class={classes!("pad")}>
+                <div class={classes!("kinda-big", "mpv-title")}>{title}</div>
+            </div>
             <div class={classes!("left", "pad")}>
                 <span>{progress_min}{"/"}{length_min}</span>
                 <span class={classes!("float-right")}>{chapter}{"/"}{chapter_total}</span>
@@ -39,7 +41,7 @@ pub fn mpv(props: &MpvProps) -> Html {
                              outer_class={classes!("mpv-progress-outer")}
                              inner_class={classes!("mpv-progress-inner")}/>
             </div>
-            <div class={classes!("space-evenly")}>
+            <div class={classes!("space-evenly", "pad")}>
                 <button onclick={click_send!(mpvcontrol::PrevChapter)}
                         class={classes!("round", "icon", "icon-skip-back")}
                         disabled={!clickable} />
@@ -166,6 +168,13 @@ fn timestamp(seconds: f64) -> String {
         let minutes = (int % 3600) / 60;
         let s = int % 60;
         format!("{:02.0}:{:02.0}:{:02.0}", hours, minutes, s)
+    }
+}
+
+fn title(front: &prot::Mpv) -> &str {
+    match front {
+        prot::Load => "Loading...",
+        prot::PlayState(prot::PlayState { title, .. }) => title,
     }
 }
 

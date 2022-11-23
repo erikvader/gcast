@@ -56,6 +56,7 @@ pub enum EndReason {
 #[derive(Debug, Clone, Builder)]
 #[builder(derive(Debug))]
 pub struct State {
+    title: String,
     pause: bool,
     playback_time: f64,
     duration: f64,
@@ -93,6 +94,7 @@ impl MpvState {
             Load => Some(ClientMpv::Load),
             End(_) => None,
             Play(state) => Some(ClientMpv::PlayState(PlayState {
+                title: state.title.clone(),
                 pause: state.pause,
                 progress: not_nan_or_zero(state.playback_time),
                 length: not_nan_or_zero(state.duration),
@@ -166,6 +168,7 @@ impl MpvHandle {
 
 fn observe_some_properties(ctx: &libmpv::events::EventContext<'_>) -> libmpv::Result<()> {
     ctx.disable_deprecated_events()?;
+    ctx.observe_property("media-title", Format::String, 0)?;
     ctx.observe_property("pause", Format::Flag, 0)?;
     ctx.observe_property("playback-time", Format::Double, 0)?; //time-pos, percent-pos, stream-pos, stream-end
     ctx.observe_property("duration", Format::Double, 0)?;
@@ -277,6 +280,13 @@ fn take_int(data: &PropertyData) -> i64 {
     panic!("'{:?}' is not an int", data)
 }
 
+fn take_string(data: &PropertyData) -> String {
+    if let PropertyData::Str(s) = data {
+        return s.to_string();
+    }
+    panic!("'{:?}' is not a string", data)
+}
+
 fn wait_for_play(
     s_tx: &StateSnd,
     ev_ctx: &mut libmpv::events::EventContext,
@@ -306,6 +316,7 @@ fn wait_for_play(
             Some(Ok(Event::PropertyChange { name, change, .. })) => {
                 log::debug!("Change: {} to {:?}", name, change);
                 match name {
+                    "media-title" => partial.title(take_string(&change)),
                     "pause" => partial.pause(take_flag(&change)),
                     "playback-time" => partial.playback_time(take_double(&change)),
                     "duration" => partial.duration(take_double(&change)),
@@ -351,6 +362,7 @@ fn wait_for_end(
             }
             Some(Ok(Event::PropertyChange { name, change, .. })) => {
                 match name {
+                    "media-title" => state.title = take_string(&change),
                     "pause" => state.pause = take_flag(&change),
                     "playback-time" => state.playback_time = take_double(&change),
                     "duration" => state.duration = take_double(&change),

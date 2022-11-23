@@ -9,6 +9,7 @@ message! {
 
 message! {
     struct Mpv, PlayState {
+        title: String,
         pause: bool,
         progress: NotNan<f64>,
         length: NotNan<f64>,

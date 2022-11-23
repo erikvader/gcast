@@ -137,27 +137,37 @@ pub fn main() {
     yew::start_app::<LiveApp>();
 
     // use protocol::to_client::front::filesearch as fs;
-    // // use protocol::to_client::front::mpv as m;
+    // use protocol::to_client::front::mpv as m;
     // yew::start_app_with_props::<App>(AppProps {
     //     ws_ready: WebSockStatus::Connected,
     //     accepted: Accepted::Accepted,
     //     front: Some(
-    //         fs::Refreshing(fs::Refreshing {
-    //             roots: vec![
-    //                 fs::RootInfo {
-    //                     path: "root1".to_string(),
-    //                     status: fs::RootStatus::Loading,
-    //                 },
-    //                 fs::RootInfo {
-    //                     path: "root2".to_string(),
-    //                     status: fs::RootStatus::Pending,
-    //                 },
-    //             ],
-    //             total_dirs: 80,
-    //             done_dirs: 20,
-    //             num_errors: 5,
+    //         m::PlayState(m::PlayState {
+    //             title: "hejsan hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej".to_string(),
+    //             pause: true,
+    //             progress: protocol::util::not_nan_or_zero(0.0),
+    //             length: protocol::util::not_nan_or_zero(0.0),
+    //             volume: protocol::util::not_nan_or_zero(0.0),
+    //             chapter: None,
     //         })
     //         .into(),
-    //     ),
+    //     ), // front: Some(
+    //     fs::Refreshing(fs::Refreshing {
+    //         roots: vec![
+    //             fs::RootInfo {
+    //                 path: "root1".to_string(),
+    //                 status: fs::RootStatus::Loading,
+    //             },
+    //             fs::RootInfo {
+    //                 path: "root2".to_string(),
+    //                 status: fs::RootStatus::Pending,
+    //             },
+    //         ],
+    //         total_dirs: 80,
+    //         done_dirs: 20,
+    //         num_errors: 5,
+    //     })
+    //     .into(),
+    // ),
     // });
 }
