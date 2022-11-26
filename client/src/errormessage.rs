@@ -14,9 +14,9 @@ pub fn errormessage(props: &ErrorProps) -> Html {
     let active = use_context::<WebSockStatus>().expect("no active context found");
     html! {
         <article class={classes!("stacker")}>
-            <h1 class={classes!("error", "pad", "white-text")}>
+            <h2 class={classes!("error", "pad", "white-text")}>
                 {"Something Exceptional Happened"}
-            </h1>
+            </h2>
             <header class={classes!("pad")}>
                 <h2>{&props.front.header}</h2>
             </header>
