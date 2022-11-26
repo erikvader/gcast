@@ -21,6 +21,7 @@ async fn handle_msg(msg: Message, front: &mut FrontJob) {
     use ToServer::*;
     match msg.take_to_server() {
         SendStatus(_) => front.send_status().await,
+        PowerCtrl(ctrl) => front.powerctrl(ctrl).await,
 
         MpvStart(mpvstart::File(file)) => front.start_mpv_file(file).await,
         MpvStart(mpvstart::Url(s)) => front.start_mpv_url(s).await,

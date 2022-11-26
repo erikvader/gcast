@@ -42,6 +42,10 @@
     content: "pause";
 }
 
+.icon-power::after {
+    content: "power_settings_new";
+}
+
 .icon-play::after {
     content: "play_arrow";
 }

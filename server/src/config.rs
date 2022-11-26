@@ -15,6 +15,7 @@ static CONF: OnceCell<Config> = OnceCell::const_new();
 struct Config {
     root_dirs: Vec<String>,
     port: u16,
+    poweroff_exe: String,
     mpv: Mpv,
     spotify: Spotify,
 }
@@ -79,6 +80,10 @@ pub fn spotify_exe() -> &'static str {
 
 pub fn spotify_fullscreen_exe() -> &'static str {
     &get_instance().spotify.fullscreen_exe
+}
+
+pub fn poweroff_exe() -> &'static str {
+    &get_instance().poweroff_exe
 }
 
 pub fn conf_dir() -> PathBuf {

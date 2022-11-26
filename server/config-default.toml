@@ -6,6 +6,9 @@ root_dirs = [
 # Port number to await websocket connections on
 port = 1337
 
+# Program to run to power off the system
+poweroff_exe = "sudo_systemctl_poweroff"
+
 # Key value pairs of properties for mpv
 [mpv.properties]
 fullscreen = "yes"

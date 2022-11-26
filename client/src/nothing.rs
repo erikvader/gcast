@@ -1,5 +1,6 @@
+use crate::confirm_button::ConfirmButton;
 use crate::WebSockStatus;
-use protocol::to_server::{fsstart, spotifystart};
+use protocol::to_server::{fsstart, powerctrl, spotifystart};
 use yew::prelude::*;
 
 #[rustfmt::skip::macros(html)]
@@ -23,6 +24,10 @@ pub fn nothing() -> Html {
                     disabled={active.is_disconnected()}>
                 {"Play video"}
             </button>
+            <ConfirmButton onclick={click_send!(powerctrl::Poweroff)}
+                           unarmed_classes={classes!("icon", "icon-power", "icon-hspace")}
+                           unarmed_text={"Power off"}
+                           armed_classes={classes!("error", "icon", "icon-front-hand", "icon-hspace")} />
         </article>
     }
 }

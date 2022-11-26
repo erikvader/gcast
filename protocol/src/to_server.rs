@@ -3,6 +3,7 @@ pub mod fscontrol;
 pub mod fsstart;
 pub mod mpvcontrol;
 pub mod mpvstart;
+pub mod powerctrl;
 pub mod sendstatus;
 pub mod spotifyctrl;
 pub mod spotifystart;
@@ -10,6 +11,7 @@ pub mod spotifystart;
 message! {
     enum super::MessageKind, ToServer {
         SendStatus(sendstatus::SendStatus),
+        PowerCtrl(powerctrl::PowerCtrl),
         MpvControl(mpvcontrol::MpvControl),
         MpvStart(mpvstart::MpvStart),
         SpotifyStart(spotifystart::SpotifyStart),

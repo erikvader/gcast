@@ -3,7 +3,8 @@ use std::convert::Infallible;
 use protocol::{
     to_client::front::{self, errormsg},
     to_server::{
-        fscontrol::FsControl, mpvcontrol::MpvControl, mpvstart, spotifyctrl::SpotifyCtrl,
+        fscontrol::FsControl, mpvcontrol::MpvControl, mpvstart, powerctrl::PowerCtrl,
+        spotifyctrl::SpotifyCtrl,
     },
 };
 
@@ -157,6 +158,16 @@ impl FrontJob {
         };
         if res.is_err() {
             log::error!("Couldn't request for status, job is down");
+        }
+    }
+
+    pub async fn powerctrl(&mut self, ctrl: PowerCtrl) {
+        send_ctrl_check!(self, "nothing", self.is_none());
+        match ctrl {
+            PowerCtrl::Poweroff => {
+                self.oneshot_process(crate::config::poweroff_exe().to_string())
+                    .await
+            }
         }
     }
 

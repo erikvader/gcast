@@ -9,6 +9,7 @@ macro_rules! click_send {
 }
 
 mod back_button;
+mod confirm_button;
 mod errormessage;
 mod mpv;
 mod nothing;
