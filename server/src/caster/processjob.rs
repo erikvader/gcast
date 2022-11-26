@@ -1,4 +1,4 @@
-use std::{io, process::ExitStatus};
+use std::process::ExitStatus;
 
 use protocol::to_client::front;
 

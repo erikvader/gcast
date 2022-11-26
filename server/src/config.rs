@@ -22,6 +22,7 @@ struct Config {
 #[derive(Debug, serde::Deserialize)]
 struct Spotify {
     executable: String,
+    fullscreen_exe: String,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -74,6 +75,10 @@ pub fn mpv_options() -> Vec<(String, String)> {
 
 pub fn spotify_exe() -> &'static str {
     &get_instance().spotify.executable
+}
+
+pub fn spotify_fullscreen_exe() -> &'static str {
+    &get_instance().spotify.fullscreen_exe
 }
 
 pub fn conf_dir() -> PathBuf {

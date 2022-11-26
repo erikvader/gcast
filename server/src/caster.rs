@@ -23,13 +23,13 @@ async fn handle_msg(msg: Message, front: &mut FrontJob) {
         SendStatus(_) => front.send_status().await,
 
         MpvStart(mpvstart::File(file)) => front.start_mpv_file(file).await,
-
         MpvStart(mpvstart::Url(s)) => front.start_mpv_url(s).await,
         MpvStart(mpvstart::Stop) => front.stop_mpv().await,
         MpvControl(ctrl) => front.send_mpv_ctrl(ctrl).await,
 
         SpotifyStart(spotifystart::Start) => front.start_spotify().await,
         SpotifyStart(spotifystart::Stop) => front.stop_spotify().await,
+        SpotifyCtrl(ctrl) => front.send_spotify_ctrl(ctrl).await,
 
         FsStart(fsstart::Start) => front.start_filer().await,
         FsStart(fsstart::Stop) => front.stop_filer().await,

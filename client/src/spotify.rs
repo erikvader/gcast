@@ -1,5 +1,5 @@
 use crate::WebSockStatus;
-use protocol::to_server::spotifystart;
+use protocol::to_server::{spotifyctrl, spotifystart};
 use yew::prelude::*;
 
 #[rustfmt::skip::macros(html)]
@@ -11,6 +11,10 @@ pub fn spotify() -> Html {
             <header class={classes!("center")}>
                 <h1>{"Spotify"}</h1>
             </header>
+            <button onclick={click_send!(spotifyctrl::Fullscreen)}
+                    disabled={active.is_disconnected()}>
+                {"Enter fullscreen"}
+            </button>
             <button onclick={click_send!(spotifystart::Stop)}
                     class={classes!("error")}
                     disabled={active.is_disconnected()}>

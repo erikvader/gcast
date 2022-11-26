@@ -1,16 +1,17 @@
-use std::{convert::Infallible, io};
+use std::convert::Infallible;
 
 use protocol::{
     to_client::front::{self, errormsg},
-    to_server::{fscontrol::FsControl, mpvcontrol::MpvControl, mpvstart},
+    to_server::{
+        fscontrol::FsControl, mpvcontrol::MpvControl, mpvstart, spotifyctrl::SpotifyCtrl,
+    },
 };
-use tokio::{select, sync::mpsc};
 
 use crate::{
-    filer::{self, FilerError, FilerResult},
-    job::{handlejob::handle_job_start, Job, JobMsg},
-    mpv::{self, MpvError, MpvResult},
-    process::{Process, ProcessError},
+    filer::{self, FilerError},
+    job::{handlejob::handle_job_start, Job},
+    mpv::{self, MpvError},
+    process::Process,
     util::send_to_conn,
     Sender,
 };
@@ -180,6 +181,31 @@ impl FrontJob {
                 }
             }
             _ => unreachable!("must be filer due to check"),
+        }
+    }
+
+    pub async fn send_spotify_ctrl(&mut self, ctrl: SpotifyCtrl) {
+        send_ctrl_check!(self, "spotify", self.is_spotify());
+        match ctrl {
+            SpotifyCtrl::Fullscreen => {
+                self.oneshot_process(crate::config::spotify_fullscreen_exe().to_string())
+                    .await;
+            }
+        }
+    }
+
+    async fn oneshot_process(&mut self, exe: String) {
+        let errmsg = format!("Failed to run process '{}'", exe);
+        match Process::start(exe) {
+            Err(e) => self.error_message_err(errmsg, e).await,
+            Ok(mut p) => match p.wait().await.unwrap() {
+                Err(e) => self.error_message_err(errmsg, e).await,
+                Ok(exitstatus) => {
+                    if !exitstatus.success() {
+                        self.error_message_str(errmsg, exitstatus).await;
+                    }
+                }
+            },
         }
     }
 

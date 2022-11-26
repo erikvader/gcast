@@ -14,3 +14,6 @@ force-window = "immediate"
 [spotify]
 # The executable to run to start spotify
 executable = "spotify"
+# Command to run to put spotify in fullscreen by, e.g., moving the cursor and pressing on
+# the fullscreen button
+fullscreen_exe = "spotify_click_fullscreen"
