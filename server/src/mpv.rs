@@ -153,7 +153,6 @@ impl MpvHandle {
         self.command_str("quit").await
     }
 
-    // TODO: throttle the messages to make it a little easier on the client?
     pub async fn next(&mut self) -> MpvResult<MpvState> {
         self.rx.recv().await.unwrap_or(Err(MpvError::Exited))
     }

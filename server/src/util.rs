@@ -44,8 +44,9 @@ pub async fn join_handle_wait_take<T>(mut handle: JoinHandle<T>) -> T {
 
 macro_rules! break_err {
     ($e:expr) => {
-        if let Err(e) = $e {
-            break Err(e);
+        match $e {
+            Ok(it) => it,
+            Err(e) => break Err(e.into()),
         }
     };
 }
