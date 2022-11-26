@@ -25,7 +25,7 @@ where
         Self {
             handle: tokio::task::spawn(async move {
                 let mut interval = tokio::time::interval(RATE);
-                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
                 let res: anyhow::Result<()> = loop {
                     let tosend: Message = match rx.recv().await {
                         Ok(it) => it,
