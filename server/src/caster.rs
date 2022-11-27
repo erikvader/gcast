@@ -4,7 +4,7 @@ mod mpvjob;
 mod processjob;
 
 use protocol::{
-    to_server::{errormsgctrl, fsstart, mpvstart, spotifystart, ToServer},
+    to_server::{errormsgctrl, fsstart, mpvstart, playurlstart, spotifystart, ToServer},
     Message,
 };
 use tokio::select;
@@ -35,6 +35,9 @@ async fn handle_msg(msg: Message, front: &mut FrontJob) {
         FsStart(fsstart::Start) => front.start_filer().await,
         FsStart(fsstart::Stop) => front.stop_filer().await,
         FsControl(ctrl) => front.send_filer_ctrl(ctrl).await,
+
+        PlayUrlStart(playurlstart::Start) => front.start_play_url().await,
+        PlayUrlStart(playurlstart::Stop) => front.stop_play_url().await,
 
         ErrorMsgCtrl(errormsgctrl::Close) => front.close_error_message().await,
     }

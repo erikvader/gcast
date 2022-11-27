@@ -28,6 +28,7 @@ enum Variant {
     Spotify(Job<(), ProcessHandleJobError>),
     Mpv(Job<MpvControl, MpvError>),
     Filer(Job<FsControl, FilerError>),
+    PlayUrl(Job<(), Infallible>),
     ErrorMsg(Job<(), Infallible>),
     None(Job<(), Infallible>),
 }
@@ -84,6 +85,7 @@ impl FrontJob {
             Spotify(j) => j.terminate(),
             Mpv(j) => j.terminate(),
             Filer(j) => j.terminate(),
+            PlayUrl(j) => j.terminate(),
             ErrorMsg(j) => j.terminate(),
             None(j) => j.terminate(),
         }
@@ -100,6 +102,7 @@ impl FrontJob {
             Spotify(j) => j.wait().await?,
             Mpv(j) => j.wait().await?,
             Filer(j) => j.wait().await?,
+            PlayUrl(j) => j.wait().await?,
             ErrorMsg(j) => j.wait().await?,
             None(j) => j.wait().await?,
         }
@@ -153,6 +156,7 @@ impl FrontJob {
             None(j) => j.send_status().await,
             Spotify(j) => j.send_status().await,
             Mpv(j) => j.send_status().await,
+            PlayUrl(j) => j.send_status().await,
             ErrorMsg(j) => j.send_status().await,
             Filer(j) => j.send_status().await,
         };
@@ -240,13 +244,17 @@ impl FrontJob {
         matches!(self.var, Variant::Filer(_))
     }
 
+    pub fn is_play_url(&self) -> bool {
+        matches!(self.var, Variant::PlayUrl(_))
+    }
+
     pub fn is_error_message(&self) -> bool {
         matches!(self.var, Variant::ErrorMsg(_))
     }
 
     pub async fn start_spotify(&mut self) {
         start_check!(self, self.is_none());
-        log::info!("Starting spotify");
+        log::info!("Starting spotify"); // TODO: same name as variant::name()
         self.transition(Variant::spotify_job).await;
     }
 
@@ -255,8 +263,19 @@ impl FrontJob {
         self.kill().await;
     }
 
-    pub async fn start_mpv_url(&mut self, url: String) {
+    pub async fn start_play_url(&mut self) {
         start_check!(self, self.is_none());
+        log::info!("Starting play url");
+        self.transition(Variant::play_url_job).await;
+    }
+
+    pub async fn stop_play_url(&mut self) {
+        stop_check!("play url", self.is_play_url());
+        self.kill().await;
+    }
+
+    pub async fn start_mpv_url(&mut self, url: String) {
+        start_check!(self, self.is_none() || self.is_play_url());
         log::info!("Starting mpv with url");
         if !url.starts_with("http") {
             self.error_message_str("Not a valid URL", "").await;
@@ -328,6 +347,20 @@ impl Variant {
         }))
     }
 
+    fn play_url_job(to_conn: Sender) -> Self {
+        Self::PlayUrl(Job::start(|mut rx| async move {
+            send_to_conn(&to_conn, front::PlayUrl).await;
+            while let Some(jm) = rx.recv().await {
+                assert!(
+                    jm.is_send_status(),
+                    "the received message must be a SendStatus"
+                );
+                send_to_conn(&to_conn, front::PlayUrl).await;
+            }
+            Ok(())
+        }))
+    }
+
     fn error_job(to_conn: Sender, header: String, body: String) -> Self {
         // TODO: create some kind of StaticJob abstraction that just resends the same
         // state over and over
@@ -364,6 +397,7 @@ impl Variant {
         match self {
             Spotify(_) => "spotify",
             Mpv(_) => "mpv",
+            PlayUrl(_) => "play url",
             Filer(_) => "filesearch",
             ErrorMsg(_) => "error message",
             None(_) => "nothing",

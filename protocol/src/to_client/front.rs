@@ -8,6 +8,7 @@ message! {
         Spotify,
         Mpv(mpv::Mpv),
         FileSearch(filesearch::FileSearch),
+        PlayUrl,
         ErrorMsg(errormsg::ErrorMsg),
     }
 }

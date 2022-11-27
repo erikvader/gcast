@@ -3,6 +3,7 @@ pub mod fscontrol;
 pub mod fsstart;
 pub mod mpvcontrol;
 pub mod mpvstart;
+pub mod playurlstart;
 pub mod powerctrl;
 pub mod sendstatus;
 pub mod spotifyctrl;
@@ -18,6 +19,7 @@ message! {
         SpotifyCtrl(spotifyctrl::SpotifyCtrl),
         FsStart(fsstart::FsStart),
         FsControl(fscontrol::FsControl),
+        PlayUrlStart(playurlstart::PlayUrlStart),
         ErrorMsgCtrl(errormsgctrl::ErrorMsgCtrl),
     }
 }

@@ -14,6 +14,7 @@ mod errormessage;
 mod mpv;
 mod nothing;
 mod pending;
+mod playurl;
 mod progressbar;
 mod rejected;
 mod search;
@@ -24,6 +25,7 @@ use errormessage::ErrorMessage;
 use mpv::Mpv;
 use nothing::Nothing;
 use pending::Pending;
+use playurl::PlayUrl;
 use protocol::{
     to_client::{front::Front, seat::Seat, ToClient},
     to_server::sendstatus::SendStatus,
@@ -88,6 +90,7 @@ fn app(props: &AppProps) -> Html {
                 (Accepted::Accepted, Some(Front::Spotify)) => html! {<Spotify />},
                 (Accepted::Accepted, Some(Front::Mpv(mpv))) => html! {<Mpv front={mpv.clone()} />},
                 (Accepted::Accepted, Some(Front::FileSearch(fs))) => html! {<Filesearch front={fs.clone()} />},
+                (Accepted::Accepted, Some(Front::PlayUrl)) => html! {<PlayUrl />},
                 (Accepted::Accepted, Some(Front::ErrorMsg(em))) => html! {<ErrorMessage front={em.clone()} />},
             }}
         </ContextProvider<WebSockStatus>>

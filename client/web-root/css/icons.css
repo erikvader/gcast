@@ -18,6 +18,10 @@
     content: "search";
 }
 
+.icon-link::after {
+    content: "link";
+}
+
 .icon-renew::after {
     content: "autorenew";
 }
