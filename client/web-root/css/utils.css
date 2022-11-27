@@ -37,6 +37,38 @@
     background: #8b0000;
 }
 
+.dracula-pink {
+    background: #ff79c6;
+}
+
+.dracula-cyan {
+    background: #8be9fd;
+}
+
+.dracula-green {
+    background: #50fa7b;
+}
+
+.dracula-orange {
+    background: #ffb86c;
+}
+
+.dracula-purple {
+    background: #bd93f9;
+}
+
+.dracula-red {
+    background: #ff5555;
+}
+
+.dracula-yellow {
+    background: #f1fa8c;
+}
+
+.dracula-black {
+    background: #282a36;
+}
+
 .white-text {
     color: white;
 }

@@ -8,6 +8,8 @@
     transition: all .3s;
     user-select: none;
     font-size: 0.8em;
+    position: relative;
+    display: flex;
 }
 
 body.no-touch .search-res:hover, body.no-touch .rows > *:nth-child(odd):hover {
@@ -15,7 +17,7 @@ body.no-touch .search-res:hover, body.no-touch .rows > *:nth-child(odd):hover {
 }
 
 .rows > *:nth-child(odd) {
-    background: lightgray;
+    background: #dddddd;
 }
 
 .invalid, .invalid:focus {
@@ -36,4 +38,13 @@ body.no-touch .search-res:hover, body.no-touch .rows > *:nth-child(odd):hover {
 
 .root-loading {
     color: blue;
+}
+
+.search-detail {
+    padding: 0.3em;
+}
+
+.search-content {
+    padding: 0.2em;
+    margin-left: 0.1em;
 }

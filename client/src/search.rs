@@ -11,6 +11,16 @@ use crate::back_button::{BackButton, Type};
 use crate::progressbar::Progressbar;
 use crate::{websocket::websocket_send, WebSockStatus};
 
+const COLORS: &[&str] = &[
+    "dracula-pink",
+    "dracula-purple",
+    "dracula-yellow",
+    "dracula-orange",
+    "dracula-cyan",
+    "dracula-green",
+    "dracula-red",
+];
+
 #[derive(Properties, PartialEq)]
 pub struct FilesearchProps {
     pub front: prot::FileSearch,
@@ -115,9 +125,19 @@ fn search_result(props: &SearchResultProps) -> Html {
         })
     };
 
+    let color_class = COLORS.get(props.front.root).copied().unwrap_or_else(|| {
+        log::warn!("Too few colors for the amount of roots in search detail");
+        "dracula-black"
+    });
+
     // TODO: handle disconnection from server. Remove all results?
     html! {
-        <div class={classes!("search-res")} onclick={on_click}>{contents}</div>
+        <div class={classes!("search-res")} onclick={on_click}>
+            <span class={classes!("search-detail", color_class)}></span>
+            <span class={classes!("search-content")}>
+                {contents}
+            </span>
+        </div>
     }
 }
 
@@ -199,7 +219,6 @@ fn init(props: &InitProps) -> Html {
                     onclick={click_send!(fscontrol::Search("".to_string()))}>
                 {"Search"}
             </button>
-            // TODO: button for youtube links here?
         </>
     }
 }
