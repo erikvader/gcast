@@ -40,8 +40,7 @@ struct ResultsProps {
 fn results(props: &ResultsProps) -> Html {
     let active = use_context::<WebSockStatus>().expect("no active context found");
 
-    // TODO: somehow reset the query to the one from the server on mount
-    let query = use_state(|| "".to_string());
+    let query = use_state(|| props.front.query.to_string());
     let query_change = {
         let query_setter = query.setter();
 
@@ -71,7 +70,6 @@ fn results(props: &ResultsProps) -> Html {
     let invalid_class = (!props.front.query_valid).then_some("invalid");
 
     // TODO: show a loading icon when props.front.query != *query
-    // TODO: handle scrolling
     html! {
         <>
             <BackButton button_type={Type::Back}
@@ -119,7 +117,7 @@ fn search_result(props: &SearchResultProps) -> Html {
 
     // TODO: handle disconnection from server. Remove all results?
     html! {
-        <div class={classes!("mono", "search-res")} onclick={on_click}>{contents}</div>
+        <div class={classes!("search-res")} onclick={on_click}>{contents}</div>
     }
 }
 
