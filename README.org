@@ -1,7 +1,33 @@
-* Introduction
-todo
+* What is it?
+A media server, sort of. Run this on a computer connected to a TV and
+control it using a phone. This application supports playing local
+video files using [[https://mpv.io/][mpv]] (or rather [[https://github.com/mpv-player/mpv/blob/master/libmpv/client.h][its C API]]), a whole lot of video from
+the internet with [[https://youtube-dl.org/][youtube-dl]] (or whatever mpv uses in the background),
+and listening to music using [[https://www.spotify.com/se/premium/][spotify]] with [[https://support.spotify.com/us/article/spotify-connect/][spotify connect]].
+* Behind the scenes
+This project is made with [[https://www.rust-lang.org/][rust]], compiled to both x86, or whatever, and
+[[https://www.rust-lang.org/what/wasm][webassembly]]. The project is divided into two main components (or
+crates): =server= and =client=.
+** Crate: Server
+This is a web server that maintains state, knows what processes are
+activate and not, whether a video is playing or not, etc. It is the
+main program of the project. It communicates via websockets to a
+client that might connect using a phone.
+** Crate: Client
+This is the "mobile app" served as a simple website. The UI is made
+with [[https://yew.rs/][yew]], a very [[https://reactjs.org/][react]]-inspired framework. So the frontend is made in
+rust and executed on a web browser as a webassembly application. This
+"app" is designed like a [[https://en.wikipedia.org/wiki/Thin_client][thin client]], it simply renders what the
+server tells it to and has minimal logic and processing.
+** All other crates
+- =cli=: Binaries used for testing without having a fully running
+  environment.
+- =protocol=: Shared data structures that define the communication
+  interface between the client and the server.
+- =searcher=: A search engine that simply searches through a bunch of
+  strings, like video file paths, using syntax inspired by [[https://github.com/abo-abo/swiper#swiper][swiper]].
 * Installation
-The missing values in =deploy-config.mk.default= needs to be filled in
+The missing values in =deploy-config-default.mk= needs to be filled in
 first and the file saved as =deploy-config.mk=. Then basically run
 ~make -C client deploy~ and ~make -C server deploy~.
 
@@ -27,7 +53,8 @@ systemctl --user add-wants xmonad.target gcast-server.service
 #+END_SRC
 
 The server also has a config that needs to be placed at
-=~/.config/gcast/config.toml=.
+=~/.config/gcast/config.toml=. A default with comments is available at
+=server/config-default.toml=.
 
 ** Port 80 without root
 Non-root processes can't create a socket on any port below 1024.
