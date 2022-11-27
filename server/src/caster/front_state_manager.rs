@@ -10,10 +10,9 @@ use protocol::{
 
 use crate::{
     filer::{self, FilerError},
-    job::{handlejob::handle_job_start, Job},
+    job::{handlejob::handle_job_start, staticjob::static_job_start, Job},
     mpv::{self, MpvError},
     process::Process,
-    util::send_to_conn,
     Sender,
 };
 
@@ -334,60 +333,28 @@ impl FrontJob {
 
 impl Variant {
     fn none_job(to_conn: Sender) -> Self {
-        Self::None(Job::start(|mut rx| async move {
-            send_to_conn(&to_conn, front::None).await;
-            while let Some(jm) = rx.recv().await {
-                assert!(
-                    jm.is_send_status(),
-                    "the received message must be a SendStatus"
-                );
-                send_to_conn(&to_conn, front::None).await;
-            }
-            Ok(())
-        }))
+        Self::None(static_job_start(to_conn, front::None))
     }
 
     fn play_url_job(to_conn: Sender) -> Self {
-        Self::PlayUrl(Job::start(|mut rx| async move {
-            send_to_conn(&to_conn, front::PlayUrl).await;
-            while let Some(jm) = rx.recv().await {
-                assert!(
-                    jm.is_send_status(),
-                    "the received message must be a SendStatus"
-                );
-                send_to_conn(&to_conn, front::PlayUrl).await;
-            }
-            Ok(())
-        }))
+        Self::PlayUrl(static_job_start(to_conn, front::PlayUrl))
     }
 
     fn error_job(to_conn: Sender, header: String, body: String) -> Self {
-        // TODO: create some kind of StaticJob abstraction that just resends the same
-        // state over and over
-        Self::ErrorMsg(Job::start(|mut rx| async move {
-            let state = errormsg::ErrorMsg { header, body };
-            send_to_conn(&to_conn, state.clone()).await;
-            while let Some(jm) = rx.recv().await {
-                assert!(
-                    jm.is_send_status(),
-                    "the received message must be a SendStatus"
-                );
-                send_to_conn(&to_conn, state.clone()).await;
-            }
-            Ok(())
-        }))
+        let state = errormsg::ErrorMsg { header, body };
+        Self::ErrorMsg(static_job_start(to_conn, state))
     }
 
     fn mpv_job(to_conn: Sender, file: String) -> Self {
-        Variant::Mpv(handle_job_start(to_conn, move || mpv::mpv(&file)))
+        Self::Mpv(handle_job_start(to_conn, move || mpv::mpv(&file)))
     }
 
     fn filer_job(to_conn: Sender) -> Self {
-        Variant::Filer(handle_job_start(to_conn, move || filer::filer()))
+        Self::Filer(handle_job_start(to_conn, move || filer::filer()))
     }
 
     fn spotify_job(to_conn: Sender) -> Self {
-        Variant::Spotify(handle_job_start(to_conn, move || {
+        Self::Spotify(handle_job_start(to_conn, move || {
             Process::start(crate::config::spotify_exe().to_string())
         }))
     }

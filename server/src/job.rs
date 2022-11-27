@@ -7,6 +7,7 @@ use tokio::{
 use crate::util::join_handle_wait;
 
 pub mod handlejob;
+pub mod staticjob;
 
 pub struct Job<T, E> {
     handle: Option<JoinHandle<Result<(), E>>>,
