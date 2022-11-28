@@ -31,6 +31,7 @@ The missing values in =deploy-config-default.mk= needs to be filled in
 first and the file saved as =deploy-config.mk=. Then basically run
 ~make -C client deploy~ and ~make -C server deploy~.
 
+** First time setup
 Some manual work needs to be performed the first time this is deployed.
 
 First, build and sync:
@@ -55,6 +56,12 @@ systemctl --user add-wants xmonad.target gcast-server.service
 The server also has a config that needs to be placed at
 =~/.config/gcast/config.toml=. A default with comments is available at
 =server/config-default.toml=.
+
+** Very different machines
+Since the =server= binary depends on shared libraries, particularly
+libmpv, it is possible to build the application on the remote machine
+using ~make -C server deploy-remote~, rather than simply copying a
+locally built binary like ~make -C server deploy~ does.
 
 ** Port 80 without root
 Non-root processes can't create a socket on any port below 1024.
