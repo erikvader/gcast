@@ -2,7 +2,7 @@
 A media server, sort of. Run this on a computer connected to a TV and
 control it using a phone. This application supports playing local
 video files using [[https://mpv.io/][mpv]] (or rather [[https://github.com/mpv-player/mpv/blob/master/libmpv/client.h][its C API]]), a whole lot of video from
-the internet with [[https://youtube-dl.org/][youtube-dl]] (or whatever mpv uses in the background),
+the internet with [[https://github.com/yt-dlp/yt-dlp][yt-dlp]] (or whatever mpv uses in the background),
 and listening to music using [[https://www.spotify.com/se/premium/][spotify]] with [[https://support.spotify.com/us/article/spotify-connect/][spotify connect]].
 * Behind the scenes
 This project is made with [[https://www.rust-lang.org/][rust]], compiled to both x86, or whatever, and
