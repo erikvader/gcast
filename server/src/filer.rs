@@ -143,7 +143,7 @@ fn read_cache(tx: &StateSnd, cache_file: &Path) -> FilerResult<Cache> {
         }
         Err(e) => Err(e),
     }?;
-    send_init(&cache, &tx)?;
+    send_init(&cache, tx)?;
     Ok(cache)
 }
 

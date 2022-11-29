@@ -2,7 +2,7 @@ use yew::prelude::*;
 
 use crate::WebSockStatus;
 
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Type {
     Back,
     Exit,

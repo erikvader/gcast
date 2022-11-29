@@ -63,7 +63,7 @@ fn main() {
             let first_ten = sorted_take(&mut search_res, 10);
             println!("{} {:?}", "sort time:".blue(), sort_prev.elapsed());
 
-            for x in first_ten.into_iter() {
+            for x in first_ten.iter_mut() {
                 println!(
                     "{}",
                     stylize::<_, _, _, String>(

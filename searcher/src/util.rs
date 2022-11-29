@@ -1,7 +1,7 @@
 use std::ops::Range;
 
 fn compact_to_ranges(indices: &[usize]) -> Vec<Range<usize>> {
-    let mut iter = indices.into_iter();
+    let mut iter = indices.iter();
     if let Some(&first) = iter.next() {
         let mut res = vec![Range {
             start: first,

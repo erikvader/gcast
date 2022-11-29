@@ -126,7 +126,7 @@ async fn handle_accept(
 }
 
 async fn handle_binary(msg: &[u8], to_cast: &mut Sender) {
-    match Message::deserialize(&msg) {
+    match Message::deserialize(msg) {
         Err(e) => log::warn!("Failed to deserialize message {:?} cuz {}", &msg, e),
         Ok(m) if m.is_to_server() => {
             if to_cast.send(m).await.is_err() {

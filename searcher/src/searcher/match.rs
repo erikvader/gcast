@@ -24,7 +24,7 @@ impl Match {
     }
 
     pub fn first(&self) -> Option<usize> {
-        self.indices.iter().next().copied()
+        self.indices.first().copied()
     }
 
     pub fn indices(&self) -> &[usize] {

@@ -21,7 +21,7 @@ const COLORS: &[&str] = &[
     "dracula-red",
 ];
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct FilesearchProps {
     pub front: prot::FileSearch,
 }

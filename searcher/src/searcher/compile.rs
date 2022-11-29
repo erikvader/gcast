@@ -10,7 +10,7 @@ const REG_ICASE: &str = "(?i)";
 const REG_NO_ICASE: &str = "(?-i)";
 
 // TODO: report what went wrong in more detail
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
 #[error("failed to compile query to regex")]
 pub struct CompileError;
 
@@ -28,10 +28,7 @@ pub fn compile_search_term_to_regexes(search_term: &str) -> Result<Vec<Regex>> {
 
 #[allow(dead_code)] // NOTE: maybe reintroduce in the future as a setting or something
 fn compile_fzf(search_term: &str) -> Result<Vec<String>> {
-    let regs: Result<Vec<_>> = search_term
-        .split_whitespace()
-        .map(|word| compile_word(word))
-        .collect();
+    let regs: Result<Vec<_>> = search_term.split_whitespace().map(compile_word).collect();
 
     regs.and_then(|vec| {
         if vec.is_empty() {
@@ -52,9 +49,9 @@ fn compile_swiper(search_term: &str) -> Result<Vec<String>> {
 
     let parts: Vec<_> = Regex::new(r"( +)|[^ ]+")
         .unwrap()
-        .find_iter(&search_term)
+        .find_iter(search_term)
         .map(|m| {
-            if m.as_str().starts_with(" ") {
+            if m.as_str().starts_with(' ') {
                 swiper_space(m.as_str())
             } else {
                 swiper_word(m.as_str())
@@ -90,7 +87,7 @@ fn compile_word(word: &str) -> Result<String> {
 
 fn swiper_space(spaces: &str) -> String {
     match spaces.chars().count() {
-        x if x <= 0 => panic!("must be non-empty"),
+        x if x == 0 => panic!("must be non-empty"),
         1 => REG_ANY.into(),
         x => format!(r" {{{}}}", x - 1),
     }

@@ -97,7 +97,6 @@ impl Connection {
         });
 
         let (ctx, mut crx) = mpsc::channel::<protocol::Message>(1000);
-        let link2 = link.clone();
         let (one_tx, tx_end) = oneshot::channel();
         spawn_local(async move {
             while let Some(msg) = crx.next().await {
@@ -118,13 +117,13 @@ impl Connection {
                     }
                     Err(WebSocketError::ConnectionClose(e)) => {
                         log::info!("Websocket disconnected: {:?}", e);
-                        link2.send_message(WSOutput::Conn(false));
+                        link.send_message(WSOutput::Conn(false));
                     }
                     Err(e) => log::error!("Failed to send: {}", e),
                 }
             }
 
-            link2.send_message(WSOutput::Conn(false));
+            link.send_message(WSOutput::Conn(false));
             if one_tx.send(tx).is_err() {
                 log::error!("tx_end failed to send back tx");
             }
@@ -220,15 +219,13 @@ impl Agent for WS {
                     if let Some(conn) = self.connection.take() {
                         conn.close();
                     }
+                } else if self.connection.is_none() {
+                    self.connection = Some(Connection::new(self.link.clone()));
                 } else {
-                    if self.connection.is_none() {
-                        self.connection = Some(Connection::new(self.link.clone()));
-                    } else {
-                        log::warn!(
-                            "Tried to create a new connection due to visibility \
-                             changing, but a connection was already up"
-                        );
-                    }
+                    log::warn!(
+                        "Tried to create a new connection due to visibility \
+                         changing, but a connection was already up"
+                    );
                 }
                 None
             }
@@ -266,7 +263,7 @@ impl Agent for WS {
 
 fn try_to_client(msg: &GlooMsg) -> Option<protocol::Message> {
     match msg {
-        GlooMsg::Bytes(bytes) => match protocol::Message::deserialize(&bytes) {
+        GlooMsg::Bytes(bytes) => match protocol::Message::deserialize(bytes) {
             Err(e) => log::error!("Could not deserialize a message: {}", e),
             Ok(m) => {
                 if m.is_to_client() {

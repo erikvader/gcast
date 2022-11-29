@@ -84,14 +84,6 @@ impl<'a> SearchRes<'a> {
             mat: Match::empty(),
         }
     }
-
-    fn new(index: usize, string: &'a str, indices: Vec<usize>) -> Self {
-        SearchRes {
-            index,
-            string,
-            mat: Match::from_vec(indices),
-        }
-    }
 }
 
 fn run_regexes_get_bytes(regs: &Vec<Regex>, string: &str) -> Option<HashSet<usize>> {

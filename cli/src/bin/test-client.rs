@@ -145,12 +145,9 @@ fn send_read_state(socket: &mut WS) {
 
     loop {
         let msg = parse_tung_msg(socket.read_message().expect("could not read message"));
-        match msg.take_to_client() {
-            ToClient::Front(f) => {
-                log::info!("Got state {:?}", f);
-                break;
-            }
-            _ => (),
+        if let ToClient::Front(f) = msg.take_to_client() {
+            log::info!("Got state {:?}", f);
+            break;
         }
     }
 }

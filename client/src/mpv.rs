@@ -8,7 +8,7 @@ use crate::back_button::{BackButton, Type};
 use crate::progressbar::Progressbar;
 use crate::WebSockStatus;
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct MpvProps {
     pub front: prot::Mpv,
 }

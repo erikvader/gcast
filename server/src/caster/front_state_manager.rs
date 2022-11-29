@@ -299,8 +299,8 @@ impl FrontJob {
                 .await;
             }
             Some(r) => {
-                assert!(file.path.starts_with("/"));
-                assert!(!r.ends_with("/"));
+                assert!(file.path.starts_with('/'));
+                assert!(!r.ends_with('/'));
                 self.transition(|to_conn| {
                     Variant::mpv_job(to_conn, r.to_string() + &file.path)
                 })
@@ -350,7 +350,7 @@ impl Variant {
     }
 
     fn filer_job(to_conn: Sender) -> Self {
-        Self::Filer(handle_job_start(to_conn, move || filer::filer()))
+        Self::Filer(handle_job_start(to_conn, filer::filer))
     }
 
     fn spotify_job(to_conn: Sender) -> Self {

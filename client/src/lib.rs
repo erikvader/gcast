@@ -1,5 +1,7 @@
-// Remove annoying warning from wasm_bindgen
+// NOTE: Remove annoying warning from wasm_bindgen
 #![allow(non_snake_case, non_upper_case_globals)]
+// NOTE: clippy doesn't like yew html macro
+#![allow(clippy::let_unit_value)]
 
 macro_rules! click_send {
     ($send:expr) => {{

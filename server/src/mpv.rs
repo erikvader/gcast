@@ -45,7 +45,7 @@ pub struct MpvHandle {
 
 #[derive(Debug)]
 pub enum EndReason {
-    EOF,
+    Eof,
     Stop,
     Quit,
     Error,
@@ -77,7 +77,7 @@ impl From<u32> for EndReason {
     fn from(r: u32) -> Self {
         use EndReason::*;
         match r {
-            0 => EOF,
+            0 => Eof,
             2 => Stop,
             3 => Quit,
             4 => Error,

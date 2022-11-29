@@ -12,7 +12,7 @@ use super::{FilerError, FilerResult, StateSnd};
 // TODO: move to config
 const EXT_WHITELIST: &[&str] = &[".mp4", ".mkv", ".wmv", ".webm", ".avi"];
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
 pub(super) struct Cache {
     files: Vec<CacheEntry>,
     updated: Option<SystemTime>,
@@ -35,10 +35,6 @@ impl CacheEntry {
         }
     }
 
-    pub(super) fn full_path(&self) -> &str {
-        &self.path
-    }
-
     pub(super) fn root(&self) -> usize {
         self.root
     }
@@ -51,16 +47,6 @@ impl CacheEntry {
 impl AsRef<str> for CacheEntry {
     fn as_ref(&self) -> &str {
         self.path_relative_root()
-    }
-}
-
-impl Default for Cache {
-    fn default() -> Self {
-        Self {
-            files: Vec::new(),
-            updated: None,
-            roots: Vec::new(),
-        }
     }
 }
 

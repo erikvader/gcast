@@ -23,7 +23,7 @@ pub fn playurl() -> Html {
                 .map(|ele: HtmlInputElement| ele.value());
 
             match input {
-                Some(inp) => url_setter.set(inp.clone()),
+                Some(inp) => url_setter.set(inp),
                 None => log::error!("Could not get value from text input"),
             }
         })

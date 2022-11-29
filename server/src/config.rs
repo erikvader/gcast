@@ -1,7 +1,4 @@
-use std::{
-    fs, io,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::PathBuf};
 
 use anyhow::Context;
 use tokio::sync::OnceCell;
@@ -96,20 +93,4 @@ pub fn cache_dir() -> PathBuf {
     dirs::cache_dir()
         .expect("could not get cache dir")
         .join(PROGNAME)
-}
-
-fn read_root_dirs(path: &Path) -> io::Result<Vec<String>> {
-    Ok(fs::read_to_string(path)?
-        .lines()
-        // NOTE: only specifying a '/' is not supported
-        .map(|s| s.trim_end_matches("/").to_string())
-        .filter_map(|s| {
-            if !s.starts_with("/") {
-                log::error!("Root dir path '{}' is not absolute, ignoring", s);
-                None
-            } else {
-                Some(s)
-            }
-        })
-        .collect())
 }

@@ -3,7 +3,7 @@ use protocol::to_client::front::errormsg as prot;
 use protocol::to_server::errormsgctrl::Close;
 use yew::prelude::*;
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct ErrorProps {
     pub front: prot::ErrorMsg,
 }

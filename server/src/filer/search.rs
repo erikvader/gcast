@@ -25,7 +25,7 @@ pub(super) fn search(query: String, cache: &Cache, tx: &StateSnd) -> FilerResult
             let top = searcher::sorted_take(&mut res, NUM_SEARCH_RESULTS);
             log::debug!("Found {} results for '{}'", top.len(), query);
             let searchres = top
-                .into_iter()
+                .iter_mut()
                 .map(|r| {
                     let c_entry = cache.files().get(r.get_index()).unwrap();
                     filesearch::SearchResult {
