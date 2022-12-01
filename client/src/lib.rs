@@ -85,16 +85,18 @@ struct AppProps {
 fn app(props: &AppProps) -> Html {
     html! {
         <ContextProvider<WebSockStatus> context={props.ws_ready}>
-            {match (props.accepted, &props.front) {
-                (Accepted::Pending, _) | (Accepted::Accepted, None) => html! {<Pending />},
-                (Accepted::Rejected, _) => html! {<Rejected />},
-                (Accepted::Accepted, Some(Front::None)) => html! {<Nothing />},
-                (Accepted::Accepted, Some(Front::Spotify)) => html! {<Spotify />},
-                (Accepted::Accepted, Some(Front::Mpv(mpv))) => html! {<Mpv front={mpv.clone()} />},
-                (Accepted::Accepted, Some(Front::FileSearch(fs))) => html! {<Filesearch front={fs.clone()} />},
-                (Accepted::Accepted, Some(Front::PlayUrl)) => html! {<PlayUrl />},
-                (Accepted::Accepted, Some(Front::ErrorMsg(em))) => html! {<ErrorMessage front={em.clone()} />},
-            }}
+            <div class={classes!("width-limiter")}>
+                {match (props.accepted, &props.front) {
+                    (Accepted::Pending, _) | (Accepted::Accepted, None) => html! {<Pending />},
+                    (Accepted::Rejected, _) => html! {<Rejected />},
+                    (Accepted::Accepted, Some(Front::None)) => html! {<Nothing />},
+                    (Accepted::Accepted, Some(Front::Spotify)) => html! {<Spotify />},
+                    (Accepted::Accepted, Some(Front::Mpv(mpv))) => html! {<Mpv front={mpv.clone()} />},
+                    (Accepted::Accepted, Some(Front::FileSearch(fs))) => html! {<Filesearch front={fs.clone()} />},
+                    (Accepted::Accepted, Some(Front::PlayUrl)) => html! {<PlayUrl />},
+                    (Accepted::Accepted, Some(Front::ErrorMsg(em))) => html! {<ErrorMessage front={em.clone()} />},
+                }}
+            </div>
         </ContextProvider<WebSockStatus>>
     }
 }
