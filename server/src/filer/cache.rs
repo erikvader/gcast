@@ -105,6 +105,7 @@ fn explode(
     Ok(())
 }
 
+// TODO: this is multiple functions
 pub(super) fn refresh_cache(tx: &StateSnd, roots: Vec<String>) -> FilerResult<Cache> {
     let mut dirs: Vec<(usize, DirEntry)> = Vec::new();
     let mut files: Vec<CacheEntry> = Vec::new();
@@ -136,6 +137,7 @@ pub(super) fn refresh_cache(tx: &StateSnd, roots: Vec<String>) -> FilerResult<Ca
 
     {
         assert!(roots.len() == root_status.len());
+        // TODO: parallelize with rayon or something?
         for (i, root) in roots.iter().enumerate() {
             root_status[i] = filesearch::RootStatus::Loading;
             send_refreshing(tx, 0, dirs.len(), &roots, &root_status, num_errors, false)?;
