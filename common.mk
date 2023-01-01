@@ -6,3 +6,5 @@ SERVICESTART := systemctl --user start
 SERVICESTATUS := systemctl --user status
 
 SSH := ssh
+
+CARGO := cargo

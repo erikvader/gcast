@@ -1,12 +1,11 @@
 CARGOFLAGS :=
+CARGORELEASEFLAGS := --release
 SERVICE := gcast-server.service
 AUXSOURCES = $(SERVICE) config-default.toml
-REMOTE_BUILD_EXCLUDE := --exclude /target/
-CARGORELEASEFLAGS := --release
 
 .PHONY: build
 build:
-	cargo build $(CARGOFLAGS)
+	$(CARGO) build $(CARGOFLAGS)
 
 include ../common.mk
 
@@ -31,28 +30,30 @@ deploy-status:
 
 .PHONY: deploy-sync
 deploy-sync:
-	$(RSYNC) $(AUXSOURCES) ../target/$(DEPLOY_TARGET)/release/server $(DEPLOY_SERVER_PATH)
+# NOTE: colon is included here because of annoying syntax highlighting in emacs
+	$(RSYNC) $(AUXSOURCES) ../target/$(DEPLOY_TARGET)/release/server $(DEPLOY_HOST)':$(DEPLOY_PATH)'/server/
 
 .PHONY: deploy
 deploy: deploy-build deploy-stop deploy-sync deploy-start
 
 .PHONY: deploy-remote-sync
 deploy-remote-sync:
-	$(RSYNC) ../ $(REMOTE_BUILD_EXCLUDE) $(DEPLOY_BUILD_PATH)
-	$(RSYNC) $(AUXSOURCES) $(DEPLOY_SERVER_PATH)
+# NOTE: colon is included here because of annoying syntax highlighting in emacs
+	$(RSYNC) ../ --exclude /target/ $(DEPLOY_HOST)':$(DEPLOY_PATH)'/build/
+	$(RSYNC) $(AUXSOURCES) $(DEPLOY_HOST)':$(DEPLOY_PATH)'/server/
 
 .PHONY: deploy-remote-build
 deploy-remote-build:
-	$(SSH) $(DEPLOY_HOST) cargo build --manifest-path $(DEPLOY_PATH)/build/Cargo.toml --bin server $(CARGORELEASEFLAGS)
+	$(SSH) $(DEPLOY_HOST) $(CARGO) build --manifest-path '$(DEPLOY_PATH)'/build/Cargo.toml --bin server $(CARGORELEASEFLAGS)
 
 .PHONY: deploy-remote-clean
 deploy-remote-clean:
-	$(SSH) $(DEPLOY_HOST) rm -rf $(DEPLOY_PATH)/build
+	$(SSH) $(DEPLOY_HOST) rm -rf '$(DEPLOY_PATH)'/build
 
 .PHONY: deploy-remote-copy
 deploy-remote-copy:
-	$(SSH) $(DEPLOY_HOST) cp -f $(DEPLOY_PATH)/build/target/release/server $(DEPLOY_PATH)/server/server
+	$(SSH) $(DEPLOY_HOST) cp -f '$(DEPLOY_PATH)'/build/target/release/server '$(DEPLOY_PATH)'/server/server
 
-.PHONY: deploy
+.PHONY: deploy-remote
 deploy-remote: deploy-remote-sync deploy-remote-build deploy-stop deploy-remote-copy deploy-start
 endif

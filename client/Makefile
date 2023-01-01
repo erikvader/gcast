@@ -62,7 +62,8 @@ deploy-status:
 
 .PHONY: deploy-sync
 deploy-sync:
-	$(RSYNC) $(SOURCES) $(DEPLOY_CLIENT_PATH)
+# NOTE: colon is included here because of annoying syntax highlighting in emacs
+	$(RSYNC) $(SOURCES) $(DEPLOY_HOST)':$(DEPLOY_PATH)'/client/
 
 .PHONY: deploy
 deploy: deploy-build deploy-stop deploy-sync deploy-start
