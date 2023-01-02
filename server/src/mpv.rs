@@ -119,7 +119,7 @@ fn control_string(ctrl: &MpvControl) -> Command {
         ToggleMute => "cycle mute",
         SubDelayEarlier => "add sub-delay -0.1",
         SubDelayLater => "add sub-delay 0.1",
-        NextChapter => "add chapter 1", // TODO: crashes when there are no chapters
+        NextChapter => "add chapter 1",
         PrevChapter => "add chapter -1",
         SeekBack => "seek -5",
         SeekForward => "seek 5",

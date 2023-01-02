@@ -21,6 +21,7 @@ pub fn mpv(props: &MpvProps) -> Html {
 
     let (progress_min, length_min) = progress_timestamps(&props.front);
     let (chapter, chapter_total) = chapters(&props.front);
+    let has_chapters = has_chapters(&props.front);
     let play_icon = play_icon(&props.front);
     let title = title(&props.front);
 
@@ -44,7 +45,7 @@ pub fn mpv(props: &MpvProps) -> Html {
             <div class={classes!("space-evenly", "pad")}>
                 <button onclick={click_send!(mpvcontrol::PrevChapter)}
                         class={classes!("round", "icon", "icon-skip-back")}
-                        disabled={!clickable} />
+                        disabled={!clickable || !has_chapters} />
 
                 <button onclick={click_send!(mpvcontrol::SeekBackLong)}
                         class={classes!("round", "icon", "icon-backward30")}
@@ -68,7 +69,7 @@ pub fn mpv(props: &MpvProps) -> Html {
 
                 <button onclick={click_send!(mpvcontrol::NextChapter)}
                         class={classes!("round", "icon", "icon-skip-fwd")}
-                        disabled={!clickable} />
+                        disabled={!clickable || !has_chapters} />
             </div>
             <div class={classes!("space-evenly")}>
                 <button onclick={click_send!(mpvcontrol::CycleSub)}
@@ -130,6 +131,16 @@ fn chapters(front: &prot::Mpv) -> (i64, i64) {
         }) => (c, t),
         _ => (0, 0),
     }
+}
+
+fn has_chapters(front: &prot::Mpv) -> bool {
+    matches!(
+        *front,
+        prot::PlayState(prot::PlayState {
+            chapter: Some(_),
+            ..
+        })
+    )
 }
 
 fn progress(front: &prot::Mpv) -> f64 {
