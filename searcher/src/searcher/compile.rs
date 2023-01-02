@@ -39,12 +39,16 @@ fn compile_fzf(search_term: &str) -> Result<Vec<String>> {
     })
 }
 
-fn compile_swiper(search_term: &str) -> Result<Vec<String>> {
-    if Regex::new(r"(^ ?$)|(^ [^ ])|([^ ] $)")
+fn compile_swiper(mut search_term: &str) -> Result<Vec<String>> {
+    if Regex::new(r"(^ ?$)|(^ [^ ])")
         .unwrap()
         .is_match(search_term)
     {
         return Err(CompileError);
+    }
+
+    if Regex::new(r"[^ ] $").unwrap().is_match(search_term) {
+        search_term = search_term.trim_end_matches(' ');
     }
 
     let parts: Vec<_> = Regex::new(r"( +)|[^ ]+")
@@ -148,7 +152,7 @@ fn test_compile_swiper() {
     assert_eq!(compile_swiper(" "), Err(CompileError));
     assert_eq!(compile_swiper(""), Err(CompileError));
     assert_eq!(compile_swiper(" x"), Err(CompileError));
-    assert_eq!(compile_swiper("x "), Err(CompileError));
+    assert!(compile_swiper("x ").is_ok());
     assert!(compile_swiper("x  ").is_ok());
 
     assert_eq!(

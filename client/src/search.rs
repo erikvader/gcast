@@ -63,8 +63,6 @@ fn results(props: &ResultsProps) -> Html {
             match input {
                 Some(inp) => {
                     query_setter.set(inp.clone());
-                    // TODO: rstrip the query to avoid getting errors on every new word.
-                    // Maybe do this on the server instead of here?
                     websocket_send(fscontrol::Search(inp));
                 }
                 None => log::error!("Could not get value from text input"),
