@@ -153,6 +153,16 @@ where
 mod test {
     use super::*;
 
+    impl<'a> SearchRes<'a> {
+        fn new(index: usize, string: &'a str, indices: Vec<usize>) -> Self {
+            SearchRes {
+                index,
+                string,
+                mat: Match::from_vec(indices),
+            }
+        }
+    }
+
     #[test]
     fn test_search_simple() {
         let cands = vec!["hej"];

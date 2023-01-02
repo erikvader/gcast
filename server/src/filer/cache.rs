@@ -105,6 +105,8 @@ fn explode(
     Ok(())
 }
 
+// TODO: run this on startup when some option in the config is turned on. Save a file in
+// /tmp to signal that it has run once this boot.
 // TODO: this is multiple functions
 pub(super) fn refresh_cache(tx: &StateSnd, roots: Vec<String>) -> FilerResult<Cache> {
     let mut dirs: Vec<(usize, DirEntry)> = Vec::new();
