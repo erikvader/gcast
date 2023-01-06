@@ -1,9 +1,10 @@
 use std::{
     fs::{create_dir_all, File},
-    path::Path,
+    path::{Path, PathBuf},
     time::SystemTime,
 };
 
+use futures_util::{stream::FuturesUnordered, StreamExt};
 use protocol::to_client::front::filesearch;
 use walkdir::{DirEntry, WalkDir};
 
@@ -90,21 +91,25 @@ pub(super) fn write_cache(path: &Path, contents: &Cache) -> FilerResult<()> {
 }
 
 // TODO: run this on startup when some option in the config is turned on. Save a file in
-// /tmp to signal that it has run once this boot.
+// /tmp to signal that it has run once this boot. Support a tx that doesn't send anything.
 pub(super) fn refresh_cache(tx: &StateSnd, roots: Vec<String>) -> FilerResult<Cache> {
-    // TODO: let root_status = probe(&roots, tx)?;
-    // tokio block
-    // en future för varje root i en FuturesUnordered
-    // varje future skall försöka öppna rooten/.
     let mut num_errors = 0;
     let mut root_status: Vec<filesearch::RootStatus> = roots
         .iter()
         .map(|_| filesearch::RootStatus::Pending)
         .collect();
 
+    log::info!("Refreshing cache... Probing roots...");
+    probe(&roots, &mut root_status, tx)?;
+
+    log::info!("Doing a shallow scan of available roots...");
     let shallow = shallow_scan(&roots, tx, &mut root_status)?;
+
+    log::info!("Doing a deep scan of all roots...");
     let files = deep_scan(&shallow.dirs, tx, &roots, &root_status, &mut num_errors)?;
-    Ok(create_cache_from_files(
+
+    log::info!("Creating a cache from all files...");
+    let cache = create_cache_from_files(
         files,
         roots,
         num_errors,
@@ -112,7 +117,44 @@ pub(super) fn refresh_cache(tx: &StateSnd, roots: Vec<String>) -> FilerResult<Ca
         shallow.files,
         shallow.dirs.len(),
         &root_status,
-    )?)
+    )?;
+
+    log::info!("Cache refresh done!");
+    Ok(cache)
+}
+
+fn probe(
+    roots: &[String],
+    root_status: &mut [filesearch::RootStatus],
+    tx: &StateSnd,
+) -> FilerResult<()> {
+    assert_eq!(roots.len(), root_status.len());
+    root_status
+        .iter_mut()
+        .for_each(|s| *s = filesearch::RootStatus::Loading);
+    send_refreshing(tx, 0, 0, &roots, &root_status, 0, false)?;
+
+    tokio::runtime::Handle::current().block_on(async {
+        let mut set: FuturesUnordered<_> = roots
+            .iter()
+            .enumerate()
+            .map(|(i, root)| async move {
+                let res =
+                    tokio::fs::File::open([root, "."].iter().collect::<PathBuf>()).await;
+                (i, res)
+            })
+            .collect();
+
+        while let Some((i, res)) = set.next().await {
+            root_status[i] = if res.is_err() {
+                filesearch::RootStatus::Error
+            } else {
+                filesearch::RootStatus::Pending
+            };
+            send_refreshing_async(tx, 0, 0, &roots, &root_status, 0, false).await?;
+        }
+        Ok(())
+    })
 }
 
 fn create_cache_from_files(
@@ -227,10 +269,15 @@ fn shallow_scan(
     tx: &StateSnd,
     root_status: &mut [filesearch::RootStatus],
 ) -> Result<ShallowScan, FilerError> {
+    assert_eq!(roots.len(), root_status.len());
     let mut dirs = Vec::new();
     let mut files = Vec::new();
 
     for (i, root) in roots.iter().enumerate() {
+        if root_status[i] == filesearch::RootStatus::Error {
+            continue;
+        }
+        assert_eq!(root_status[i], filesearch::RootStatus::Pending);
         root_status[i] = filesearch::RootStatus::Loading;
         send_refreshing(tx, 0, dirs.len(), roots, &root_status, 0, false)?;
         match explode(
@@ -263,6 +310,51 @@ fn send_refreshing(
     num_errors: usize,
     is_done: bool,
 ) -> FilerResult<()> {
+    let msg = make_refreshing(
+        roots,
+        root_status,
+        total_dirs,
+        done_dirs,
+        num_errors,
+        is_done,
+    );
+
+    tx.blocking_send(Ok(msg.into()))
+        .map_err(|_| FilerError::Interrupted)
+}
+
+async fn send_refreshing_async(
+    tx: &StateSnd,
+    done_dirs: usize,
+    total_dirs: usize,
+    roots: &[String],
+    root_status: &[filesearch::RootStatus],
+    num_errors: usize,
+    is_done: bool,
+) -> FilerResult<()> {
+    let msg = make_refreshing(
+        roots,
+        root_status,
+        total_dirs,
+        done_dirs,
+        num_errors,
+        is_done,
+    );
+
+    tx.send(Ok(msg.into()))
+        .await
+        .map_err(|_| FilerError::Interrupted)
+}
+
+fn make_refreshing(
+    roots: &[String],
+    root_status: &[filesearch::RootStatus],
+    total_dirs: usize,
+    done_dirs: usize,
+    num_errors: usize,
+    is_done: bool,
+) -> filesearch::Refreshing {
+    assert_eq!(roots.len(), root_status.len());
     let msg = filesearch::Refreshing {
         roots: roots
             .iter()
@@ -277,7 +369,5 @@ fn send_refreshing(
         num_errors,
         is_done,
     };
-
-    tx.blocking_send(Ok(msg.into()))
-        .map_err(|_| FilerError::Interrupted)
+    msg
 }
