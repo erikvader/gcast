@@ -96,12 +96,35 @@ pub(super) fn refresh_cache(tx: &StateSnd, roots: Vec<String>) -> FilerResult<Ca
     // tokio block
     // en future för varje root i en FuturesUnordered
     // varje future skall försöka öppna rooten/.
-    let shallow = shallow_scan(&roots, tx)?;
-    let (mut num_errors, files) =
-        deep_scan(&shallow.dirs, tx, &roots, &shallow.root_status)?;
+    let mut num_errors = 0;
+    let mut root_status: Vec<filesearch::RootStatus> = roots
+        .iter()
+        .map(|_| filesearch::RootStatus::Pending)
+        .collect();
 
-    let mut cache_files: Vec<CacheEntry> = shallow
-        .files
+    let shallow = shallow_scan(&roots, tx, &mut root_status)?;
+    let files = deep_scan(&shallow.dirs, tx, &roots, &root_status, &mut num_errors)?;
+    Ok(create_cache_from_files(
+        files,
+        roots,
+        num_errors,
+        tx,
+        shallow.files,
+        shallow.dirs.len(),
+        &root_status,
+    )?)
+}
+
+fn create_cache_from_files(
+    files: Vec<(usize, DirEntry)>,
+    roots: Vec<String>,
+    mut num_errors: usize,
+    tx: &StateSnd,
+    files_shallow: Vec<(usize, DirEntry)>,
+    num_dirs: usize,
+    root_status: &[filesearch::RootStatus],
+) -> Result<Cache, FilerError> {
+    let mut cache_files: Vec<CacheEntry> = files_shallow
         .into_iter()
         .chain(files)
         .filter_map(|(i, de)| match create_cache_entry(de, i, &roots) {
@@ -116,10 +139,10 @@ pub(super) fn refresh_cache(tx: &StateSnd, roots: Vec<String>) -> FilerResult<Ca
 
     send_refreshing(
         tx,
-        shallow.dirs.len(),
-        shallow.dirs.len(),
+        num_dirs,
+        num_dirs,
         &roots,
-        &shallow.root_status,
+        root_status,
         num_errors,
         true,
     )?;
@@ -172,41 +195,40 @@ fn deep_scan(
     tx: &StateSnd,
     roots: &[String],
     root_status: &[filesearch::RootStatus],
-) -> Result<(usize, Vec<(usize, DirEntry)>), FilerError> {
-    let mut num_errors = 0;
+    num_errors: &mut usize,
+) -> Result<Vec<(usize, DirEntry)>, FilerError> {
     let mut files: Vec<(usize, DirEntry)> = Vec::new();
     let total_dirs = dirs.len();
 
     for (i, (root, dir)) in dirs.iter().enumerate() {
-        send_refreshing(tx, i, total_dirs, roots, root_status, num_errors, false)?;
+        send_refreshing(tx, i, total_dirs, roots, root_status, *num_errors, false)?;
 
         for de in WalkDir::new(dir.path()) {
             match de {
                 Err(e) => {
                     log::error!("Failed to walk: {}", e);
-                    num_errors += 1;
+                    *num_errors += 1;
                 }
                 Ok(e) if e.file_type().is_file() => files.push((*root, e)),
                 Ok(_) => (),
             }
         }
     }
-    Ok((num_errors, files))
+    Ok(files)
 }
 
 struct ShallowScan {
     files: Vec<(usize, DirEntry)>,
     dirs: Vec<(usize, DirEntry)>,
-    root_status: Vec<filesearch::RootStatus>,
 }
 
-fn shallow_scan(roots: &[String], tx: &StateSnd) -> Result<ShallowScan, FilerError> {
+fn shallow_scan(
+    roots: &[String],
+    tx: &StateSnd,
+    root_status: &mut [filesearch::RootStatus],
+) -> Result<ShallowScan, FilerError> {
     let mut dirs = Vec::new();
     let mut files = Vec::new();
-    let mut root_status: Vec<filesearch::RootStatus> = roots
-        .iter()
-        .map(|_| filesearch::RootStatus::Pending)
-        .collect();
 
     for (i, root) in roots.iter().enumerate() {
         root_status[i] = filesearch::RootStatus::Loading;
@@ -225,11 +247,7 @@ fn shallow_scan(roots: &[String], tx: &StateSnd) -> Result<ShallowScan, FilerErr
     }
     send_refreshing(tx, 0, dirs.len(), roots, &root_status, 0, false)?;
 
-    Ok(ShallowScan {
-        files,
-        dirs,
-        root_status,
-    })
+    Ok(ShallowScan { files, dirs })
 }
 
 fn has_whitelisted_extension(path: &str) -> bool {
