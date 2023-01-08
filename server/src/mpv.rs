@@ -186,6 +186,7 @@ pub fn mpv(path: &str) -> MpvResult<MpvHandle> {
     let (s_tx, s_rx): (_, StateRcv) = mpsc::channel(crate::CHANNEL_SIZE);
 
     let mpv = Mpv::with_initializer(|x| {
+        // TODO: yt-dl flags for max resolution and stuff
         x.set_property("idle", "once")?; // NOTE: needed for the correct events to appear
         for (key, value) in crate::config::mpv_options() {
             if BANNED_PROPERTIES.contains(&key.as_str()) {

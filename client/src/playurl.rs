@@ -12,6 +12,8 @@ use crate::{websocket::websocket_send, WebSockStatus};
 pub fn playurl() -> Html {
     let active = use_context::<WebSockStatus>().expect("no active context found");
 
+    // TODO: initialize with clipboard contents if it as an URL. Probably use a lib for
+    // this since checking if a string is a URL is done in multiple places
     let url = use_state(|| "".to_string());
     let url_change = {
         let url_setter = url.setter();

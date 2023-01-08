@@ -3,7 +3,7 @@ mod search;
 
 use std::{
     io,
-    path::Path,
+    path::{Path, PathBuf},
     sync::atomic::{AtomicBool, Ordering},
 };
 
@@ -105,9 +105,12 @@ impl Handle {
     }
 }
 
+fn cache_file() -> PathBuf {
+    config::cache_dir().join("files_cache")
+}
+
 fn run(rx: TaskRcv, tx: StateSnd) -> FilerResult<()> {
-    let cache_file = config::cache_dir().join("files_cache");
-    let mut cache = read_cache(&tx, &cache_file)?;
+    let mut cache = read_cache(&tx, &cache_file())?;
 
     loop {
         match rx.blocking_recv() {
@@ -116,18 +119,27 @@ fn run(rx: TaskRcv, tx: StateSnd) -> FilerResult<()> {
                 return Err(FilerError::Interrupted);
             }
             Ok(TaskMsg::Search(query)) => search::search(query, &cache, &tx)?,
-            Ok(TaskMsg::Cache) => cache = refresh_cache(&tx, &cache_file)?,
+            Ok(TaskMsg::Cache) => cache = refresh_cache(&tx)?,
             Ok(TaskMsg::BackToTheBeginning) => send_init(&cache, &tx)?,
         }
     }
 }
 
-fn refresh_cache(tx: &StateSnd, cache_file: &Path) -> FilerResult<Cache> {
+fn refresh_cache(tx: &impl cache::RefreshingProgress) -> FilerResult<Cache> {
     log::info!("Refreshing cache");
     let newcache = cache::refresh_cache(tx, config::root_dirs().to_vec())?;
-    cache::write_cache(cache_file, &newcache)?;
+    cache::write_cache(&cache_file(), &newcache)?;
     log::info!("Refreshing cache done");
     Ok(newcache)
+}
+
+pub async fn refresh_cache_at_init() -> FilerResult<()> {
+    // NOTE: Needs to run on a separate thread from tokio due to implementation details in
+    // cache::probe. Simply matches the environment the original refresh_cache runs in.
+    join_handle_wait_take(spawn_blocking(|| {
+        refresh_cache(&cache::VoidProgress).map(|_| ())
+    }))
+    .await
 }
 
 fn read_cache(tx: &StateSnd, cache_file: &Path) -> FilerResult<Cache> {

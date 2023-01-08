@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf};
 use anyhow::Context;
 use tokio::sync::OnceCell;
 
-const PROGNAME: &str = "gcast";
+pub const PROGNAME: &str = "gcast";
 const CONFIG_NAME: &str = "config.toml";
 
 static CONF: OnceCell<Config> = OnceCell::const_new();

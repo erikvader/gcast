@@ -70,8 +70,29 @@ fn log_actor_error(res: Result<Result<(), anyhow::Error>, JoinError>, name: &str
     }
 }
 
+async fn maybe_refresh_cache() {
+    if std::fs::File::options()
+        .write(true)
+        .create_new(true)
+        .open(std::path::PathBuf::from(format!(
+            "/tmp/{}_cache_initialized",
+            config::PROGNAME
+        )))
+        .is_ok()
+    {
+        log::info!("Refreshing the cache at startup");
+        if let Err(e) = filer::refresh_cache_at_init().await {
+            log::error!("Failed to refresh the cache at initalization time: {}", e);
+        }
+    } else {
+        log::info!("Not refreshing the cache at startup");
+    }
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn async_main() -> ExitCode {
+    maybe_refresh_cache().await;
+
     let (to_cast, from_conn) = mpsc::channel(CHANNEL_SIZE);
     let (to_conn, from_cast) = mpsc::channel(CHANNEL_SIZE);
     let canceltoken = CancellationToken::new();
