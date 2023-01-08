@@ -5,3 +5,4 @@ Description=server for gcast
 ExecStart=%h/gcast/server/server
 #TODO: make the %h/gcast/server path configurable somehow
 WorkingDirectory=%h/gcast/server
+Environment=RUST_BACKTRACE=full
