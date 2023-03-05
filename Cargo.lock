@@ -834,8 +834,7 @@ checksum = "329c933548736bc49fd575ee68c89e8be4d260064184389a5b77517cddd99ffb"
 [[package]]
 name = "libmpv"
 version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61a58e2d19b34775e81e0fdca194b3b8ee8de973b092e7582b416343979e22e7"
+source = "git+https://github.com/ParadoxSpiral/libmpv-rs.git?rev=3e6c389#3e6c389b716f52a595cc5e8e3fa1f96cb76b3de7"
 dependencies = [
  "libmpv-sys",
 ]
@@ -843,8 +842,7 @@ dependencies = [
 [[package]]
 name = "libmpv-sys"
 version = "3.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0df938d3145cd8f134572721a27afa3a51f9bc1c26ae30a1d5077162f96d074b"
+source = "git+https://github.com/ParadoxSpiral/libmpv-rs.git?rev=3e6c389#3e6c389b716f52a595cc5e8e3fa1f96cb76b3de7"
 
 [[package]]
 name = "link-cplusplus"
