@@ -129,6 +129,10 @@ impl Message {
     pub fn is_newer_than(&self, old: Id) -> bool {
         self.id() > old
     }
+
+    pub fn is_expected_or_newer_than(&self, expected: Id) -> bool {
+        self.id() >= expected
+    }
 }
 
 impl From<MessageKind> for Message {

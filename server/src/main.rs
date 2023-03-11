@@ -9,6 +9,7 @@ mod mpv;
 mod process;
 mod repeatable_oneshot;
 mod signal;
+mod state_machine;
 
 use std::process::ExitCode;
 
@@ -22,6 +23,7 @@ use crate::{
 };
 
 const CHANNEL_SIZE: usize = 1024;
+// TODO: rename to MsgSender and MsgReceiver?
 type Sender = mpsc::Sender<Message>;
 type Receiver = mpsc::Receiver<Message>;
 
