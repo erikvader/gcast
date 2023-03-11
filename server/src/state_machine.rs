@@ -2,6 +2,7 @@ use std::future::Future;
 use std::{collections::VecDeque, convert::Infallible};
 
 use anyhow::Context;
+use protocol::to_server::playurlstart;
 use protocol::{
     to_client::{front::Front, ToClient},
     to_server::{
@@ -10,10 +11,17 @@ use protocol::{
     },
     Message, ToMessage,
 };
+use tokio_util::sync::CancellationToken;
 
+use crate::util::FutureCancel;
 use crate::{Receiver, Sender};
 
+use self::mpv_play::{mpv_file_state, mpv_url_state};
+use self::play_url::play_url_state;
+
 mod error_msg;
+mod mpv_play;
+mod play_url;
 
 pub type MachineResult<T> = anyhow::Result<T>;
 
@@ -44,7 +52,7 @@ impl Gatekeeper {
     }
 
     fn set_last_sent(&mut self, msg: &Message) {
-        assert!(!msg.is_to_client(), "wrong message kind");
+        assert!(msg.is_to_client(), "wrong message kind");
         if let ToClient::Front(f) = msg.borrow_to_client() {
             self.last_sent = f.clone();
         }
@@ -55,14 +63,21 @@ struct Control {
     from_conn: Receiver,
     to_conn: Sender,
     keeper: Gatekeeper,
+    canceltoken: CancellationToken,
 }
 
 impl Control {
-    fn new(from_conn: Receiver, to_conn: Sender, initial_state: Front) -> Self {
+    fn new(
+        from_conn: Receiver,
+        to_conn: Sender,
+        initial_state: Front,
+        canceltoken: CancellationToken,
+    ) -> Self {
         Self {
             from_conn,
             to_conn,
             keeper: Gatekeeper::new(initial_state),
+            canceltoken,
         }
     }
 
@@ -75,7 +90,9 @@ impl Control {
     }
 
     async fn recv(&mut self) -> Option<ToServer> {
-        while let Some(msg) = self.from_conn.recv().await {
+        while let Some(Some(msg)) =
+            self.from_conn.recv().cancellable(&self.canceltoken).await
+        {
             assert!(msg.is_to_server(), "connections actor's responsibility");
             if !self.keeper.should_accept(&msg) {
                 log::debug!("Throwing away an out of date message");
@@ -91,18 +108,13 @@ impl Control {
             return Some(toserver);
         }
 
-        log::info!("Connections closed its end, exiting...");
+        log::info!("Connections closed its end or I got cancelled, exiting...");
         None
     }
 
     async fn send_recv(&mut self, msg: impl ToMessage) -> Option<ToServer> {
         self.send(msg).await;
         self.recv().await
-    }
-
-    // TODO: göra såhär 1?
-    fn jump_mpv_file(&self, root: usize, path: String) -> MachineResult<Infallible> {
-        return Err(Jump::Mpv(mpvstart::File { root, path }.into()).into());
     }
 }
 
@@ -142,71 +154,99 @@ enum Jump {
 }
 
 impl Jump {
-    // TODO: eller så här 2?
-    fn user_error<H, E>(header: H, error: E) -> Self
+    fn user_error<H, E>(header: H, error: E) -> MachineResult<()>
     where
         H: ToString,
         E: std::fmt::Debug,
     {
-        Self::UserError {
+        Err(Self::UserError {
             header: header.to_string(),
             body: format!("{:?}", error),
         }
+        .into())
+    }
+
+    fn mpv_file(root: usize, path: String) -> MachineResult<()> {
+        Err(Self::Mpv(mpvstart::File { root, path }.into()).into())
+    }
+
+    fn mpv_url(url: String) -> MachineResult<()> {
+        Err(Self::Mpv(mpvstart::Url(url).into()).into())
     }
 }
 
-fn log_state_exited(state_name: &str) {
-    log::info!("State '{}' exited", state_name);
+struct StateLogger<'a> {
+    name: &'a str,
 }
 
-fn log_state_entered(state_name: &str) {
-    log::info!("Entered state '{}'", state_name);
+impl<'a> StateLogger<'a> {
+    fn new(name: &'a str) -> Self {
+        log::info!("Entered state '{}'", name);
+        Self { name }
+    }
+
+    fn invalid_message(&self, msg: &ToServer) {
+        log::warn!("State '{}' received an invalid msg: {:?}", self.name, msg);
+    }
+
+    fn name(&self) -> &str {
+        self.name
+    }
 }
 
-fn log_invalid_msg(state_name: &str, msg: &ToServer) {
-    log::warn!("State '{}' received an invalid msg: {:?}", state_name, msg);
+impl Drop for StateLogger<'_> {
+    fn drop(&mut self) {
+        log::info!("Exited state '{}'", self.name);
+    }
 }
 
-pub async fn state_start(from_conn: Receiver, to_conn: Sender) -> MachineResult<()> {
-    let mut ctrl = Control::new(from_conn, to_conn, Front::None);
+pub async fn state_start(
+    from_conn: Receiver,
+    to_conn: Sender,
+    canceltoken: CancellationToken,
+) -> MachineResult<()> {
+    let mut ctrl = Control::new(from_conn, to_conn, Front::None, canceltoken);
     init_state(&mut ctrl).await
 }
 
 async fn init_state(ctrl: &mut Control) -> MachineResult<()> {
-    const NAME: &str = "Init";
-    log_state_entered(NAME);
-
+    let logger = StateLogger::new("Init");
     let mut queue = InjectableQueue::new();
 
     while let Some(msg) = queue.pop_or(|| ctrl.send_recv(Front::None)).await {
         let res: MachineResult<()> = match msg {
             ToServer::PowerCtrl(_) => todo!(),
-            ToServer::MpvStart(_) => todo!(),
+            ToServer::MpvStart(mpvstart::Url(url)) => {
+                mpv_url_state(ctrl, url).await.context("mpv url")
+            }
+            ToServer::MpvStart(mpvstart::File(file)) => {
+                mpv_file_state(ctrl, file.root, file.path)
+                    .await
+                    .context("mpv file")
+            }
             ToServer::SpotifyStart(_) => todo!(),
             ToServer::FsStart(_) => todo!(),
-            ToServer::PlayUrlStart(_) => todo!(),
+            ToServer::PlayUrlStart(playurlstart::Start) => {
+                play_url_state(ctrl).await.context("play url")
+            }
             _ => {
-                log_invalid_msg(NAME, &msg);
+                logger.invalid_message(&msg);
                 Ok(())
             }
         };
 
-        if let Err(e) = res.context(format!("in state '{}'", NAME)) {
+        if let Err(e) = res.context(format!("in state '{}'", logger.name())) {
             match e.downcast() {
                 Ok(Jump::Mpv(mpvstart)) => queue.inject(mpvstart.into()),
                 Ok(Jump::UserError { header, body }) => {
                     error_msg::error_msg_state(ctrl, header, body)
                         .await
-                        .context(format!(
-                            "in state '{}' showing an error message",
-                            NAME
-                        ))?
+                        .context("error message")?
                 }
                 Err(e) => return Err(e),
             }
         }
     }
 
-    log_state_exited(NAME);
     Ok(())
 }
