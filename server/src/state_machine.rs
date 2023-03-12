@@ -189,6 +189,14 @@ impl<'a> StateLogger<'a> {
         log::warn!("State '{}' received an invalid msg: {:?}", self.name, msg);
     }
 
+    fn attempt_exit(&self) {
+        log::debug!("State '{}' is attempting to exit", self.name);
+    }
+
+    fn waiting(&self, something: &str) {
+        log::debug!("State '{}' is waiting for {}", self.name, something);
+    }
+
     fn name(&self) -> &str {
         self.name
     }

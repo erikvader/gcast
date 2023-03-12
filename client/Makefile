@@ -13,6 +13,7 @@ all: build $(DEPSFOLDER) $(DEPS)
 .PHONY: build
 build:
 	wasm-pack build $(if $(RELEASE),--release,--dev) --target web --out-dir web-root/pkg --no-typescript .
+#TODO: gör om sidans title till "gcast debug" om inte variabeln RELEASE är icke-tom
 
 .PHONY: serve
 serve:

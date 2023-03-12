@@ -1,13 +1,14 @@
 use anyhow::Context;
 use protocol::{
-    to_client::front::Front,
+    to_client::front::{self, Front},
     to_server::{
         mpvstart::{self, MpvStart},
         playurlstart, ToServer,
     },
 };
+use tokio::select;
 
-use crate::mpv::{self, mpv};
+use crate::mpv::{self, mpv, MpvError};
 
 use super::{Control, Jump, MachineResult, StateLogger};
 
@@ -39,16 +40,35 @@ pub(super) async fn mpv_file_state(
 
 async fn mpv_state(ctrl: &mut Control, path: String) -> MachineResult<()> {
     let logger = StateLogger::new("Mpv");
-    let handle = mpv::mpv(&path).context("creating mpv handle")?;
 
-    // TODO:
-    while let Some(msg) = ctrl.send_recv(Front::PlayUrl).await {
-        match msg {
-            ToServer::MpvStart(mpvstart::Url(url)) => return Jump::mpv_url(url),
-            ToServer::PlayUrlStart(playurlstart::Stop) => break,
-            _ => logger.invalid_message(&msg),
+    ctrl.send(front::mpv::Load).await;
+
+    let mut handle = mpv::mpv(&path).context("creating mpv handle")?;
+
+    let retval: MachineResult<()> = loop {
+        select! {
+            msg = ctrl.recv() => {
+                match msg {
+                    Some(ToServer::MpvStart(mpvstart::Stop)) | None => {
+                        logger.attempt_exit();
+                        break handle.quit().await.map_err(|e| e.into())
+                    },
+                    Some(ToServer::MpvControl(mpvctrl)) => break_err!(handle.command(&mpvctrl).await),
+                    Some(m) => logger.invalid_message(&m),
+                }
+            }
+            state = handle.next() => {
+                match state.map(|s| s.to_client_state()) {
+                    Ok(Some(newstate)) => ctrl.send(newstate).await,
+                    Ok(None) => (),
+                    Err(MpvError::Exited) => break Ok(()),
+                    Err(e) => break Jump::user_error("Mpv play", e),
+                }
+            }
         }
-    }
+    };
 
-    Ok(())
+    logger.waiting("mpv handle to exit");
+    handle.wait_until_closed().await;
+    retval
 }
