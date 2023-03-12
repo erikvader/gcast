@@ -6,7 +6,10 @@ use std::{
 
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use protocol::to_client::front::filesearch;
+use tokio::task::spawn_blocking;
 use walkdir::{DirEntry, WalkDir};
+
+use crate::util::{join_handle_unwrap, join_handle_wait_take};
 
 use super::{FilerError, FilerResult, StateSnd};
 
@@ -14,7 +17,7 @@ use super::{FilerError, FilerResult, StateSnd};
 const EXT_WHITELIST: &[&str] = &[".mp4", ".mkv", ".wmv", ".webm", ".avi"];
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
-pub(super) struct Cache {
+pub struct Cache {
     files: Vec<CacheEntry>,
     updated: Option<SystemTime>,
     roots: Vec<String>,
@@ -52,7 +55,7 @@ impl AsRef<str> for CacheEntry {
 }
 
 impl Cache {
-    pub(super) fn new(files: Vec<CacheEntry>, roots: Vec<String>) -> Self {
+    fn new(files: Vec<CacheEntry>, roots: Vec<String>) -> Self {
         Self {
             files,
             updated: Some(SystemTime::now()),
@@ -60,7 +63,7 @@ impl Cache {
         }
     }
 
-    pub(super) fn updated(&self) -> Option<SystemTime> {
+    pub fn updated(&self) -> Option<SystemTime> {
         self.updated
     }
 
@@ -68,29 +71,45 @@ impl Cache {
         &self.files
     }
 
-    pub(super) fn is_outdated(&self, roots: &[String]) -> bool {
+    pub fn is_outdated(&self, roots: &[String]) -> bool {
         self.roots != roots
     }
 }
 
-pub(super) fn read_cache(path: &Path) -> FilerResult<Cache> {
-    let file = File::open(path)?;
-    bincode::deserialize_from(file).map_err(|e| e.into())
+pub async fn read_cache(path: &Path) -> FilerResult<Cache> {
+    // NOTE: tokio is doing this itself, i.e., creating a PathBuf
+    // https://docs.rs/tokio/1.26.0/src/tokio/fs/read.rs.html#48-51
+    let path = path.to_owned();
+    join_handle_wait_take(spawn_blocking(move || {
+        let file = File::open(&path)?;
+        bincode::deserialize_from(file).map_err(|e| e.into())
+    }))
+    .await
 }
 
-pub(super) fn write_cache(path: &Path, contents: &Cache) -> FilerResult<()> {
-    if let Some(p) = path.parent() {
-        create_dir_all(p)?;
-    }
-    let mut file = File::create(path)?;
+pub(super) async fn write_cache(path: &Path, contents: Cache) -> FilerResult<Cache> {
+    // NOTE: Taking ownership of `contents` is only done to work around the 'static
+    // requirement on `spawn_blocking`, use some kind of async variant of thread scopes
+    // when available?
+    // NOTE: tokio is doing this itself, i.e., creating a PathBuf
+    // https://docs.rs/tokio/1.26.0/src/tokio/fs/read.rs.html#48-51
+    let path = path.to_owned();
+    join_handle_wait_take(spawn_blocking(move || {
+        if let Some(p) = path.parent() {
+            create_dir_all(p)?;
+        }
+        let mut file = File::create(path)?;
 
-    bincode::serialize_into(&mut file, contents)?;
+        bincode::serialize_into(&mut file, &contents)?;
 
-    file.sync_all()?;
-    Ok(())
+        file.sync_all()?;
+        Ok(contents)
+    }))
+    .await
 }
 
 pub(super) fn refresh_cache(
+    // TODO: what to give here? Control? Something that wraps Control? Wrapper for async closure?
     tx: &impl RefreshingProgress,
     roots: Vec<String>,
 ) -> FilerResult<Cache> {

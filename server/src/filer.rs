@@ -1,4 +1,4 @@
-mod cache;
+pub mod cache;
 mod search;
 
 use std::{
@@ -105,30 +105,31 @@ impl Handle {
     }
 }
 
-fn cache_file() -> PathBuf {
+// TODO: lazy_static?
+pub fn cache_file() -> PathBuf {
     config::cache_dir().join("files_cache")
 }
 
-fn run(rx: TaskRcv, tx: StateSnd) -> FilerResult<()> {
-    let mut cache = read_cache(&tx, &cache_file())?;
+// fn run(rx: TaskRcv, tx: StateSnd) -> FilerResult<()> {
+//     let mut cache = read_cache(&cache_file())?;
 
-    loop {
-        match rx.blocking_recv() {
-            Err(_) => {
-                log::info!("Filer task received exit signal");
-                return Err(FilerError::Interrupted);
-            }
-            Ok(TaskMsg::Search(query)) => search::search(query, &cache, &tx)?,
-            Ok(TaskMsg::Cache) => cache = refresh_cache(&tx)?,
-            Ok(TaskMsg::BackToTheBeginning) => send_init(&cache, &tx)?,
-        }
-    }
-}
+//     loop {
+//         match rx.blocking_recv() {
+//             Err(_) => {
+//                 log::info!("Filer task received exit signal");
+//                 return Err(FilerError::Interrupted);
+//             }
+//             Ok(TaskMsg::Search(query)) => search::search(query, &cache, &tx)?,
+//             Ok(TaskMsg::Cache) => cache = refresh_cache(&tx)?,
+//             Ok(TaskMsg::BackToTheBeginning) => send_init(&cache, &tx)?,
+//         }
+//     }
+// }
 
-fn refresh_cache(tx: &impl cache::RefreshingProgress) -> FilerResult<Cache> {
+pub async fn refresh_cache(tx: &impl cache::RefreshingProgress) -> FilerResult<Cache> {
     log::info!("Refreshing cache");
     let newcache = cache::refresh_cache(tx, config::root_dirs().to_vec())?;
-    cache::write_cache(&cache_file(), &newcache)?;
+    let newcache = cache::write_cache(&cache_file(), newcache).await?;
     log::info!("Refreshing cache done");
     Ok(newcache)
 }
@@ -137,13 +138,14 @@ pub async fn refresh_cache_at_init() -> FilerResult<()> {
     // NOTE: Needs to run on a separate thread from tokio due to implementation details in
     // cache::probe. Simply matches the environment the original refresh_cache runs in.
     join_handle_wait_take(spawn_blocking(|| {
-        refresh_cache(&cache::VoidProgress).map(|_| ())
+        // refresh_cache(&cache::VoidProgress).map(|_| ())
+        todo!()
     }))
     .await
 }
 
-fn read_cache(tx: &StateSnd, cache_file: &Path) -> FilerResult<Cache> {
-    let cache = match cache::read_cache(cache_file) {
+pub async fn read_cache(cache_file: &Path) -> FilerResult<Cache> {
+    let cache = match cache::read_cache(cache_file).await {
         Ok(c) if c.is_outdated(config::root_dirs()) => {
             log::info!("Saved cache is outdated");
             Ok(Cache::default())
@@ -155,7 +157,6 @@ fn read_cache(tx: &StateSnd, cache_file: &Path) -> FilerResult<Cache> {
         }
         Err(e) => Err(e),
     }?;
-    send_init(&cache, tx)?;
     Ok(cache)
 }
 
@@ -165,27 +166,4 @@ fn send_init(cache: &Cache, tx: &StateSnd) -> FilerResult<()> {
     };
     tx.blocking_send(Ok(init.into()))
         .map_err(|_| FilerError::Interrupted)
-}
-
-pub fn filer() -> FilerResult<Handle> {
-    if FILER_THREAD_ON.swap(true, Ordering::SeqCst) {
-        return Err(FilerError::AlreadyRunning);
-    }
-
-    let (t_tx, t_rx): (TaskSnd, TaskRcv) = repeatable_oneshot::repeat_oneshot();
-    let (s_tx, s_rx): (StateSnd, StateRcv) = mpsc::channel(crate::CHANNEL_SIZE);
-
-    let joinhandle = spawn_blocking(move || {
-        if let Err(e) = run(t_rx, s_tx.clone()) {
-            s_tx.blocking_send(Err(e)).ok();
-        }
-
-        FILER_THREAD_ON.store(false, Ordering::SeqCst);
-    });
-
-    Ok(Handle {
-        rx: s_rx,
-        tx: t_tx,
-        joinhandle,
-    })
 }

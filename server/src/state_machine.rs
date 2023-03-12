@@ -2,7 +2,7 @@ use std::future::Future;
 use std::{collections::VecDeque, convert::Infallible};
 
 use anyhow::Context;
-use protocol::to_server::playurlstart;
+use protocol::to_server::{fsstart, playurlstart};
 use protocol::{
     to_client::{front::Front, ToClient},
     to_server::{
@@ -16,12 +16,13 @@ use tokio_util::sync::CancellationToken;
 use crate::util::FutureCancel;
 use crate::{Receiver, Sender};
 
-use self::mpv_play::{mpv_file_state, mpv_url_state};
-use self::play_url::play_url_state;
+use self::mpv_state::{mpv_file_state, mpv_url_state};
+use self::play_url_state::play_url_state;
 
-mod error_msg;
-mod mpv_play;
-mod play_url;
+mod error_msg_state;
+mod filer_state;
+mod mpv_state;
+mod play_url_state;
 
 pub type MachineResult<T> = anyhow::Result<T>;
 
@@ -114,6 +115,15 @@ impl Control {
 
     async fn send_recv(&mut self, msg: impl ToMessage) -> Option<ToServer> {
         self.send(msg).await;
+        self.recv().await
+    }
+
+    async fn send_recv_lazy<F, M>(&mut self, msg_fun: F) -> Option<ToServer>
+    where
+        F: FnOnce() -> M,
+        M: ToMessage,
+    {
+        self.send(msg_fun()).await;
         self.recv().await
     }
 }
@@ -233,7 +243,9 @@ async fn init_state(ctrl: &mut Control) -> MachineResult<()> {
                     .context("mpv file")
             }
             ToServer::SpotifyStart(_) => todo!(),
-            ToServer::FsStart(_) => todo!(),
+            ToServer::FsStart(fsstart::Start) => {
+                filer_state::filer_state(ctrl).await.context("filer")
+            }
             ToServer::PlayUrlStart(playurlstart::Start) => {
                 play_url_state(ctrl).await.context("play url")
             }
@@ -247,7 +259,7 @@ async fn init_state(ctrl: &mut Control) -> MachineResult<()> {
             match e.downcast() {
                 Ok(Jump::Mpv(mpvstart)) => queue.inject(mpvstart.into()),
                 Ok(Jump::UserError { header, body }) => {
-                    error_msg::error_msg_state(ctrl, header, body)
+                    error_msg_state::error_msg_state(ctrl, header, body)
                         .await
                         .context("error message")?
                 }

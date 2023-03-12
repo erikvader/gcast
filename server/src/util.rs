@@ -27,8 +27,16 @@ where
     }
 }
 
+pub async fn join_handle_wait_take<T>(mut handle: JoinHandle<T>) -> T {
+    join_handle_wait(&mut handle).await
+}
+
 pub async fn join_handle_wait<T>(handle: &mut JoinHandle<T>) -> T {
-    match handle.await {
+    join_handle_unwrap(handle.await)
+}
+
+pub fn join_handle_unwrap<T>(awaited_handle: Result<T, tokio::task::JoinError>) -> T {
+    match awaited_handle {
         Err(err) if err.is_panic() => std::panic::resume_unwind(err.into_panic()),
         Err(err) if err.is_cancelled() => {
             panic!("Currently not supporting JoinHandle::abort")
@@ -36,10 +44,6 @@ pub async fn join_handle_wait<T>(handle: &mut JoinHandle<T>) -> T {
         Err(_) => unreachable!("A new variant of JoinError has been introduced"),
         Ok(x) => x,
     }
-}
-
-pub async fn join_handle_wait_take<T>(mut handle: JoinHandle<T>) -> T {
-    join_handle_wait(&mut handle).await
 }
 
 macro_rules! break_err {
