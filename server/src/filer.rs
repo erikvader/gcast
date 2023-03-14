@@ -8,6 +8,7 @@ use std::{
 };
 
 use protocol::to_client::front::{self, filesearch};
+use std::future::Future;
 use tokio::{
     sync::mpsc,
     task::{spawn_blocking, JoinHandle},
@@ -126,22 +127,22 @@ pub fn cache_file() -> PathBuf {
 //     }
 // }
 
-pub async fn refresh_cache(tx: &impl cache::RefreshingProgress) -> FilerResult<Cache> {
+pub async fn refresh_cache<F, Fut>(prog_report: F) -> FilerResult<Cache>
+where
+    F: FnMut(filesearch::Refreshing) -> Fut,
+    Fut: Future<Output = ()>,
+{
     log::info!("Refreshing cache");
-    let newcache = cache::refresh_cache(tx, config::root_dirs().to_vec())?;
+    let newcache =
+        cache::refresh_cache(prog_report, config::root_dirs().to_vec()).await?;
     let newcache = cache::write_cache(&cache_file(), newcache).await?;
     log::info!("Refreshing cache done");
     Ok(newcache)
 }
 
 pub async fn refresh_cache_at_init() -> FilerResult<()> {
-    // NOTE: Needs to run on a separate thread from tokio due to implementation details in
-    // cache::probe. Simply matches the environment the original refresh_cache runs in.
-    join_handle_wait_take(spawn_blocking(|| {
-        // refresh_cache(&cache::VoidProgress).map(|_| ())
-        todo!()
-    }))
-    .await
+    // refresh_cache(|_| async {}).await.map(|_| ())
+    Ok(()) // TODO:
 }
 
 pub async fn read_cache(cache_file: &Path) -> FilerResult<Cache> {
