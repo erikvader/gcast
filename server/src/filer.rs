@@ -1,5 +1,5 @@
 pub mod cache;
-mod search;
+pub mod search;
 
 use std::{
     io,

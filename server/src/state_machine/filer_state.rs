@@ -2,16 +2,16 @@ use std::cell::RefCell;
 
 use protocol::{
     to_client::front::{errormsg, filesearch},
-    to_server::{errormsgctrl::ErrorMsgCtrl, fscontrol, fsstart, ToServer},
+    to_server::{errormsgctrl::ErrorMsgCtrl, fscontrol, fsstart, mpvstart, ToServer},
 };
 use tokio::task::spawn_blocking;
 
 use crate::{
-    filer::{cache::Cache, cache_file, read_cache, refresh_cache},
+    filer::{self, cache::Cache, cache_file, read_cache, refresh_cache},
     util::join_handle_wait_take,
 };
 
-use super::{Control, LockedControl, MachineResult, StateLogger};
+use super::{Control, Jump, LockedControl, MachineResult, StateLogger};
 
 pub(super) async fn filer_state(ctrl: &mut Control) -> MachineResult<()> {
     let logger = StateLogger::new("Filer");
@@ -28,7 +28,9 @@ pub(super) async fn filer_state(ctrl: &mut Control) -> MachineResult<()> {
             ToServer::FsControl(fscontrol::RefreshCache) => {
                 cache = filer_refresh_cache_state(ctrl).await?;
             }
-            ToServer::FsControl(fscontrol::Search(search)) => (),
+            ToServer::FsControl(fscontrol::Search(search)) if search.is_empty() => {
+                filer_search_state(ctrl, &cache).await?;
+            }
             m => logger.invalid_message(&m),
         }
     }
@@ -65,4 +67,26 @@ async fn filer_refresh_cache_state(ctrl: &mut Control) -> MachineResult<Cache> {
     }
 
     Ok(cache)
+}
+
+async fn filer_search_state(ctrl: &mut Control, cache: &Cache) -> MachineResult<()> {
+    let logger = StateLogger::new("FilerSearch");
+
+    ctrl.send(filer::search::search("".to_string(), cache))
+        .await;
+
+    while let Some(msg) = ctrl.recv().await {
+        match msg {
+            ToServer::FsControl(fscontrol::BackToTheBeginning) => break,
+            ToServer::FsControl(fscontrol::Search(search)) => {
+                ctrl.send(filer::search::search(search, cache)).await;
+            }
+            ToServer::MpvStart(mpvstart::File(file)) => {
+                return Jump::mpv_file(file.root, file.path);
+            }
+            m => logger.invalid_message(&m),
+        }
+    }
+
+    Ok(())
 }

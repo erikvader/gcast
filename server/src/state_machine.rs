@@ -199,18 +199,22 @@ impl Jump {
         H: ToString,
         E: std::fmt::Debug,
     {
+        let header = header.to_string();
+        log::debug!("Jump to user error: header={}", header);
         Err(Self::UserError {
-            header: header.to_string(),
+            header,
             body: format!("{:?}", error),
         }
         .into())
     }
 
     fn mpv_file(root: usize, path: String) -> MachineResult<()> {
+        log::debug!("Jump to mpv: root={}, path={}", root, path);
         Err(Self::Mpv(mpvstart::File { root, path }.into()).into())
     }
 
     fn mpv_url(url: String) -> MachineResult<()> {
+        log::debug!("Jump to mpv: url={}", url);
         Err(Self::Mpv(mpvstart::Url(url).into()).into())
     }
 }
@@ -221,7 +225,7 @@ struct StateLogger<'a> {
 
 impl<'a> StateLogger<'a> {
     fn new(name: &'a str) -> Self {
-        log::info!("Entered state '{}'", name);
+        log::debug!("Entered state '{}'", name);
         Self { name }
     }
 
@@ -244,7 +248,7 @@ impl<'a> StateLogger<'a> {
 
 impl Drop for StateLogger<'_> {
     fn drop(&mut self) {
-        log::info!("Exited state '{}'", self.name);
+        log::debug!("Exited state '{}'", self.name);
     }
 }
 
