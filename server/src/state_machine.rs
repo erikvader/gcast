@@ -128,6 +128,36 @@ impl Control {
     }
 }
 
+// It is problematic to create an async closure that captures stuff mutably.
+//
+// "If I were able to define an async closure mutably capturing its environment, it
+// would be possible to invoke the closure multiple times without actually awaiting
+// the future (or dropping it in some other way).
+// This way, we would get multiple Futures with aliased mutable pointers."
+// Source: https://github.com/rust-lang/rust/issues/69446#issuecomment-619354375
+//
+// This is a wrapper around Control that makes it possible by providing a non-mutable send
+// function. The send function is guarded by a mutex instead of borrowing rules.
+struct LockedControl<'a> {
+    ctrl: tokio::sync::Mutex<&'a mut Control>,
+}
+
+impl<'a> LockedControl<'a> {
+    fn new(ctrl: &'a mut Control) -> Self {
+        Self {
+            ctrl: tokio::sync::Mutex::new(ctrl),
+        }
+    }
+
+    async fn send(&self, msg: impl ToMessage) {
+        self.ctrl.lock().await.send(msg).await
+    }
+
+    fn into_inner(self) -> &'a mut Control {
+        self.ctrl.into_inner()
+    }
+}
+
 struct InjectableQueue<T> {
     queue: VecDeque<T>,
 }
