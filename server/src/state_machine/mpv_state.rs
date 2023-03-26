@@ -13,6 +13,7 @@ use crate::mpv::{self, mpv, MpvError};
 use super::{Control, Jump, MachineResult, StateLogger};
 
 pub(super) async fn mpv_url_state(ctrl: &mut Control, url: String) -> MachineResult<()> {
+    let _logger = StateLogger::new("MpvUrl");
     mpv_state(ctrl, url).await
 }
 
@@ -21,10 +22,12 @@ pub(super) async fn mpv_file_state(
     root: usize,
     path: String,
 ) -> MachineResult<()> {
+    let logger = StateLogger::new("MpvFile");
     let roots = crate::config::root_dirs();
+
     match roots.get(root) {
         None => {
-            log::error!("Root {} out of range of 0..{}", root, roots.len());
+            logger.error(format!("Root {} out of range of 0..{}", root, roots.len()));
             Jump::user_error(
                 "Could not find file to play",
                 "Root dir is out of range, try to refresh the cache",

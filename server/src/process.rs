@@ -26,6 +26,10 @@ pub enum ProcessError {
 }
 
 impl Process {
+    pub async fn oneshot(exe: String) -> ProcResult<ExitStatus> {
+        Self::start(exe)?.wait().await.expect("only waited once")
+    }
+
     pub fn start(exe: String) -> ProcResult<Self> {
         assert!(!exe.is_empty());
         // TODO: use progname in config?

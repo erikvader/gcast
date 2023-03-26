@@ -1,8 +1,9 @@
+use std::collections::VecDeque;
 use std::future::Future;
-use std::{collections::VecDeque, convert::Infallible};
+use std::process::ExitStatus;
 
 use anyhow::Context;
-use protocol::to_server::{fsstart, playurlstart};
+use protocol::to_server::{fsstart, playurlstart, spotifystart};
 use protocol::{
     to_client::{front::Front, ToClient},
     to_server::{
@@ -18,11 +19,13 @@ use crate::{Receiver, Sender};
 
 use self::mpv_state::{mpv_file_state, mpv_url_state};
 use self::play_url_state::play_url_state;
+use self::spotify_state::spotify_state;
 
 mod error_msg_state;
 mod filer_state;
 mod mpv_state;
 mod play_url_state;
+mod spotify_state;
 
 pub type MachineResult<T> = anyhow::Result<T>;
 
@@ -194,7 +197,7 @@ enum Jump {
 }
 
 impl Jump {
-    fn user_error<H, E>(header: H, error: E) -> MachineResult<()>
+    fn user_error<T, H, E>(header: H, error: E) -> MachineResult<T>
     where
         H: ToString,
         E: std::fmt::Debug,
@@ -208,14 +211,31 @@ impl Jump {
         .into())
     }
 
-    fn mpv_file(root: usize, path: String) -> MachineResult<()> {
+    fn mpv_file<T>(root: usize, path: String) -> MachineResult<T> {
         log::debug!("Jump to mpv: root={}, path={}", root, path);
         Err(Self::Mpv(mpvstart::File { root, path }.into()).into())
     }
 
-    fn mpv_url(url: String) -> MachineResult<()> {
+    fn mpv_url<T>(url: String) -> MachineResult<T> {
         log::debug!("Jump to mpv: url={}", url);
         Err(Self::Mpv(mpvstart::Url(url).into()).into())
+    }
+}
+
+trait JumpableError<S, H> {
+    fn jump_user_error(self, header: H) -> MachineResult<S>;
+}
+
+impl<T, H, E> JumpableError<T, H> for Result<T, E>
+where
+    E: std::fmt::Debug,
+    H: ToString,
+{
+    fn jump_user_error(self, header: H) -> MachineResult<T> {
+        match self {
+            Ok(t) => Ok(t),
+            Err(e) => Jump::user_error(header, e),
+        }
     }
 }
 
@@ -225,20 +245,53 @@ struct StateLogger<'a> {
 
 impl<'a> StateLogger<'a> {
     fn new(name: &'a str) -> Self {
-        log::debug!("Entered state '{}'", name);
-        Self { name }
+        let seld = Self { name };
+        seld.debug(format!("entered state"));
+        seld
     }
 
     fn invalid_message(&self, msg: &ToServer) {
-        log::warn!("State '{}' received an invalid msg: {:?}", self.name, msg);
+        self.warn(format!("received an invalid msg: {:?}", msg));
     }
 
     fn attempt_exit(&self) {
-        log::debug!("State '{}' is attempting to exit", self.name);
+        self.debug("attempting to exit");
     }
 
-    fn waiting(&self, something: &str) {
-        log::debug!("State '{}' is waiting for {}", self.name, something);
+    fn waiting(&self, something: impl AsRef<str>) {
+        self.debug(format!("waiting for {}", something.as_ref()));
+    }
+
+    fn process_done(&self, proc_name: impl AsRef<str>, exit: ExitStatus) {
+        if exit.success() {
+            self.info(format!(
+                "process '{}' exited with: {}",
+                proc_name.as_ref(),
+                exit
+            ));
+        } else {
+            self.warn(format!(
+                "process '{}' exited with: {}",
+                proc_name.as_ref(),
+                exit
+            ));
+        }
+    }
+
+    fn error(&self, something: impl AsRef<str>) {
+        log::error!("State '{}': {}", self.name, something.as_ref());
+    }
+
+    fn info(&self, something: impl AsRef<str>) {
+        log::info!("State '{}': {}", self.name, something.as_ref());
+    }
+
+    fn warn(&self, something: impl AsRef<str>) {
+        log::warn!("State '{}': {}", self.name, something.as_ref());
+    }
+
+    fn debug(&self, something: impl AsRef<str>) {
+        log::debug!("State '{}': {}", self.name, something.as_ref());
     }
 
     fn name(&self) -> &str {
@@ -248,7 +301,7 @@ impl<'a> StateLogger<'a> {
 
 impl Drop for StateLogger<'_> {
     fn drop(&mut self) {
-        log::debug!("Exited state '{}'", self.name);
+        self.debug("exited state")
     }
 }
 
@@ -276,7 +329,9 @@ async fn init_state(ctrl: &mut Control) -> MachineResult<()> {
                     .await
                     .context("mpv file")
             }
-            ToServer::SpotifyStart(_) => todo!(),
+            ToServer::SpotifyStart(spotifystart::Start) => {
+                spotify_state(ctrl).await.context("spotify")
+            }
             ToServer::FsStart(fsstart::Start) => {
                 filer_state::filer_state(ctrl).await.context("filer")
             }

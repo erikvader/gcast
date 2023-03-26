@@ -8,6 +8,7 @@ const CONFIG_NAME: &str = "config.toml";
 
 static CONF: OnceCell<Config> = OnceCell::const_new();
 
+// TODO: only make public in state_machine?
 #[derive(Debug, serde::Deserialize)]
 struct Config {
     root_dirs: Vec<String>,
