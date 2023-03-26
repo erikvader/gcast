@@ -21,24 +21,26 @@ pub type MachineResult<T> = anyhow::Result<T>;
 
 struct Gatekeeper {
     last_sent: Front,
-    next_id: protocol::Id,
 }
 
 impl Gatekeeper {
     fn new(initial_state: Front) -> Self {
         Self {
             last_sent: initial_state,
-            next_id: 0,
         }
     }
 
-    fn should_accept(&mut self, msg: &Message) -> bool {
-        if msg.is_expected_or_newer_than(self.next_id) {
-            self.next_id = msg.id() + 1;
-            true
-        } else {
-            false
-        }
+    fn should_accept(&mut self, _msg: &Message) -> bool {
+        // TODO: this doesn't work! Needs to be reset on each new client connection. This
+        // logic thus needs to be in connections.rs.
+
+        // if msg.is_expected_or_newer_than(self.next_id) {
+        //     self.next_id = msg.id() + 1;
+        //     true
+        // } else {
+        //     false
+        // }
+        true
     }
 
     fn last_sent(&self) -> Front {
