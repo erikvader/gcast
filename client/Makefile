@@ -2,18 +2,18 @@ RELEASE :=
 SERVICE := gcast-client.service
 SOURCES := serve.py web-root $(SERVICE)
 
-DEPSFOLDER:= web-root/deps
+INDEXHTML := web-root/index.html
+DEPSFOLDER := web-root/deps
 3PP := normalize.css material-icons LeckerliOne-Regular.ttf
 DEPS := $(3PP:%=$(DEPSFOLDER)/%)
 CURLFLAGS := -L
 
 .PHONY: all
-all: build $(DEPSFOLDER) $(DEPS)
+all: build $(DEPSFOLDER) $(DEPS) $(INDEXHTML)
 
 .PHONY: build
 build:
 	wasm-pack build $(if $(RELEASE),--release,--dev) --target web --out-dir web-root/pkg --no-typescript .
-#TODO: gör om sidans title till "gcast debug" om inte variabeln RELEASE är icke-tom
 
 .PHONY: serve
 serve:
@@ -35,6 +35,11 @@ $(DEPSFOLDER)/material-icons:
 
 $(DEPSFOLDER)/LeckerliOne-Regular.ttf:
 	curl $(CURLFLAGS) 'https://fonts.google.com/download?family=Leckerli%20One' | bsdtar -C $(DEPSFOLDER) -xf - $(@F)
+
+# NOTE: PHONY to make sure it always gets the correct title
+.PHONY: $(INDEXHTML)
+$(INDEXHTML): index.html.in
+	sed 's/###TITLE###/gcast$(if $(RELEASE),, debug)/' < $< > $@
 
 .PHONY: clean
 clean:
