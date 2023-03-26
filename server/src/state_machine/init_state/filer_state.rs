@@ -1,15 +1,9 @@
-use std::cell::RefCell;
-
 use protocol::{
-    to_client::front::{errormsg, filesearch},
-    to_server::{errormsgctrl::ErrorMsgCtrl, fscontrol, fsstart, mpvstart, ToServer},
+    to_client::front::filesearch,
+    to_server::{fscontrol, fsstart, mpvstart, ToServer},
 };
-use tokio::task::spawn_blocking;
 
-use crate::{
-    filer::{self, cache::Cache, cache_file, read_cache, refresh_cache},
-    util::join_handle_wait_take,
-};
+use crate::filer::{self, cache::Cache, cache_file, read_cache, refresh_cache};
 
 use super::{Control, Jump, LockedControl, MachineResult, StateLogger};
 

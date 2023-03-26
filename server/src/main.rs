@@ -4,7 +4,6 @@ mod caster;
 mod config;
 mod connections;
 mod filer;
-mod job;
 mod mpv;
 mod process;
 mod repeatable_oneshot;

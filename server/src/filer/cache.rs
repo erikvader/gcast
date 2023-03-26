@@ -10,9 +10,9 @@ use std::future::Future;
 use tokio::task::spawn_blocking;
 use walkdir::{DirEntry, WalkDir};
 
-use crate::util::{join_handle_unwrap, join_handle_wait_take};
+use crate::util::join_handle_wait_take;
 
-use super::{FilerError, FilerResult, StateSnd};
+use super::{FilerError, FilerResult};
 
 // TODO: move to config
 const EXT_WHITELIST: &[&str] = &[".mp4", ".mkv", ".wmv", ".webm", ".avi"];
@@ -371,39 +371,6 @@ where
 
 fn has_whitelisted_extension(path: &str) -> bool {
     EXT_WHITELIST.iter().any(|ext| path.ends_with(ext))
-}
-
-// TODO: remove
-#[async_trait::async_trait]
-pub trait RefreshingProgress {
-    fn send(&self, msg: filesearch::Refreshing) -> FilerResult<()>;
-    async fn send_async(&self, msg: filesearch::Refreshing) -> FilerResult<()>;
-}
-
-#[async_trait::async_trait]
-impl RefreshingProgress for StateSnd {
-    fn send(&self, msg: filesearch::Refreshing) -> FilerResult<()> {
-        self.blocking_send(Ok(msg.into()))
-            .map_err(|_| FilerError::Interrupted)
-    }
-
-    async fn send_async(&self, msg: filesearch::Refreshing) -> FilerResult<()> {
-        self.send(Ok(msg.into()))
-            .await
-            .map_err(|_| FilerError::Interrupted)
-    }
-}
-
-pub(super) struct VoidProgress;
-
-#[async_trait::async_trait]
-impl RefreshingProgress for VoidProgress {
-    fn send(&self, _msg: filesearch::Refreshing) -> FilerResult<()> {
-        Ok(())
-    }
-    async fn send_async(&self, _msg: filesearch::Refreshing) -> FilerResult<()> {
-        Ok(())
-    }
 }
 
 fn make_refreshing(

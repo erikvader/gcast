@@ -14,6 +14,7 @@ struct Config {
     root_dirs: Vec<String>,
     port: u16,
     poweroff_exe: String,
+    refresh_cache_boot: bool,
     mpv: Mpv,
     spotify: Spotify,
 }
@@ -82,6 +83,10 @@ pub fn spotify_fullscreen_exe() -> &'static str {
 
 pub fn poweroff_exe() -> &'static str {
     &get_instance().poweroff_exe
+}
+
+pub fn refresh_cache_boot() -> bool {
+    get_instance().refresh_cache_boot
 }
 
 pub fn conf_dir() -> PathBuf {

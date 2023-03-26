@@ -1,10 +1,7 @@
 use async_trait::async_trait;
-use protocol::ToMessage;
 use std::future::Future;
 use tokio::{select, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
-
-use crate::Sender;
 
 #[async_trait]
 pub trait FutureCancel
@@ -53,10 +50,4 @@ macro_rules! break_err {
             Err(e) => break Err(e.into()),
         }
     };
-}
-
-pub async fn send_to_conn(to_conn: &Sender, msg: impl ToMessage) {
-    if to_conn.send(msg.to_message()).await.is_err() {
-        log::warn!("Seems like connections is down");
-    }
 }

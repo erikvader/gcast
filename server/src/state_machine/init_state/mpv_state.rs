@@ -1,14 +1,11 @@
 use anyhow::Context;
 use protocol::{
-    to_client::front::{self, Front},
-    to_server::{
-        mpvstart::{self, MpvStart},
-        playurlstart, ToServer,
-    },
+    to_client::front,
+    to_server::{mpvstart, ToServer},
 };
 use tokio::select;
 
-use crate::mpv::{self, mpv, MpvError};
+use crate::mpv::{self, MpvError};
 
 use super::{Control, Jump, MachineResult, StateLogger};
 

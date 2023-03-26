@@ -58,6 +58,7 @@ where
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub async fn send(&self, msg: T) -> Result<(), OtherEndClosed> {
         self.send_test_and_set(|_| Some(msg)).await
     }
@@ -89,6 +90,7 @@ impl<T> Receiver<T> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn blocking_recv(&self) -> Result<T, OtherEndClosed> {
         tokio::runtime::Handle::current().block_on(self.recv())
     }
