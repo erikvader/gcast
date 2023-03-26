@@ -97,6 +97,7 @@ impl Control {
 
             let toserver = msg.take_to_server();
             if let ToServer::SendStatus(_) = toserver {
+                log::debug!("Sending the last sent state again");
                 self.send(self.keeper.last_sent()).await;
                 continue;
             }

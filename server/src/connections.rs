@@ -129,6 +129,7 @@ async fn handle_binary(msg: &[u8], to_cast: &mut Sender) {
     match Message::deserialize(msg) {
         Err(e) => log::warn!("Failed to deserialize message {:?} cuz {}", &msg, e),
         Ok(m) if m.is_to_server() => {
+            log::debug!("Received (caster): {:?}", m);
             if to_cast.send(m).await.is_err() {
                 log::warn!("Seems like caster is down");
             }
