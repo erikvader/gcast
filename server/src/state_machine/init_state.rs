@@ -1,9 +1,11 @@
 use anyhow::Context;
-use protocol::to_server::{fsstart, playurlstart, spotifystart};
+use protocol::to_server::{fsstart, playurlstart, powerctrl, spotifystart};
 use protocol::{
     to_client::front::Front,
     to_server::{mpvstart, ToServer},
 };
+
+use crate::process::Process;
 
 use self::mpv_state::{mpv_file_state, mpv_url_state};
 use self::play_url_state::play_url_state;
@@ -23,7 +25,17 @@ pub(super) async fn init_state(ctrl: &mut Control) -> MachineResult<()> {
 
     while let Some(msg) = queue.pop_or(|| ctrl.send_recv(Front::None)).await {
         let res: MachineResult<()> = match msg {
-            ToServer::PowerCtrl(_) => todo!(),
+            ToServer::PowerCtrl(powerctrl::Poweroff) => {
+                let name = crate::config::poweroff_exe();
+                Process::oneshot(name.to_string())
+                    .await
+                    .context("running poweroff exe")
+                    .jump_user_error("Failed to run poweroff exe")
+                    .map(|exit| {
+                        logger.process_done(name, exit);
+                        ()
+                    })
+            }
             ToServer::MpvStart(mpvstart::Url(url)) => {
                 mpv_url_state(ctrl, url).await.context("mpv url")
             }
