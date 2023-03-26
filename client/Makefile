@@ -66,6 +66,10 @@ deploy-start:
 deploy-status:
 	$(SSH) $(DEPLOY_HOST) $(SERVICESTATUS) $(SERVICE)
 
+.PHONY: deploy-journal
+deploy-journal:
+	$(SSH) $(DEPLOY_HOST) $(SERVICEJOURNAL) $(SERVICE)
+
 .PHONY: deploy-sync
 deploy-sync:
 # NOTE: colon is included here because of annoying syntax highlighting in emacs
