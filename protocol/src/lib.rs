@@ -70,6 +70,15 @@ message_part! {
 #[error(transparent)]
 pub struct MessageError(#[from] bincode::Error);
 
+// TODO: reworka vart Message skapas.
+// Endast delarna som tar hand om att skicka och ta emot meddelandena (typ connections.rs)
+// ska skapa dem och hantera att ID:n kommer i rätt ordning osv. Ta bort den atomiska
+// message countern. Varje ny anslutning ska börja om på 0 på båda sidor.
+// Applikaitonsdelarna ska skicka och ta emot ToServer och ToClient UTAN att gör om dem
+// till ett Message först, eller ens bry sig om att den structen finns. Kanske göra
+// mottagardelen i Client mer uppenbar och inte bara en funktion i huvudkomponenten? Man
+// ska aldrig behöva kolla ID:t när man skickar, för den ska alltid skapas precis innan
+// man skickar. Bara på mottagning skall ID kollas, och det gör inte servern i dagsläget.
 impl Message {
     fn new(kind: MessageKind) -> Self {
         Message {
