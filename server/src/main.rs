@@ -73,6 +73,11 @@ fn log_actor_error(res: Result<Result<(), anyhow::Error>, JoinError>, name: &str
 }
 
 async fn maybe_refresh_cache() {
+    if !config::refresh_cache_boot() {
+        log::debug!("Not refreshing cache on start since it is not configured");
+        return;
+    }
+
     if std::fs::File::options()
         .write(true)
         .create_new(true)
@@ -87,7 +92,9 @@ async fn maybe_refresh_cache() {
             log::error!("Failed to refresh the cache at initalization time: {}", e);
         }
     } else {
-        log::info!("Not refreshing the cache at startup");
+        log::info!(
+            "Not refreshing the cache at startup, it has already been done this boot"
+        );
     }
 }
 

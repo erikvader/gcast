@@ -9,6 +9,9 @@ port = 1337
 # Program to run to power off the system
 poweroff_exe = "sudo_systemctl_poweroff"
 
+# If true, refresh the cache on program start, once per boot
+refresh_cache_boot = false
+
 # Key value pairs of properties for mpv
 [mpv.properties]
 fullscreen = "yes"

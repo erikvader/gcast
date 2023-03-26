@@ -141,8 +141,7 @@ where
 }
 
 pub async fn refresh_cache_at_init() -> FilerResult<()> {
-    // refresh_cache(|_| async {}).await.map(|_| ())
-    Ok(()) // TODO:
+    refresh_cache(|_| async {}).await.map(|_| ())
 }
 
 pub async fn read_cache(cache_file: &Path) -> FilerResult<Cache> {
