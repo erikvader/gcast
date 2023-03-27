@@ -64,6 +64,19 @@ pub struct State {
     chapters: i64,
     #[builder(default = "-1")]
     chapter: i64,
+    tracks: Vec<Track>,
+}
+
+#[derive(Debug, Clone, Builder)]
+#[builder(derive(Debug))]
+pub struct Track {
+    id: i64,
+    ttype: String,
+    #[builder(default)]
+    title: Option<String>,
+    #[builder(default)]
+    lang: Option<String>,
+    selected: bool,
 }
 
 #[derive(Debug)]
@@ -130,6 +143,7 @@ fn control_string(ctrl: &MpvControl) -> Command {
         SubSmaller => "add sub-scale -0.1",
         SubMoveUp => "add sub-pos -1",
         SubMoveDown => "add sub-pos 1",
+        SetSub(sid) => "", //TODO: format!("set sid {}", sid),
     }
 }
 
@@ -174,6 +188,9 @@ fn observe_some_properties(ctx: &libmpv::events::EventContext<'_>) -> libmpv::Re
     ctx.observe_property("volume", Format::Double, 0)?;
     ctx.observe_property("chapters", Format::Int64, 0)?;
     ctx.observe_property("chapter", Format::Int64, 0)?;
+    ctx.observe_property("track-list", Format::Node, 0)?;
+    // ctx.observe_property("sid", Format::Int64, 0)?; // TODO: remove
+    // ctx.observe_property("aid", Format::Int64, 0)?;
     Ok(())
 }
 
@@ -287,6 +304,35 @@ fn take_string(data: &PropertyData) -> String {
     panic!("'{:?}' is not a string", data)
 }
 
+fn take_tracks(data: &PropertyData) -> Vec<Track> {
+    if let PropertyData::Node(node) = data {
+        let mut tracks = Vec::new();
+        for track_node in node.to_array().expect("is not an array") {
+            let mut track = TrackBuilder::default();
+
+            for (key, value_node) in track_node.to_map().expect("is not a map") {
+                match key {
+                    "id" => track.id(value_node.to_i64().expect("not i64")),
+                    "type" => {
+                        track.ttype(value_node.to_str().expect("not string").to_string())
+                    }
+                    "title" => track.title(Some(
+                        value_node.to_str().expect("not string").to_string(),
+                    )),
+                    "lang" => track
+                        .lang(Some(value_node.to_str().expect("not string").to_string())),
+                    "selected" => track.selected(value_node.to_bool().expect("not bool")),
+                    _ => &mut track,
+                };
+            }
+
+            tracks.push(track.build().expect("did not receive all fields"));
+        }
+        return tracks;
+    }
+    panic!("'{:?}' is not a Node", data)
+}
+
 fn wait_for_play(
     s_tx: &StateSnd,
     ev_ctx: &mut libmpv::events::EventContext,
@@ -323,6 +369,7 @@ fn wait_for_play(
                     "volume" => partial.volume(take_double(&change)),
                     "chapters" => partial.chapters(take_int(&change)),
                     "chapter" => partial.chapter(take_int(&change)),
+                    "track-list" => partial.tracks(take_tracks(&change)),
                     _ => &mut partial,
                 };
 
@@ -369,6 +416,7 @@ fn wait_for_end(
                     "volume" => state.volume = take_double(&change),
                     "chapters" => state.chapters = take_int(&change),
                     "chapter" => state.chapter = take_int(&change),
+                    "track-list" => state.tracks = take_tracks(&change),
                     _ => (),
                 };
 

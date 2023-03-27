@@ -14,6 +14,7 @@ message! {
         SeekBackLong,
         SeekForwardLong,
         CycleSub,
+        SetSub(i64),
         SubLarger,
         SubSmaller,
         SubMoveUp,
