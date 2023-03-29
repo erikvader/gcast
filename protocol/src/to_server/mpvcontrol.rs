@@ -2,6 +2,7 @@ message! {
     enum super::ToServer, MpvControl {
         TogglePause,
         CycleAudio,
+        SetAudio(i64),
         VolumeUp,
         VolumeDown,
         ToggleMute,

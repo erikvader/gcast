@@ -11,7 +11,7 @@ use libmpv::{
     FileState, Format, Mpv,
 };
 use protocol::{
-    to_client::front::mpv::{Mpv as ClientMpv, PlayState},
+    to_client::front::mpv::{Mpv as ClientMpv, PlayState, Track as ClientTrack},
     to_server::mpvcontrol::MpvControl,
     util::not_nan_or_zero,
 };
@@ -25,7 +25,7 @@ use crate::util::join_handle_wait_take;
 pub use self::errors::*;
 pub type MpvResult<T> = Result<T, MpvError>;
 
-type Command = &'static str;
+type Command = String;
 type StateRcv = mpsc::Receiver<MpvResult<MpvState>>;
 type StateSnd = mpsc::Sender<MpvResult<MpvState>>;
 type HandleResp = oneshot::Sender<MpvResult<()>>;
@@ -117,6 +117,36 @@ impl MpvState {
                 } else {
                     None
                 },
+                subtitles: state
+                    .tracks
+                    .iter()
+                    .filter(|t| t.ttype == "sub")
+                    .map(|t| ClientTrack {
+                        id: t.id,
+                        title: t
+                            .title
+                            .as_deref()
+                            .or(t.lang.as_deref())
+                            .unwrap_or("unknown")
+                            .to_string(),
+                        selected: t.selected,
+                    })
+                    .collect(),
+                audios: state
+                    .tracks
+                    .iter()
+                    .filter(|t| t.ttype == "audio")
+                    .map(|t| ClientTrack {
+                        id: t.id,
+                        title: t
+                            .title
+                            .as_deref()
+                            .or(t.lang.as_deref())
+                            .unwrap_or("unknown")
+                            .to_string(),
+                        selected: t.selected,
+                    })
+                    .collect(),
             })),
         }
     }
@@ -125,25 +155,26 @@ impl MpvState {
 fn control_string(ctrl: &MpvControl) -> Command {
     use MpvControl::*;
     match ctrl {
-        TogglePause => "cycle pause",
-        CycleAudio => "cycle audio",
-        VolumeUp => "add volume 2",
-        VolumeDown => "add volume -2",
-        ToggleMute => "cycle mute",
-        SubDelayEarlier => "add sub-delay -0.1",
-        SubDelayLater => "add sub-delay 0.1",
-        NextChapter => "add chapter 1",
-        PrevChapter => "add chapter -1",
-        SeekBack => "seek -5",
-        SeekForward => "seek 5",
-        CycleSub => "cycle sub",
-        SeekBackLong => "seek -30",
-        SeekForwardLong => "seek 30",
-        SubLarger => "add sub-scale 0.1",
-        SubSmaller => "add sub-scale -0.1",
-        SubMoveUp => "add sub-pos -1",
-        SubMoveDown => "add sub-pos 1",
-        SetSub(sid) => "", //TODO: format!("set sid {}", sid),
+        TogglePause => "cycle pause".to_string(),
+        CycleAudio => "cycle audio".to_string(), // TODO: keep?
+        VolumeUp => "add volume 2".to_string(),
+        VolumeDown => "add volume -2".to_string(),
+        ToggleMute => "cycle mute".to_string(),
+        SubDelayEarlier => "add sub-delay -0.1".to_string(),
+        SubDelayLater => "add sub-delay 0.1".to_string(),
+        NextChapter => "add chapter 1".to_string(),
+        PrevChapter => "add chapter -1".to_string(),
+        SeekBack => "seek -5".to_string(),
+        SeekForward => "seek 5".to_string(),
+        CycleSub => "cycle sub".to_string(), // TODO: keep?
+        SeekBackLong => "seek -30".to_string(),
+        SeekForwardLong => "seek 30".to_string(),
+        SubLarger => "add sub-scale 0.1".to_string(),
+        SubSmaller => "add sub-scale -0.1".to_string(),
+        SubMoveUp => "add sub-pos -1".to_string(),
+        SubMoveDown => "add sub-pos 1".to_string(),
+        SetSub(sid) => format!("set sid {}", sid),
+        SetAudio(aid) => format!("set aid {}", aid),
     }
 }
 
@@ -164,7 +195,7 @@ impl MpvHandle {
     }
 
     pub async fn quit(&self) -> MpvResult<()> {
-        self.command_str("quit").await
+        self.command_str("quit".to_string()).await
     }
 
     pub async fn next(&mut self) -> MpvResult<MpvState> {
@@ -189,8 +220,6 @@ fn observe_some_properties(ctx: &libmpv::events::EventContext<'_>) -> libmpv::Re
     ctx.observe_property("chapters", Format::Int64, 0)?;
     ctx.observe_property("chapter", Format::Int64, 0)?;
     ctx.observe_property("track-list", Format::Node, 0)?;
-    // ctx.observe_property("sid", Format::Int64, 0)?; // TODO: remove
-    // ctx.observe_property("aid", Format::Int64, 0)?;
     Ok(())
 }
 
@@ -234,7 +263,7 @@ pub fn mpv(path: &str) -> MpvResult<MpvHandle> {
                 barrier.wait();
                 while let Some((cmd, tx_res)) = h_rx.blocking_recv() {
                     log::debug!("Executing mpv command: {}", cmd);
-                    let res = mpv.command(cmd, &[]); // NOTE: args is just appended to cmd
+                    let res = mpv.command(&cmd, &[]); // NOTE: args is just appended to cmd
                     if let Err(e) = &res {
                         log::error!("Mpv errored: {}", e); // TODO: remove since handle probably also will log?
                     }
