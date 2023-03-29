@@ -26,7 +26,6 @@ pub fn mpv(props: &MpvProps) -> Html {
     let title = title(&props.front);
 
     // TODO: show a volume indicator
-    // TODO: set the default to 80%. Do it on the server and have a field in the config file
     html! {
         <article class={classes!("stacker")}>
             <BackButton button_type={Type::Exit}

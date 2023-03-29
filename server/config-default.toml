@@ -16,6 +16,7 @@ refresh_cache_boot = false
 [mpv.properties]
 fullscreen = "yes"
 force-window = "immediate"
+volume = "100"
 
 [spotify]
 # The executable to run to start spotify
