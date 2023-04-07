@@ -147,7 +147,7 @@ pub fn track_selector(props: &TrackSelectorProps) -> Html {
         .map(|t| {
             let onclick = props.onclick.clone();
             let id = t.id;
-            let selected = if t.selected { None } else { Some("inverted") };
+            let selected = (!t.selected).then_some("inverted");
             html! {
                 <button onclick={Callback::from(move |_| onclick.emit(id))}
                         disabled={props.disabled}
@@ -231,11 +231,11 @@ fn title(front: &prot::Mpv) -> &str {
     }
 }
 
-fn play_icon(front: &prot::Mpv) -> Option<&'static str> {
+fn play_icon(front: &prot::Mpv) -> Vec<&'static str> {
     match front {
-        prot::Load => None,
-        prot::PlayState(prot::PlayState { pause: true, .. }) => Some("icon-play"),
-        prot::PlayState(prot::PlayState { pause: false, .. }) => Some("icon-pause"),
+        prot::Load => vec!["icon-renew", "spin"],
+        prot::PlayState(prot::PlayState { pause: true, .. }) => vec!["icon-play"],
+        prot::PlayState(prot::PlayState { pause: false, .. }) => vec!["icon-pause"],
     }
 }
 

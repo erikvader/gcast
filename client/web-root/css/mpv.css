@@ -47,6 +47,19 @@
     transform: translate(-50%, -50%);
 }
 
+@keyframes spin-round {
+    from {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
+.round.spin::after {
+    animation: spin-round 2s infinite linear;
+}
+
 body.no-touch .round:hover {
     box-shadow: inset 0 0 0 99em rgba(255,255,255,.4);
 }
