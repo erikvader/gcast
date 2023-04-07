@@ -133,8 +133,10 @@ fn to_client_tracks(tracks: &[Track], ttype: &str) -> Vec<ClientTrack> {
             title: t
                 .title
                 .as_deref()
+                .and_then(|tit| tit.chars().any(|c| !c.is_whitespace()).then_some(tit))
                 .or(t.lang.as_deref())
-                .unwrap_or("unknown")
+                .and_then(|lan| lan.chars().any(|c| !c.is_whitespace()).then_some(lan))
+                .unwrap_or("Unknown")
                 .to_string(),
             selected: t.selected,
         })
