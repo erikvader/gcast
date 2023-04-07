@@ -106,6 +106,7 @@ pub fn mpv(props: &MpvProps) -> Html {
                         disabled={!clickable} />
             </div>
             <TrackSelector tracks={subtitles}
+                           disabled={!clickable}
                            onclick={Callback::from(|id| websocket_send(mpvcontrol::SetSub(id)))} />
             <div class={classes!("section", "pad", "small")}>
                 <span>{"Audio controls"}</span>
@@ -124,6 +125,7 @@ pub fn mpv(props: &MpvProps) -> Html {
                         disabled={!clickable} />
             </div>
             <TrackSelector tracks={audios}
+                           disabled={!clickable}
                            onclick={Callback::from(|id| websocket_send(mpvcontrol::SetAudio(id)))} />
         </article>
     }
@@ -133,6 +135,7 @@ pub fn mpv(props: &MpvProps) -> Html {
 pub struct TrackSelectorProps {
     pub tracks: Vec<prot::Track>,
     pub onclick: Callback<i64>,
+    pub disabled: bool,
 }
 
 #[rustfmt::skip::macros(html)]
@@ -147,7 +150,8 @@ pub fn track_selector(props: &TrackSelectorProps) -> Html {
             let selected = if t.selected { None } else { Some("inverted") };
             html! {
                 <button onclick={Callback::from(move |_| onclick.emit(id))}
-                     class={classes!(selected)}>
+                        disabled={props.disabled}
+                        class={classes!(selected)}>
                     {t.title.clone()}
                 </button>
             }
@@ -237,14 +241,22 @@ fn play_icon(front: &prot::Mpv) -> Option<&'static str> {
 
 fn subtitles(front: &prot::Mpv) -> Vec<prot::Track> {
     match front {
-        prot::Load => vec![],
+        prot::Load => vec![prot::Track {
+            id: 0,
+            selected: true,
+            title: "Loading...".to_string(),
+        }],
         prot::PlayState(prot::PlayState { subtitles, .. }) => subtitles.clone(),
     }
 }
 
 fn audios(front: &prot::Mpv) -> Vec<prot::Track> {
     match front {
-        prot::Load => vec![],
+        prot::Load => vec![prot::Track {
+            id: 0,
+            selected: true,
+            title: "Loading...".to_string(),
+        }],
         prot::PlayState(prot::PlayState { audios, .. }) => audios.clone(),
     }
 }
