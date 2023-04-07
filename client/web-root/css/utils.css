@@ -10,12 +10,20 @@
     font-size: 0.8em;
 }
 
+.kinda-small {
+    font-size: 0.9em;
+}
+
 .center {
     text-align: center;
 }
 
 .bold {
     font-weight: bold;
+}
+
+.italic {
+    font-style: italic;
 }
 
 .pad {

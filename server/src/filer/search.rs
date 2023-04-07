@@ -30,6 +30,7 @@ pub fn search(query: String, cache: &Cache) -> filesearch::Results {
                         path: c_entry.path_relative_root().to_string(),
                         root: c_entry.root(),
                         indices: r.get_match().indices().to_vec(),
+                        basename: c_entry.basename_char(),
                     }
                 })
                 .collect();

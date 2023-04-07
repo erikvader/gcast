@@ -47,7 +47,7 @@ message_part! {
         path: String,
         root: usize,
         indices: Vec<usize>,
-        // basename: usize, // TODO:
+        basename: usize,
     }
 }
 

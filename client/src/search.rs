@@ -107,9 +107,49 @@ struct SearchResultProps {
 #[rustfmt::skip::macros(html)]
 #[function_component(SearchResult)]
 fn search_result(props: &SearchResultProps) -> Html {
-    let contents: Html = searcher::stylize(
-        &props.front.path,
-        &props.front.indices,
+    let indices_basename = props
+        .front
+        .indices
+        .iter()
+        .copied()
+        .enumerate()
+        .find(|(_, j)| *j >= props.front.basename)
+        .map(|(i, _)| i)
+        .unwrap_or(props.front.indices.len());
+
+    let dir_str: String = props
+        .front
+        .path
+        .chars()
+        .enumerate()
+        .take_while(|(i, _)| *i < props.front.basename)
+        .map(|(_, c)| c)
+        .collect();
+
+    let dir: Html = searcher::stylize(
+        &dir_str,
+        &props.front.indices[..indices_basename],
+        |on| html! {<span class={classes!("search-hl")}>{on}</span>},
+        |off| html! {off},
+    );
+
+    let base_str: String = props
+        .front
+        .path
+        .chars()
+        .enumerate()
+        .skip_while(|(i, _)| *i < props.front.basename)
+        .map(|(_, c)| c)
+        .collect();
+
+    let base_indices: Vec<_> = props.front.indices[indices_basename..]
+        .into_iter()
+        .map(|i| i - props.front.basename)
+        .collect();
+
+    let base: Html = searcher::stylize(
+        &base_str,
+        &base_indices,
         |on| html! {<span class={classes!("search-hl")}>{on}</span>},
         |off| html! {off},
     );
@@ -135,7 +175,9 @@ fn search_result(props: &SearchResultProps) -> Html {
         <div class={classes!("search-res")} onclick={on_click}>
             <span class={classes!("search-detail", color_class)}></span>
             <span class={classes!("search-content")}>
-                {contents}
+                <span class={classes!("kinda-small", "italic")}>{dir}</span>
+                <br />
+                <span>{base}</span>
             </span>
         </div>
     }

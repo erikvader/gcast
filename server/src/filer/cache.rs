@@ -47,6 +47,19 @@ impl CacheEntry {
     pub(super) fn path_relative_root(&self) -> &str {
         &self.path[self.root_len..]
     }
+
+    pub(super) fn basename_char(&self) -> usize {
+        match self
+            .path_relative_root()
+            .chars()
+            .enumerate()
+            .filter(|&(_, c)| c == std::path::MAIN_SEPARATOR)
+            .last()
+        {
+            Some((i, _)) => i,
+            None => 0,
+        }
+    }
 }
 
 impl AsRef<str> for CacheEntry {

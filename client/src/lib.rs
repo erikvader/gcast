@@ -186,7 +186,12 @@ pub fn main() {
     //         done_dirs: 20,
     //         num_errors: 5,
     //     })
-    //     .into(),
+    //     fs::Results(fs::Results{
+    //         query: "testing testing".to_string(),
+    //         query_valid: true,
+    //         results: vec![fs::SearchResult{path: "/anime_cache/[EMBER] Go-Toubun no Hanayome (Movie) [1080p] [HEVC WEBRip DDP].mkv".to_string(), root: 0, indices: vec![1, 10, 21], basename: 13}],
+    //     })
+    // .into(),
     // ),
     // });
 }
