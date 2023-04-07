@@ -4,9 +4,12 @@ use protocol::{
 };
 use yew::prelude::*;
 
-use crate::back_button::{BackButton, Type};
 use crate::progressbar::Progressbar;
 use crate::WebSockStatus;
+use crate::{
+    back_button::{BackButton, Type},
+    websocket::websocket_send,
+};
 
 #[derive(Properties, PartialEq, Eq)]
 pub struct MpvProps {
@@ -24,6 +27,8 @@ pub fn mpv(props: &MpvProps) -> Html {
     let has_chapters = has_chapters(&props.front);
     let play_icon = play_icon(&props.front);
     let title = title(&props.front);
+    let subtitles = subtitles(&props.front);
+    let audios = audios(&props.front);
 
     // TODO: show a volume indicator
     html! {
@@ -72,30 +77,10 @@ pub fn mpv(props: &MpvProps) -> Html {
                         class={classes!("round", "icon", "icon-skip-fwd")}
                         disabled={!clickable || !has_chapters} />
             </div>
-            <div class={classes!("space-evenly")}>
-                <button onclick={click_send!(mpvcontrol::CycleSub)}
-                        class={classes!("round", "icon", "icon-subtitles")}
-                        disabled={!clickable} />
-                <button onclick={click_send!(mpvcontrol::CycleAudio)}
-                        class={classes!("round", "icon", "icon-audio-file")}
-                        disabled={!clickable} />
-
-                <button onclick={click_send!(mpvcontrol::VolumeUp)}
-                        class={classes!("round", "icon", "icon-volume-up")}
-                        disabled={!clickable} />
-
-                <button onclick={click_send!(mpvcontrol::VolumeDown)}
-                        class={classes!("round", "icon", "icon-volume-down")}
-                        disabled={!clickable} />
-
-                <button onclick={click_send!(mpvcontrol::ToggleMute)}
-                        class={classes!("round", "icon", "icon-volume-mute")}
-                        disabled={!clickable} />
-            </div>
             <div class={classes!("section", "pad", "small")}>
-                <span>{"Subtitle controls"}</span>
+                <span>{"subtitle controls"}</span>
             </div>
-            <div class={classes!("space-evenly")}>
+            <div class={classes!("space-evenly", "pad")}>
                 <button onclick={click_send!(mpvcontrol::SubDelayEarlier)}
                         class={classes!("round", "icon", "icon-back-arrow")}
                         disabled={!clickable} />
@@ -120,7 +105,59 @@ pub fn mpv(props: &MpvProps) -> Html {
                         class={classes!("round", "icon", "icon-down-arrow")}
                         disabled={!clickable} />
             </div>
+            <TrackSelector tracks={subtitles}
+                           onclick={Callback::from(|id| websocket_send(mpvcontrol::SetSub(id)))} />
+            <div class={classes!("section", "pad", "small")}>
+                <span>{"Audio controls"}</span>
+            </div>
+            <div class={classes!("space-evenly", "pad")}>
+                <button onclick={click_send!(mpvcontrol::ToggleMute)}
+                        class={classes!("round", "icon", "icon-volume-mute")}
+                        disabled={!clickable} />
+
+                <button onclick={click_send!(mpvcontrol::VolumeDown)}
+                        class={classes!("round", "icon", "icon-volume-down")}
+                        disabled={!clickable} />
+
+                <button onclick={click_send!(mpvcontrol::VolumeUp)}
+                        class={classes!("round", "icon", "icon-volume-up")}
+                        disabled={!clickable} />
+            </div>
+            <TrackSelector tracks={audios}
+                           onclick={Callback::from(|id| websocket_send(mpvcontrol::SetAudio(id)))} />
         </article>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+pub struct TrackSelectorProps {
+    pub tracks: Vec<prot::Track>,
+    pub onclick: Callback<i64>,
+}
+
+#[rustfmt::skip::macros(html)]
+#[function_component(TrackSelector)]
+pub fn track_selector(props: &TrackSelectorProps) -> Html {
+    let contents: Html = props
+        .tracks
+        .iter()
+        .map(|t| {
+            let onclick = props.onclick.clone();
+            let id = t.id;
+            let selected = if t.selected { None } else { Some("inverted") };
+            html! {
+                <button onclick={Callback::from(move |_| onclick.emit(id))}
+                     class={classes!(selected)}>
+                    {t.title.clone()}
+                </button>
+            }
+        })
+        .collect();
+
+    html! {
+        <div class={classes!("pad", "box", "fill-nicely")}>
+            {contents}
+        </div>
     }
 }
 
@@ -195,5 +232,19 @@ fn play_icon(front: &prot::Mpv) -> Option<&'static str> {
         prot::Load => None,
         prot::PlayState(prot::PlayState { pause: true, .. }) => Some("icon-play"),
         prot::PlayState(prot::PlayState { pause: false, .. }) => Some("icon-pause"),
+    }
+}
+
+fn subtitles(front: &prot::Mpv) -> Vec<prot::Track> {
+    match front {
+        prot::Load => vec![],
+        prot::PlayState(prot::PlayState { subtitles, .. }) => subtitles.clone(),
+    }
+}
+
+fn audios(front: &prot::Mpv) -> Vec<prot::Track> {
+    match front {
+        prot::Load => vec![],
+        prot::PlayState(prot::PlayState { audios, .. }) => audios.clone(),
     }
 }

@@ -117,46 +117,45 @@ impl MpvState {
                 } else {
                     None
                 },
-                subtitles: state
-                    .tracks
-                    .iter()
-                    .filter(|t| t.ttype == "sub")
-                    .map(|t| ClientTrack {
-                        id: t.id,
-                        title: t
-                            .title
-                            .as_deref()
-                            .or(t.lang.as_deref())
-                            .unwrap_or("unknown")
-                            .to_string(),
-                        selected: t.selected,
-                    })
-                    .collect(),
-                audios: state
-                    .tracks
-                    .iter()
-                    .filter(|t| t.ttype == "audio")
-                    .map(|t| ClientTrack {
-                        id: t.id,
-                        title: t
-                            .title
-                            .as_deref()
-                            .or(t.lang.as_deref())
-                            .unwrap_or("unknown")
-                            .to_string(),
-                        selected: t.selected,
-                    })
-                    .collect(),
+                subtitles: to_client_tracks(&state.tracks, "sub"),
+                audios: to_client_tracks(&state.tracks, "audio"),
             })),
         }
     }
+}
+
+fn to_client_tracks(tracks: &[Track], ttype: &str) -> Vec<ClientTrack> {
+    let mut client_tracks: Vec<_> = tracks
+        .iter()
+        .filter(|t| t.ttype == ttype)
+        .map(|t| ClientTrack {
+            id: t.id,
+            title: t
+                .title
+                .as_deref()
+                .or(t.lang.as_deref())
+                .unwrap_or("unknown")
+                .to_string(),
+            selected: t.selected,
+        })
+        .collect();
+
+    client_tracks.insert(
+        0,
+        ClientTrack {
+            id: 0,
+            title: "None".to_string(),
+            selected: client_tracks.iter().all(|t| !t.selected),
+        },
+    );
+
+    client_tracks
 }
 
 fn control_string(ctrl: &MpvControl) -> Command {
     use MpvControl::*;
     match ctrl {
         TogglePause => "cycle pause".to_string(),
-        CycleAudio => "cycle audio".to_string(), // TODO: keep?
         VolumeUp => "add volume 2".to_string(),
         VolumeDown => "add volume -2".to_string(),
         ToggleMute => "cycle mute".to_string(),
@@ -166,7 +165,6 @@ fn control_string(ctrl: &MpvControl) -> Command {
         PrevChapter => "add chapter -1".to_string(),
         SeekBack => "seek -5".to_string(),
         SeekForward => "seek 5".to_string(),
-        CycleSub => "cycle sub".to_string(), // TODO: keep?
         SeekBackLong => "seek -30".to_string(),
         SeekForwardLong => "seek 30".to_string(),
         SubLarger => "add sub-scale 0.1".to_string(),

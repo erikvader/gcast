@@ -157,6 +157,17 @@ pub fn main() {
     //             length: protocol::util::not_nan_or_zero(0.0),
     //             volume: protocol::util::not_nan_or_zero(0.0),
     //             chapter: None,
+    //             subtitles: vec![
+    //                 m::Track {id: 0, selected: false, title: "None".to_string()},
+    //                 m::Track {id: 1, selected: false, title: "Engelska".to_string()},
+    //                 m::Track {id: 2, selected: true, title: "Svenska".to_string()},
+    //                 m::Track {id: 3, selected: false, title: "Franska".to_string()},
+    //             ],
+    //             audios: vec![
+    //                 m::Track {id: 0, selected: false, title: "None".to_string()},
+    //                 m::Track {id: 1, selected: false, title: "Engelska".to_string()},
+    //                 m::Track {id: 2, selected: true, title: "Japanska".to_string()},
+    //             ],
     //         })
     //         .into(),
     //     ), // front: Some(

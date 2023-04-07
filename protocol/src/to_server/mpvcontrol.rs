@@ -1,7 +1,6 @@
 message! {
     enum super::ToServer, MpvControl {
         TogglePause,
-        CycleAudio,
         SetAudio(i64),
         VolumeUp,
         VolumeDown,
@@ -14,7 +13,6 @@ message! {
         SeekForward,
         SeekBackLong,
         SeekForwardLong,
-        CycleSub,
         SetSub(i64),
         SubLarger,
         SubSmaller,

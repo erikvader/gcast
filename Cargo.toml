@@ -37,7 +37,7 @@ colored = "2" # cli: terminal colors
 tungstenite = "0.17" # cli: websockets blocking
 clap = {version="4.0", features=["derive"]} # cli: commandline arguments
 
-yew = "0.19" # client: react
+yew = "=0.19" # client: react
 yew-agent = "0.1" # client: websocket background job
 wasm-bindgen = "0.2" # client: wasm stuff
 wasm-logger = "0.2" # client: log to web browser console
