@@ -1,0 +1,8 @@
+:root {
+    --body-bg: #fff;
+    --body-fg: #111;
+    --main-bg: #0074d9;
+    --main-fg: #fff;
+    --disabled-bg: #aaa;
+    --error-bg:  #8b0000;
+}

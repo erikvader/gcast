@@ -34,7 +34,7 @@
 }
 
 .error {
-    background: #8b0000;
+    background: var(--error-bg);
 }
 
 .dracula-pink {
@@ -107,7 +107,7 @@
 
 .embellishment {
     font-size: 1.3em;
-    color: #0074d9;
+    color: var(--main-bg);
     font-weight: normal;
 }
 

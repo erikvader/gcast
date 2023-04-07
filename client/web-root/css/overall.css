@@ -20,18 +20,18 @@ html,body {
 
 body {
     margin: 0;
-    color: #111;
+    color: var(--body-fg);
     font-size: 1.1em;
     line-height: 1.5;
-    background: #fff;
+    background: var(--body-bg);
 }
 
 @media only screen and (min-width: 366px) {
     .width-limiter {
         max-width: 366px;
         margin: auto;
-        border-left: 3px solid black;
-        border-right: 3px solid black;
+        border-left: 3px solid var(--body-fg);
+        border-right: 3px solid var(--body-fg);
         height: 100%;
         overflow: hidden;
     }
@@ -39,11 +39,11 @@ body {
 
 button {
     user-select: none;
-    background: #0074d9;
+    background: var(--main-bg);
     border-radius: .2em;
     border: 0;
     box-shadow: 0 0 rgba(17,17,17,0) inset;
-    color: #fff;
+    color: var(--main-fg);
     cursor: pointer;
     display: inline-block;
     font: inherit;
@@ -62,13 +62,13 @@ button {
 }
 
 button.inverted {
-    background: rgba(0, 0, 0, 0);
-    color: #0074d9;
+    background: var(--body-bg);
+    color: var(--main-bg);
 }
 
 button.inverted::after {
     content: "";
-    border: 3px solid #0074d9;
+    border: 3px solid var(--main-bg);
     position: absolute;
     top: 0;
     left: 0;
@@ -90,13 +90,13 @@ body.no-touch button:hover {
 button[disabled] {
     cursor: default;
     box-shadow: none;
-    background: #aaa;
+    background: var(--disabled-bg);
 }
 
 input {
-    background-color: #fff;
+    background-color: var(--body-bg);
     border-radius: .2em;
-    border: 1px solid #aaa;
+    border: 1px solid var(--disabled-bg);
     color: inherit;
     font: inherit;
     height: 2.1em;
@@ -108,7 +108,7 @@ input {
 }
 
 input:focus {
-    border: 1px solid #0074d9;
+    border: 1px solid var(--main-bg);
     outline: 0;
 }
 
