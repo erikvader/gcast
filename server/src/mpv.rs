@@ -157,6 +157,7 @@ fn to_client_tracks(tracks: &[Track], ttype: &str) -> Vec<ClientTrack> {
 fn control_string(ctrl: &MpvControl) -> Command {
     use MpvControl::*;
     match ctrl {
+        // TODO: cycle stereo-safe, tvingat 2.1 osv
         TogglePause => "cycle pause".to_string(),
         VolumeUp => "add volume 2".to_string(),
         VolumeDown => "add volume -2".to_string(),
@@ -173,6 +174,7 @@ fn control_string(ctrl: &MpvControl) -> Command {
         SubSmaller => "add sub-scale -0.1".to_string(),
         SubMoveUp => "add sub-pos -1".to_string(),
         SubMoveDown => "add sub-pos 1".to_string(),
+        // TODO: no osd
         SetSub(sid) => format!("set sid {}", sid),
         SetAudio(aid) => format!("set aid {}", aid),
     }
@@ -287,6 +289,7 @@ pub fn mpv(path: &str) -> MpvResult<MpvHandle> {
                 }
 
                 if let Some(state) = wait_for_play(&s_tx, &mut ev_ctx) {
+                    // TODO: auto set audio and subtitle track
                     wait_for_end(&s_tx, &mut ev_ctx, state);
                 }
 

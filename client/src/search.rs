@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use protocol::{
     to_client::front::filesearch as prot,
     to_server::{fscontrol, fsstart, mpvstart},
@@ -107,51 +109,16 @@ struct SearchResultProps {
 #[rustfmt::skip::macros(html)]
 #[function_component(SearchResult)]
 fn search_result(props: &SearchResultProps) -> Html {
-    let indices_basename = props
-        .front
-        .indices
-        .iter()
-        .copied()
-        .enumerate()
-        .find(|(_, j)| *j >= props.front.basename)
-        .map(|(i, _)| i)
-        .unwrap_or(props.front.indices.len());
-
-    let dir_str: String = props
-        .front
-        .path
-        .chars()
-        .enumerate()
-        .take_while(|(i, _)| *i < props.front.basename)
-        .map(|(_, c)| c)
-        .collect();
-
-    let dir: Html = searcher::stylize(
-        &dir_str,
-        &props.front.indices[..indices_basename],
-        |on| html! {<span class={classes!("search-hl")}>{on}</span>},
-        |off| html! {off},
+    let dir = search_result_substr(
+        &props.front.path,
+        &props.front.indices,
+        0..props.front.basename,
     );
 
-    let base_str: String = props
-        .front
-        .path
-        .chars()
-        .enumerate()
-        .skip_while(|(i, _)| *i < props.front.basename)
-        .map(|(_, c)| c)
-        .collect();
-
-    let base_indices: Vec<_> = props.front.indices[indices_basename..]
-        .into_iter()
-        .map(|i| i - props.front.basename)
-        .collect();
-
-    let base: Html = searcher::stylize(
-        &base_str,
-        &base_indices,
-        |on| html! {<span class={classes!("search-hl")}>{on}</span>},
-        |off| html! {off},
+    let base = search_result_substr(
+        &props.front.path,
+        &props.front.indices,
+        props.front.basename..props.front.path.len(),
     );
 
     let on_click = {
@@ -181,6 +148,28 @@ fn search_result(props: &SearchResultProps) -> Html {
             </span>
         </div>
     }
+}
+
+fn search_result_substr(path: &str, indices: &[usize], char_range: Range<usize>) -> Html {
+    let substr: String = path
+        .chars()
+        .enumerate()
+        .filter(|(i, _)| char_range.contains(i))
+        .map(|(_, c)| c)
+        .collect();
+
+    let subindices: Vec<_> = indices
+        .iter()
+        .filter(|i| char_range.contains(i))
+        .map(|i| i - char_range.start)
+        .collect();
+
+    searcher::stylize(
+        &substr,
+        &subindices,
+        |on| html! {<span class={classes!("search-hl")}>{on}</span>},
+        |off| html! {off},
+    )
 }
 
 #[derive(Properties, PartialEq)]
