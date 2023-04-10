@@ -1,19 +1,4 @@
-macro_rules! message_part {
-    (enum $($rest:tt)+) => {
-        #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
-        pub enum $($rest)+
-    };
-    (struct $name:ident;) => {
-        #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
-        pub struct $name;
-    };
-    (struct $name:ident { $($id:ident : $type:ty,)* }) => {
-        #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
-        pub struct $name {
-            $(pub $id : $type ,)*
-        }
-    };
-}
+use protocol_macros::message_part;
 
 macro_rules! message {
     (enum $kind:ty, $name:ident $body:tt) => {
@@ -24,9 +9,8 @@ macro_rules! message {
         message! {@x struct $kind, $name $body}
     };
     (@x $enumstruct:ident $kind:ty, $name:ident $body:tt) => {
-        message_part! {
-            $enumstruct $name $body
-        }
+        #[protocol_macros::message_part]
+        $enumstruct $name $body
 
         impl From<$name> for $crate::Message {
             fn from(m: $name) -> Self {
@@ -52,18 +36,16 @@ pub type Id = u64;
 
 static MESSAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-message_part! {
-    enum MessageKind {
-        ToServer(to_server::ToServer),
-        ToClient(to_client::ToClient),
-    }
+#[message_part]
+enum MessageKind {
+    ToServer(to_server::ToServer),
+    ToClient(to_client::ToClient),
 }
 
-message_part! {
-    struct Message {
-        id: Id,
-        kind: MessageKind,
-    }
+#[message_part]
+struct Message {
+    id: Id,
+    kind: MessageKind,
 }
 
 #[derive(thiserror::Error, Debug)]

@@ -5,6 +5,7 @@ members = [
   "cli",
   "client",
   "protocol",
+  "protocol-macros",
 ]
 
 [workspace.dependencies]
@@ -58,3 +59,7 @@ itertools = "0.10" # searcher: tuple_windows
 regex = "1" # searcher: primary search tool
 regex-syntax = "0.6" # searcher: escape strings
 rayon = "1" # searcher: search in parallel
+
+quote = "1" # protocol-macros
+syn = "2" # protocol-macros
+proc-macro2 = "1" # protocol-macros

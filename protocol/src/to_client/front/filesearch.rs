@@ -1,5 +1,7 @@
 use std::time::SystemTime;
 
+use protocol_macros::message_part;
+
 message! {
     enum super::Front, FileSearch {
         Refreshing(Refreshing),
@@ -18,20 +20,18 @@ message! {
     }
 }
 
-message_part! {
-    struct RootInfo {
-        path: String,
-        status: RootStatus,
-    }
+#[message_part]
+struct RootInfo {
+    path: String,
+    status: RootStatus,
 }
 
-message_part! {
-    enum RootStatus {
-        Pending,
-        Loading,
-        Error,
-        Done,
-    }
+#[message_part]
+enum RootStatus {
+    Pending,
+    Loading,
+    Error,
+    Done,
 }
 
 message! {
@@ -42,13 +42,12 @@ message! {
     }
 }
 
-message_part! {
-    struct SearchResult {
-        path: String,
-        root: usize,
-        indices: Vec<usize>,
-        basename: usize,
-    }
+#[message_part]
+struct SearchResult {
+    path: String,
+    root: usize,
+    indices: Vec<usize>,
+    basename: usize,
 }
 
 message! {

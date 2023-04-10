@@ -1,4 +1,5 @@
 use ordered_float::NotNan;
+use protocol_macros::message_part;
 
 message! {
     enum super::Front, Mpv {
@@ -20,10 +21,9 @@ message! {
     }
 }
 
-message_part! {
-    struct Track {
-        id: i64,
-        title: String,
-        selected: bool,
-    }
+#[message_part]
+struct Track {
+    id: i64,
+    title: String,
+    selected: bool,
 }
