@@ -1,4 +1,4 @@
-* What is it?
+* What is this?
 A media server, sort of. Run this on a computer connected to a TV and
 control it using a phone. This application supports playing local
 video files using [[https://mpv.io/][mpv]] (or rather [[https://github.com/mpv-player/mpv/blob/master/libmpv/client.h][its C API]]), a whole lot of video from
@@ -24,6 +24,7 @@ server tells it to and has minimal logic and processing.
   environment.
 - =protocol=: Shared data structures that define the communication
   interface between the client and the server.
+- =protocol-macros=: Procedural macros for the protocol crate.
 - =searcher=: A search engine that simply searches through a bunch of
   strings, like video file paths, using syntax inspired by [[https://github.com/abo-abo/swiper#swiper][swiper]].
 * Installation
