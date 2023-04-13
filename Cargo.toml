@@ -61,5 +61,5 @@ regex-syntax = "0.6" # searcher: escape strings
 rayon = "1" # searcher: search in parallel
 
 quote = "1" # protocol-macros
-syn = "2" # protocol-macros
+syn = {version = "2", features=["full"]} # protocol-macros
 proc-macro2 = "1" # protocol-macros
