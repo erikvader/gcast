@@ -1,5 +1,4 @@
-message! {
-    enum super::ToServer, PowerCtrl {
-        Poweroff,
-    }
+#[protocol_macros::message_part]
+enum PowerCtrl {
+    Poweroff,
 }

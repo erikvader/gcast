@@ -1,8 +1,7 @@
-message! {
-    enum super::ToClient, Seat {
-        Accept,
-        Reject,
-    }
+#[protocol_macros::message_part]
+enum Seat {
+    Accept,
+    Reject,
 }
 
 impl Seat {

@@ -1,6 +1,5 @@
-message! {
-    struct super::Front, ErrorMsg {
-        header: String,
-        body: String,
-    }
+#[protocol_macros::message_part]
+struct ErrorMsg {
+    header: String,
+    body: String,
 }

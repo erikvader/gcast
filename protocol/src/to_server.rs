@@ -9,17 +9,16 @@ pub mod sendstatus;
 pub mod spotifyctrl;
 pub mod spotifystart;
 
-message! {
-    enum super::MessageKind, ToServer {
-        SendStatus(sendstatus::SendStatus),
-        PowerCtrl(powerctrl::PowerCtrl),
-        MpvControl(mpvcontrol::MpvControl),
-        MpvStart(mpvstart::MpvStart),
-        SpotifyStart(spotifystart::SpotifyStart),
-        SpotifyCtrl(spotifyctrl::SpotifyCtrl),
-        FsStart(fsstart::FsStart),
-        FsControl(fscontrol::FsControl),
-        PlayUrlStart(playurlstart::PlayUrlStart),
-        ErrorMsgCtrl(errormsgctrl::ErrorMsgCtrl),
-    }
+#[protocol_macros::message_aggregator]
+enum ToServer {
+    SendStatus(sendstatus::SendStatus),
+    PowerCtrl(powerctrl::PowerCtrl),
+    MpvControl(mpvcontrol::MpvControl),
+    MpvStart(mpvstart::MpvStart),
+    SpotifyStart(spotifystart::SpotifyStart),
+    SpotifyCtrl(spotifyctrl::SpotifyCtrl),
+    FsStart(fsstart::FsStart),
+    FsControl(fscontrol::FsControl),
+    PlayUrlStart(playurlstart::PlayUrlStart),
+    ErrorMsgCtrl(errormsgctrl::ErrorMsgCtrl),
 }

@@ -1,5 +1,7 @@
+use protocol_macros::message_aggregator;
 use protocol_macros::message_part;
 
+// TODO: remove
 macro_rules! message {
     (enum $kind:ty, $name:ident $body:tt) => {
         pub use $name::*;
@@ -36,7 +38,7 @@ pub type Id = u64;
 
 static MESSAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-#[message_part]
+#[message_aggregator]
 enum MessageKind {
     ToServer(to_server::ToServer),
     ToClient(to_client::ToClient),

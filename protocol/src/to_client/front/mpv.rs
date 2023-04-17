@@ -1,24 +1,22 @@
 use ordered_float::NotNan;
-use protocol_macros::message_part;
+use protocol_macros::{message_aggregator, message_part};
 
-message! {
-    enum super::Front, Mpv {
-        Load,
-        PlayState(PlayState),
-    }
+#[message_aggregator]
+enum Mpv {
+    Load,
+    PlayState(PlayState),
 }
 
-message! {
-    struct Mpv, PlayState {
-        title: String,
-        pause: bool,
-        progress: NotNan<f64>,
-        length: NotNan<f64>,
-        volume: NotNan<f64>,
-        chapter: Option<(i64, i64)>,
-        subtitles: Vec<Track>,
-        audios: Vec<Track>,
-    }
+#[message_part]
+struct PlayState {
+    title: String,
+    pause: bool,
+    progress: NotNan<f64>,
+    length: NotNan<f64>,
+    volume: NotNan<f64>,
+    chapter: Option<(i64, i64)>,
+    subtitles: Vec<Track>,
+    audios: Vec<Track>,
 }
 
 #[message_part]

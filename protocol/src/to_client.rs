@@ -1,9 +1,8 @@
 pub mod front;
 pub mod seat;
 
-message! {
-    enum super::MessageKind, ToClient {
-        Seat(seat::Seat),
-        Front(front::Front),
-    }
+#[protocol_macros::message_aggregator]
+enum ToClient {
+    Seat(seat::Seat),
+    Front(front::Front),
 }

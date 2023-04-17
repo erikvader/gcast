@@ -1,3 +1,2 @@
-message! {
-    struct super::ToServer, SendStatus;
-}
+#[protocol_macros::message_part]
+struct SendStatus;

@@ -1,7 +1,6 @@
-message! {
-    enum super::ToServer, FsControl {
-        Search(String),
-        RefreshCache,
-        BackToTheBeginning,
-    }
+#[protocol_macros::message_part]
+enum FsControl {
+    Search(String),
+    RefreshCache,
+    BackToTheBeginning,
 }

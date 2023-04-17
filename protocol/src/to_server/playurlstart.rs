@@ -1,6 +1,5 @@
-message! {
-    enum super::ToServer, PlayUrlStart {
-        Start,
-        Stop,
-    }
+#[protocol_macros::message_part]
+enum PlayUrlStart {
+    Start,
+    Stop,
 }

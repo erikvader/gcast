@@ -1,6 +1,5 @@
-message! {
-    enum super::ToServer, FsStart {
-        Start,
-        Stop,
-    }
+#[protocol_macros::message_part]
+enum FsStart {
+    Start,
+    Stop,
 }

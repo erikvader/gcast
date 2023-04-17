@@ -1,23 +1,21 @@
 use std::time::SystemTime;
 
-use protocol_macros::message_part;
+use protocol_macros::{message_aggregator, message_part};
 
-message! {
-    enum super::Front, FileSearch {
-        Refreshing(Refreshing),
-        Results(Results),
-        Init(Init),
-    }
+#[message_aggregator]
+enum FileSearch {
+    Refreshing(Refreshing),
+    Results(Results),
+    Init(Init),
 }
 
-message! {
-    struct FileSearch, Refreshing {
-        roots: Vec<RootInfo>,
-        total_dirs: usize,
-        done_dirs: usize,
-        is_done: bool,
-        num_errors: usize,
-    }
+#[message_part]
+struct Refreshing {
+    roots: Vec<RootInfo>,
+    total_dirs: usize,
+    done_dirs: usize,
+    is_done: bool,
+    num_errors: usize,
 }
 
 #[message_part]
@@ -34,12 +32,11 @@ enum RootStatus {
     Done,
 }
 
-message! {
-    struct FileSearch, Results {
-        results: Vec<SearchResult>,
-        query: String,
-        query_valid: bool,
-    }
+#[message_part]
+struct Results {
+    results: Vec<SearchResult>,
+    query: String,
+    query_valid: bool,
 }
 
 #[message_part]
@@ -50,8 +47,7 @@ struct SearchResult {
     basename: usize,
 }
 
-message! {
-    struct FileSearch, Init {
-        last_cache_date: Option<SystemTime>,
-    }
+#[message_part]
+struct Init {
+    last_cache_date: Option<SystemTime>,
 }

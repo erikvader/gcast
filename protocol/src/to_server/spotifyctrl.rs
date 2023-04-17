@@ -1,5 +1,4 @@
-message! {
-    enum super::ToServer, SpotifyCtrl {
-        Fullscreen,
-    }
+#[protocol_macros::message_part]
+enum SpotifyCtrl {
+    Fullscreen,
 }
