@@ -17,6 +17,7 @@ refresh_cache_boot = false
 fullscreen = "yes"
 force-window = "immediate"
 volume = "100"
+ytdl-format="bestvideo[height<=1080]+bestaudio/best[height<=1080]/bestvideo+bestaudio/best"
 
 [spotify]
 # The executable to run to start spotify
