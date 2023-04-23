@@ -36,7 +36,7 @@ pub(super) async fn init_state(ctrl: &mut Control) -> MachineResult<()> {
                         ()
                     })
             }
-            ToServer::MpvStart(mpvstart::Url(url)) => {
+            ToServer::MpvStart(mpvstart::Url(mpvstart::url::Url(url))) => {
                 mpv_url_state(ctrl, url).await.context("mpv url")
             }
             ToServer::MpvStart(mpvstart::File(file)) => {

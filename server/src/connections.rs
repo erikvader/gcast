@@ -2,10 +2,11 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use anyhow::Context;
 use futures_util::{Sink, SinkExt, StreamExt, TryStreamExt};
-use protocol::{to_client::seat::Seat, Message};
+use protocol::{to_client::seat::Seat, Message, ToClientable};
 use tokio::{
     net::{TcpListener, TcpStream},
     select,
+    sync::mpsc,
 };
 use tokio_tungstenite::tungstenite::Message as TungMsg;
 use tokio_util::sync::CancellationToken;
@@ -13,18 +14,20 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     config,
     util::{join_handle_wait_take, FutureCancel},
-    Receiver, Sender,
 };
+
+type Sender = mpsc::Sender<protocol::ToServer>;
+type Receiver = mpsc::Receiver<protocol::ToClient>;
 
 mod tractor;
 
 async fn ws_send<T, S>(msg: T, ws: &mut S) -> anyhow::Result<()>
 where
-    T: Into<Message>,
+    T: ToClientable,
     S: Sink<TungMsg> + Unpin,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    let bytes = msg.into().serialize()?;
+    let bytes = protocol::Message::from(msg.to_client()).serialize()?;
     ws.send(TungMsg::Binary(bytes)).await?;
     Ok(())
 }
@@ -130,7 +133,7 @@ async fn handle_binary(msg: &[u8], to_cast: &mut Sender) {
         Err(e) => log::warn!("Failed to deserialize message {:?} cuz {}", &msg, e),
         Ok(m) if m.is_to_server() => {
             log::debug!("Received (caster): {:?}", m);
-            if to_cast.send(m).await.is_err() {
+            if to_cast.send(m.take_to_server().unwrap()).await.is_err() {
                 log::warn!("Seems like caster is down");
             }
         }

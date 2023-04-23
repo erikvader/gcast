@@ -133,7 +133,7 @@ pub fn mpv(props: &MpvProps) -> Html {
 
 #[derive(Properties, PartialEq)]
 pub struct TrackSelectorProps {
-    pub tracks: Vec<prot::Track>,
+    pub tracks: Vec<prot::playstate::Track>,
     pub onclick: Callback<i64>,
     pub disabled: bool,
 }
@@ -167,7 +167,7 @@ pub fn track_selector(props: &TrackSelectorProps) -> Html {
 
 fn chapters(front: &prot::Mpv) -> (i64, i64) {
     match *front {
-        prot::PlayState(prot::PlayState {
+        prot::PlayState(prot::playstate::PlayState {
             chapter: Some((c, t)),
             ..
         }) => (c, t),
@@ -178,7 +178,7 @@ fn chapters(front: &prot::Mpv) -> (i64, i64) {
 fn has_chapters(front: &prot::Mpv) -> bool {
     matches!(
         *front,
-        prot::PlayState(prot::PlayState {
+        prot::PlayState(prot::playstate::PlayState {
             chapter: Some(_),
             ..
         })
@@ -187,7 +187,7 @@ fn has_chapters(front: &prot::Mpv) -> bool {
 
 fn progress(front: &prot::Mpv) -> f64 {
     let p = match *front {
-        prot::PlayState(prot::PlayState {
+        prot::PlayState(prot::playstate::PlayState {
             progress, length, ..
         }) if length != 0.0 => ((progress / length) * 100.0).into_inner(),
         _ => 0.0,
@@ -203,7 +203,7 @@ fn progress(front: &prot::Mpv) -> f64 {
 fn progress_timestamps(front: &prot::Mpv) -> (String, String) {
     match front {
         prot::Load => ("0".to_string(), "0".to_string()),
-        prot::PlayState(prot::PlayState {
+        prot::PlayState(prot::playstate::PlayState {
             progress, length, ..
         }) => (
             timestamp(progress.into_inner()),
@@ -227,36 +227,42 @@ fn timestamp(seconds: f64) -> String {
 fn title(front: &prot::Mpv) -> &str {
     match front {
         prot::Load => "Loading...",
-        prot::PlayState(prot::PlayState { title, .. }) => title,
+        prot::PlayState(prot::playstate::PlayState { title, .. }) => title,
     }
 }
 
 fn play_icon(front: &prot::Mpv) -> Vec<&'static str> {
     match front {
         prot::Load => vec!["icon-renew", "spin"],
-        prot::PlayState(prot::PlayState { pause: true, .. }) => vec!["icon-play"],
-        prot::PlayState(prot::PlayState { pause: false, .. }) => vec!["icon-pause"],
+        prot::PlayState(prot::playstate::PlayState { pause: true, .. }) => {
+            vec!["icon-play"]
+        }
+        prot::PlayState(prot::playstate::PlayState { pause: false, .. }) => {
+            vec!["icon-pause"]
+        }
     }
 }
 
-fn subtitles(front: &prot::Mpv) -> Vec<prot::Track> {
+fn subtitles(front: &prot::Mpv) -> Vec<prot::playstate::Track> {
     match front {
-        prot::Load => vec![prot::Track {
+        prot::Load => vec![prot::playstate::Track {
             id: 0,
             selected: true,
             title: "Loading...".to_string(),
         }],
-        prot::PlayState(prot::PlayState { subtitles, .. }) => subtitles.clone(),
+        prot::PlayState(prot::playstate::PlayState { subtitles, .. }) => {
+            subtitles.clone()
+        }
     }
 }
 
-fn audios(front: &prot::Mpv) -> Vec<prot::Track> {
+fn audios(front: &prot::Mpv) -> Vec<prot::playstate::Track> {
     match front {
-        prot::Load => vec![prot::Track {
+        prot::Load => vec![prot::playstate::Track {
             id: 0,
             selected: true,
             title: "Loading...".to_string(),
         }],
-        prot::PlayState(prot::PlayState { audios, .. }) => audios.clone(),
+        prot::PlayState(prot::playstate::PlayState { audios, .. }) => audios.clone(),
     }
 }

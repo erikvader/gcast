@@ -34,7 +34,7 @@ pub fn playurl() -> Html {
     let play_click = {
         let url2 = url.clone();
         Callback::from(move |_| {
-            websocket_send(mpvstart::Url((*url2).clone()));
+            websocket_send(mpvstart::url::Url((*url2).clone()));
         })
     };
 

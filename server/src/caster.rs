@@ -1,6 +1,10 @@
+use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use crate::{state_machine, Receiver, Sender};
+use crate::state_machine;
+
+pub type Sender = mpsc::Sender<protocol::ToClient>;
+pub type Receiver = mpsc::Receiver<protocol::ToServer>;
 
 pub async fn caster_actor(
     to_conn: Sender,

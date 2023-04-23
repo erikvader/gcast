@@ -13,7 +13,6 @@ mod state_machine;
 use std::process::ExitCode;
 
 use futures_util::future::maybe_done;
-use protocol::Message;
 use tokio::{join, select, spawn, sync::mpsc, task::JoinError};
 use tokio_util::sync::CancellationToken;
 
@@ -22,9 +21,6 @@ use crate::{
 };
 
 const CHANNEL_SIZE: usize = 1024;
-// TODO: rename to MsgSender and MsgReceiver?
-type Sender = mpsc::Sender<Message>;
-type Receiver = mpsc::Receiver<Message>;
 
 fn started_by_systemd() -> bool {
     // TODO: use https://docs.rs/systemd-journal-logger/latest/systemd_journal_logger/index.html instead?

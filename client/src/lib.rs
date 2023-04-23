@@ -31,7 +31,6 @@ use playurl::PlayUrl;
 use protocol::{
     to_client::{front::Front, seat::Seat, ToClient},
     to_server::sendstatus::SendStatus,
-    Id, ToMessage,
 };
 use rejected::Rejected;
 use search::Filesearch;
@@ -106,7 +105,7 @@ fn app(props: &AppProps) -> Html {
 fn live_app() -> Html {
     let accepted = use_state_eq(|| Accepted::Pending);
     let ws_ready = use_state_eq(|| WebSockStatus::Disconnected);
-    let front = use_state_eq::<Option<(Id, Front)>, _>(|| None);
+    let front = use_state_eq::<Option<Front>, _>(|| None);
     let _ws_status = {
         let ws_ready_setter = ws_ready.setter();
         use_websocket_status(move |b| ws_ready_setter.set(b.into()))
@@ -114,19 +113,16 @@ fn live_app() -> Html {
     let _ws = {
         let accepted_setter = accepted.setter();
         let front_clone = front.clone();
-        use_websocket(move |m| match m.borrow_to_client() {
+        use_websocket(move |m| match m.as_ref() {
             ToClient::Seat(Seat::Accept) => {
                 accepted_setter.set(Accepted::Accepted);
-                websocket_send(SendStatus.to_message());
+                websocket_send(SendStatus);
             }
             ToClient::Seat(Seat::Reject) => {
                 accepted_setter.set(Accepted::Rejected);
             }
             ToClient::Front(front) => {
-                let f = (*front_clone).as_ref();
-                if f.is_none() || m.is_newer_than(f.unwrap().0) {
-                    front_clone.set(Some((m.id(), front.clone())));
-                }
+                front_clone.set(Some(front.clone()));
             }
         })
     };
@@ -134,7 +130,7 @@ fn live_app() -> Html {
     html! {
         <App ws_ready={*ws_ready}
              accepted={*accepted}
-             front={front.as_ref().map(|(_, f)| f.clone())}
+             front={(*front).clone()}
          />
     }
 }

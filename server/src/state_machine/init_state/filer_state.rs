@@ -12,7 +12,7 @@ pub(super) async fn filer_state(ctrl: &mut Control) -> MachineResult<()> {
     let mut cache = filer_read_cache_state(ctrl).await?;
 
     while let Some(msg) = ctrl
-        .send_recv_lazy(|| filesearch::Init {
+        .send_recv_lazy(|| filesearch::init::Init {
             last_cache_date: cache.updated(),
         })
         .await
@@ -36,7 +36,7 @@ async fn filer_read_cache_state(ctrl: &mut Control) -> MachineResult<Cache> {
     let _logger = StateLogger::new("FilerReadCache");
 
     // TODO: flag to say it is initializing/loading
-    ctrl.send(filesearch::Init {
+    ctrl.send(filesearch::init::Init {
         last_cache_date: None,
     })
     .await;

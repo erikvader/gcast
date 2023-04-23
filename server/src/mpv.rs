@@ -11,7 +11,9 @@ use libmpv::{
     FileState, Format, Mpv,
 };
 use protocol::{
-    to_client::front::mpv::{Mpv as ClientMpv, PlayState, Track as ClientTrack},
+    to_client::front::mpv::{
+        playstate::PlayState, playstate::Track as ClientTrack, Mpv as ClientMpv,
+    },
     to_server::mpvcontrol::MpvControl,
     util::not_nan_or_zero,
 };

@@ -127,13 +127,13 @@ pub(super) async fn refresh_cache<F, Fut>(
     roots: Vec<String>,
 ) -> FilerResult<Cache>
 where
-    F: FnMut(filesearch::Refreshing) -> Fut,
+    F: FnMut(filesearch::refreshing::Refreshing) -> Fut,
     Fut: Future<Output = ()>,
 {
     let mut num_errors = 0;
-    let mut root_status: Vec<filesearch::RootStatus> = roots
+    let mut root_status: Vec<filesearch::refreshing::RootStatus> = roots
         .iter()
-        .map(|_| filesearch::RootStatus::Pending)
+        .map(|_| filesearch::refreshing::RootStatus::Pending)
         .collect();
 
     log::info!("Probing roots...");
@@ -170,17 +170,17 @@ where
 
 async fn probe<F, Fut>(
     roots: &[String],
-    root_status: &mut [filesearch::RootStatus],
+    root_status: &mut [filesearch::refreshing::RootStatus],
     mut prog_report: F,
 ) -> FilerResult<()>
 where
-    F: FnMut(filesearch::Refreshing) -> Fut,
+    F: FnMut(filesearch::refreshing::Refreshing) -> Fut,
     Fut: Future<Output = ()>,
 {
     assert_eq!(roots.len(), root_status.len());
     root_status
         .iter_mut()
-        .for_each(|s| *s = filesearch::RootStatus::Loading);
+        .for_each(|s| *s = filesearch::refreshing::RootStatus::Loading);
 
     prog_report(make_refreshing(0, 0, &roots, &root_status, 0, false)).await;
 
@@ -196,9 +196,9 @@ where
 
     while let Some((i, res)) = set.next().await {
         root_status[i] = if res.is_err() {
-            filesearch::RootStatus::Error
+            filesearch::refreshing::RootStatus::Error
         } else {
-            filesearch::RootStatus::Pending
+            filesearch::refreshing::RootStatus::Pending
         };
         prog_report(make_refreshing(0, 0, &roots, &root_status, 0, false)).await;
     }
@@ -212,10 +212,10 @@ async fn create_cache_from_files<F, Fut>(
     mut prog_report: F,
     files_shallow: Vec<(usize, DirEntry)>,
     num_dirs: usize,
-    root_status: &[filesearch::RootStatus],
+    root_status: &[filesearch::refreshing::RootStatus],
 ) -> Result<Cache, FilerError>
 where
-    F: FnMut(filesearch::Refreshing) -> Fut,
+    F: FnMut(filesearch::refreshing::Refreshing) -> Fut,
     Fut: Future<Output = ()>,
 {
     let mut cache_files: Vec<CacheEntry> = files_shallow
@@ -288,11 +288,11 @@ async fn deep_scan<F, Fut>(
     dirs: &[(usize, DirEntry)],
     mut prog_report: F,
     roots: &[String],
-    root_status: &[filesearch::RootStatus],
+    root_status: &[filesearch::refreshing::RootStatus],
     num_errors: &mut usize,
 ) -> Result<Vec<(usize, DirEntry)>, FilerError>
 where
-    F: FnMut(filesearch::Refreshing) -> Fut,
+    F: FnMut(filesearch::refreshing::Refreshing) -> Fut,
     Fut: Future<Output = ()>,
 {
     let mut files: Vec<(usize, DirEntry)> = Vec::new();
@@ -331,10 +331,10 @@ struct ShallowScan {
 async fn shallow_scan<F, Fut>(
     roots: &[String],
     mut prog_report: F,
-    root_status: &mut [filesearch::RootStatus],
+    root_status: &mut [filesearch::refreshing::RootStatus],
 ) -> Result<ShallowScan, FilerError>
 where
-    F: FnMut(filesearch::Refreshing) -> Fut,
+    F: FnMut(filesearch::refreshing::Refreshing) -> Fut,
     Fut: Future<Output = ()>,
 {
     assert_eq!(roots.len(), root_status.len());
@@ -342,11 +342,11 @@ where
     let mut files = Vec::new();
 
     for (i, root) in roots.iter().enumerate() {
-        if root_status[i] == filesearch::RootStatus::Error {
+        if root_status[i] == filesearch::refreshing::RootStatus::Error {
             continue;
         }
-        assert_eq!(root_status[i], filesearch::RootStatus::Pending);
-        root_status[i] = filesearch::RootStatus::Loading;
+        assert_eq!(root_status[i], filesearch::refreshing::RootStatus::Pending);
+        root_status[i] = filesearch::refreshing::RootStatus::Loading;
         prog_report(make_refreshing(
             0,
             dirs.len(),
@@ -363,10 +363,10 @@ where
             |de| dirs.push((i, de)),
         ) {
             Err(e) => {
-                root_status[i] = filesearch::RootStatus::Error;
+                root_status[i] = filesearch::refreshing::RootStatus::Error;
                 log::error!("Failed to walk '{}' cuz '{}'", root, e);
             }
-            Ok(()) => root_status[i] = filesearch::RootStatus::Done,
+            Ok(()) => root_status[i] = filesearch::refreshing::RootStatus::Done,
         }
     }
     prog_report(make_refreshing(
@@ -390,16 +390,16 @@ fn make_refreshing(
     done_dirs: usize,
     total_dirs: usize,
     roots: &[String],
-    root_status: &[filesearch::RootStatus],
+    root_status: &[filesearch::refreshing::RootStatus],
     num_errors: usize,
     is_done: bool,
-) -> filesearch::Refreshing {
+) -> filesearch::refreshing::Refreshing {
     assert_eq!(roots.len(), root_status.len());
-    let msg = filesearch::Refreshing {
+    let msg = filesearch::refreshing::Refreshing {
         roots: roots
             .iter()
             .zip(root_status)
-            .map(|(path, status)| filesearch::RootInfo {
+            .map(|(path, status)| filesearch::refreshing::RootInfo {
                 path: path.to_string(),
                 status: status.clone(),
             })

@@ -20,7 +20,7 @@ pub struct WS {
 
 #[derive(Clone)]
 pub enum WSOutput {
-    Msg(Rc<protocol::Message>),
+    Msg(Rc<protocol::ToClient>),
     Conn(bool),
 }
 
@@ -36,7 +36,7 @@ impl From<WSOutput> for WSInternal {
 }
 
 struct Connection {
-    ctx: mpsc::Sender<protocol::Message>,
+    ctx: mpsc::Sender<protocol::ToServer>,
     close_rx: oneshot::Sender<()>,
     rx_end: oneshot::Receiver<SplitStream<WebSocket>>,
     tx_end: oneshot::Receiver<SplitSink<WebSocket, GlooMsg>>,
@@ -96,11 +96,11 @@ impl Connection {
             log::info!("Websocket rx_end closed");
         });
 
-        let (ctx, mut crx) = mpsc::channel::<protocol::Message>(1000);
+        let (ctx, mut crx) = mpsc::channel::<protocol::ToServer>(1000);
         let (one_tx, tx_end) = oneshot::channel();
         spawn_local(async move {
             while let Some(msg) = crx.next().await {
-                let bytes = match msg.serialize() {
+                let bytes = match protocol::Message::from(msg).serialize() {
                     Ok(bytes) => bytes,
                     Err(e) => {
                         log::error!("Could not serialize cuz: {}", e);
@@ -164,7 +164,7 @@ impl Connection {
         });
     }
 
-    fn sender(&mut self) -> &mut mpsc::Sender<protocol::Message> {
+    fn sender(&mut self) -> &mut mpsc::Sender<protocol::ToServer> {
         &mut self.ctx
     }
 }
@@ -172,7 +172,7 @@ impl Connection {
 impl Agent for WS {
     type Reach = yew_agent::Context<Self>;
     type Message = WSInternal;
-    type Input = protocol::Message;
+    type Input = protocol::ToServer;
     type Output = WSOutput;
 
     fn create(link: yew_agent::AgentLink<Self>) -> Self {
@@ -261,17 +261,16 @@ impl Agent for WS {
     }
 }
 
-fn try_to_client(msg: &GlooMsg) -> Option<protocol::Message> {
+fn try_to_client(msg: &GlooMsg) -> Option<protocol::ToClient> {
     match msg {
         GlooMsg::Bytes(bytes) => match protocol::Message::deserialize(bytes) {
             Err(e) => log::error!("Could not deserialize a message: {}", e),
-            Ok(m) => {
-                if m.is_to_client() {
-                    return Some(m);
-                } else {
-                    log::warn!("Message not meant for client: {:?}", m);
+            Ok(m) => match m.take_to_client() {
+                Ok(toclient) => return Some(toclient),
+                Err(toserver) => {
+                    log::warn!("Message not meant for client: {:?}", toserver)
                 }
-            }
+            },
         },
         GlooMsg::Text(_) => {
             log::warn!("Received a text message from the server")
@@ -282,7 +281,7 @@ fn try_to_client(msg: &GlooMsg) -> Option<protocol::Message> {
 
 pub fn use_websocket<F>(on_output: F) -> UseBridgeHandle<WS>
 where
-    F: Fn(Rc<protocol::Message>) + 'static,
+    F: Fn(Rc<protocol::ToClient>) + 'static,
 {
     use_bridge(move |wsout| {
         if let WSOutput::Msg(toclient) = wsout {
@@ -293,9 +292,9 @@ where
 
 pub fn websocket_send<T>(msg: T)
 where
-    T: protocol::ToMessage,
+    T: protocol::ToServerable,
 {
-    WS::bridge(yew::Callback::noop()).send(msg.to_message());
+    WS::bridge(yew::Callback::noop()).send(msg.to_server());
 }
 
 pub fn use_websocket_status<F>(on_change: F) -> UseBridgeHandle<WS>

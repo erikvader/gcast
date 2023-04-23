@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use protocol::{
     to_client::{seat, ToClient},
     to_server::{fscontrol, fsstart, mpvcontrol, mpvstart, sendstatus, spotifystart},
-    Message, ToMessage,
+    ToServerable,
 };
 use tungstenite::connect;
 
@@ -59,24 +59,25 @@ fn main() {
 
     send_read_state(&mut socket);
 
-    let tosend = match &cli.command {
-        Commands::SpotifyStart => spotifystart::Start.to_message(),
-        Commands::SpotifyStop => spotifystart::Stop.to_message(),
-        Commands::FilerStart => fsstart::Start.to_message(),
-        Commands::FilerStop => fsstart::Stop.to_message(),
-        Commands::FilerRefreshCache => fscontrol::RefreshCache.to_message(),
+    let tosend: protocol::Message = match &cli.command {
+        Commands::SpotifyStart => spotifystart::Start.to_server(),
+        Commands::SpotifyStop => spotifystart::Stop.to_server(),
+        Commands::FilerStart => fsstart::Start.to_server(),
+        Commands::FilerStop => fsstart::Stop.to_server(),
+        Commands::FilerRefreshCache => fscontrol::RefreshCache.to_server(),
         Commands::FilerSearch { query } => {
-            fscontrol::Search(query.to_string()).to_message()
+            fscontrol::Search(query.to_string()).to_server()
         }
-        Commands::MpvPlayUrl { url } => mpvstart::Url(url.clone()).to_message(),
-        Commands::MpvPlayFile { root, path } => mpvstart::File {
+        Commands::MpvPlayUrl { url } => mpvstart::url::Url(url.clone()).to_server(),
+        Commands::MpvPlayFile { root, path } => mpvstart::file::File {
             root: *root,
             path: path.to_string(),
         }
-        .to_message(),
-        Commands::MpvStop => mpvstart::Stop.to_message(),
-        Commands::MpvPause => mpvcontrol::TogglePause.to_message(),
-    };
+        .to_server(),
+        Commands::MpvStop => mpvstart::Stop.to_server(),
+        Commands::MpvPause => mpvcontrol::TogglePause.to_server(),
+    }
+    .into();
 
     log::info!("Sending: {:?}", tosend);
     let data = tosend.serialize().expect("serialization failed");
@@ -108,7 +109,7 @@ fn main() {
 
 fn parse_tung_msg(msg: tungstenite::Message) -> protocol::Message {
     if let tungstenite::Message::Binary(data) = msg {
-        Message::deserialize(&data).expect("could not deserialize")
+        protocol::Message::deserialize(&data).expect("could not deserialize")
     } else {
         panic!("nani");
     }
@@ -121,11 +122,11 @@ fn read_seat(socket: &mut WS) -> bool {
     loop {
         let msg = parse_tung_msg(socket.read_message().expect("could not read message"));
         match msg.take_to_client() {
-            ToClient::Seat(seat::Accept) => {
+            Ok(ToClient::Seat(seat::Accept)) => {
                 log::info!("Got accepted");
                 break true;
             }
-            ToClient::Seat(seat::Reject) => {
+            Ok(ToClient::Seat(seat::Reject)) => {
                 log::warn!("Got rejected");
                 break false;
             }
@@ -135,8 +136,7 @@ fn read_seat(socket: &mut WS) -> bool {
 }
 
 fn send_read_state(socket: &mut WS) {
-    let data = sendstatus::SendStatus
-        .to_message()
+    let data = protocol::Message::from(sendstatus::SendStatus.to_server())
         .serialize()
         .expect("ser failed");
     socket
@@ -145,7 +145,7 @@ fn send_read_state(socket: &mut WS) {
 
     loop {
         let msg = parse_tung_msg(socket.read_message().expect("could not read message"));
-        if let ToClient::Front(f) = msg.take_to_client() {
+        if let Ok(ToClient::Front(f)) = msg.take_to_client() {
             log::info!("Got state {:?}", f);
             break;
         }

@@ -4,7 +4,7 @@ use crate::filer::cache::Cache;
 
 const NUM_SEARCH_RESULTS: usize = 30;
 
-pub fn search(query: String, cache: &Cache) -> filesearch::Results {
+pub fn search(query: String, cache: &Cache) -> filesearch::results::Results {
     log::info!("Searching for: {}", query);
     match searcher::search(&query, cache.files()) {
         Err(e) => {
@@ -13,7 +13,7 @@ pub fn search(query: String, cache: &Cache) -> filesearch::Results {
                 query,
                 e
             );
-            filesearch::Results {
+            filesearch::results::Results {
                 results: Vec::new(),
                 query,
                 query_valid: false,
@@ -26,7 +26,7 @@ pub fn search(query: String, cache: &Cache) -> filesearch::Results {
                 .iter_mut()
                 .map(|r| {
                     let c_entry = cache.files().get(r.get_index()).unwrap();
-                    filesearch::SearchResult {
+                    filesearch::results::SearchResult {
                         path: c_entry.path_relative_root().to_string(),
                         root: c_entry.root(),
                         indices: r.get_match().indices().to_vec(),
@@ -35,7 +35,7 @@ pub fn search(query: String, cache: &Cache) -> filesearch::Results {
                 })
                 .collect();
 
-            filesearch::Results {
+            filesearch::results::Results {
                 results: searchres,
                 query,
                 query_valid: true,

@@ -44,7 +44,7 @@ pub fn filesearch(props: &FilesearchProps) -> Html {
 
 #[derive(Properties, PartialEq)]
 struct ResultsProps {
-    front: prot::Results,
+    front: prot::results::Results,
 }
 
 #[rustfmt::skip::macros(html)]
@@ -103,7 +103,7 @@ fn results(props: &ResultsProps) -> Html {
 
 #[derive(Properties, PartialEq)]
 struct SearchResultProps {
-    front: prot::SearchResult,
+    front: prot::results::SearchResult,
 }
 
 #[rustfmt::skip::macros(html)]
@@ -125,7 +125,7 @@ fn search_result(props: &SearchResultProps) -> Html {
         let root = props.front.root;
         let path = props.front.path.clone();
         Callback::from(move |_| {
-            websocket_send(mpvstart::File {
+            websocket_send(mpvstart::file::File {
                 root,
                 path: path.clone(),
             })
@@ -174,7 +174,7 @@ fn search_result_substr(path: &str, indices: &[usize], char_range: Range<usize>)
 
 #[derive(Properties, PartialEq)]
 struct RefreshingProps {
-    front: prot::Refreshing,
+    front: prot::refreshing::Refreshing,
 }
 
 #[rustfmt::skip::macros(html)]
@@ -188,7 +188,7 @@ fn refreshing(props: &RefreshingProps) -> Html {
         100.0 * (done_dirs as f64) / (total_dirs as f64)
     };
     let roots = props.front.roots.iter().map(|rootinfo| {
-        use prot::RootStatus::*;
+        use prot::refreshing::RootStatus::*;
         let class = match rootinfo.status {
             Pending => "root-pending",
             Loading => "root-loading",
@@ -227,7 +227,7 @@ fn refreshing(props: &RefreshingProps) -> Html {
 
 #[derive(Properties, PartialEq)]
 struct InitProps {
-    front: prot::Init,
+    front: prot::init::Init,
 }
 
 #[rustfmt::skip::macros(html)]

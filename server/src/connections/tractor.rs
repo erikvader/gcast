@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use futures_util::Sink;
-use protocol::Message;
 use tokio::task::JoinHandle;
 use tokio_tungstenite::tungstenite::Message as TungMsg;
 
@@ -12,7 +11,7 @@ const RATE: Duration = Duration::from_micros(16_700);
 // Rate limiter
 pub struct Tractor<S> {
     handle: JoinHandle<anyhow::Result<S>>,
-    sender: repeatable_oneshot::Sender<Message>,
+    sender: repeatable_oneshot::Sender<protocol::ToClient>,
 }
 
 impl<S> Tractor<S>
@@ -27,7 +26,7 @@ where
                 let mut interval = tokio::time::interval(RATE);
                 interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
                 let res: anyhow::Result<()> = loop {
-                    let tosend: Message = match rx.recv().await {
+                    let tosend: protocol::ToClient = match rx.recv().await {
                         Ok(it) => it,
                         Err(_) => break Ok(()),
                     };
@@ -44,15 +43,9 @@ where
 
     pub async fn send(
         &self,
-        msg: Message,
+        msg: protocol::ToClient,
     ) -> Result<(), repeatable_oneshot::OtherEndClosed> {
-        self.sender
-            .send_test_and_set(move |old| match old {
-                None => Some(msg),
-                Some(o) if msg.is_newer_than(o.id()) => Some(msg),
-                Some(_) => None,
-            })
-            .await
+        self.sender.send(msg).await
     }
 
     pub async fn close(self) -> anyhow::Result<S> {

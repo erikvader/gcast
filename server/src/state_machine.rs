@@ -8,12 +8,11 @@ use protocol::{
         mpvstart::{self, MpvStart},
         ToServer,
     },
-    Message, ToMessage,
+    ToClientable,
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::util::FutureCancel;
-use crate::{Receiver, Sender};
+use crate::{caster, util::FutureCancel};
 
 mod init_state;
 
@@ -30,42 +29,28 @@ impl Gatekeeper {
         }
     }
 
-    fn should_accept(&mut self, _msg: &Message) -> bool {
-        // TODO: this doesn't work! Needs to be reset on each new client connection. This
-        // logic thus needs to be in connections.rs.
-
-        // if msg.is_expected_or_newer_than(self.next_id) {
-        //     self.next_id = msg.id() + 1;
-        //     true
-        // } else {
-        //     false
-        // }
-        true
-    }
-
     fn last_sent(&self) -> Front {
         self.last_sent.clone()
     }
 
-    fn set_last_sent(&mut self, msg: &Message) {
-        assert!(msg.is_to_client(), "wrong message kind");
-        if let ToClient::Front(f) = msg.borrow_to_client() {
+    fn set_last_sent(&mut self, msg: &ToClient) {
+        if let ToClient::Front(f) = msg {
             self.last_sent = f.clone();
         }
     }
 }
 
 struct Control {
-    from_conn: Receiver,
-    to_conn: Sender,
+    from_conn: caster::Receiver,
+    to_conn: caster::Sender,
     keeper: Gatekeeper,
     canceltoken: CancellationToken,
 }
 
 impl Control {
     fn new(
-        from_conn: Receiver,
-        to_conn: Sender,
+        from_conn: caster::Receiver,
+        to_conn: caster::Sender,
         initial_state: Front,
         canceltoken: CancellationToken,
     ) -> Self {
@@ -77,8 +62,8 @@ impl Control {
         }
     }
 
-    async fn send(&mut self, msg: impl ToMessage) {
-        let m = msg.to_message();
+    async fn send(&mut self, msg: impl ToClientable) {
+        let m = msg.to_client();
         self.keeper.set_last_sent(&m);
         if self.to_conn.send(m).await.is_err() {
             log::warn!("Seems like connections is down");
@@ -86,16 +71,9 @@ impl Control {
     }
 
     async fn recv(&mut self) -> Option<ToServer> {
-        while let Some(Some(msg)) =
+        while let Some(Some(toserver)) =
             self.from_conn.recv().cancellable(&self.canceltoken).await
         {
-            assert!(msg.is_to_server(), "connections actor's responsibility");
-            if !self.keeper.should_accept(&msg) {
-                log::debug!("Throwing away an out of date message");
-                continue;
-            }
-
-            let toserver = msg.take_to_server();
             if let ToServer::SendStatus(_) = toserver {
                 log::debug!("Sending the last sent state again");
                 self.send(self.keeper.last_sent()).await;
@@ -109,7 +87,7 @@ impl Control {
         None
     }
 
-    async fn send_recv(&mut self, msg: impl ToMessage) -> Option<ToServer> {
+    async fn send_recv(&mut self, msg: impl ToClientable) -> Option<ToServer> {
         self.send(msg).await;
         self.recv().await
     }
@@ -117,7 +95,7 @@ impl Control {
     async fn send_recv_lazy<F, M>(&mut self, msg_fun: F) -> Option<ToServer>
     where
         F: FnOnce() -> M,
-        M: ToMessage,
+        M: ToClientable,
     {
         self.send(msg_fun()).await;
         self.recv().await
@@ -145,7 +123,7 @@ impl<'a> LockedControl<'a> {
         }
     }
 
-    async fn send(&self, msg: impl ToMessage) {
+    async fn send(&self, msg: impl ToClientable) {
         self.ctrl.lock().await.send(msg).await
     }
 
@@ -206,12 +184,12 @@ impl Jump {
 
     fn mpv_file<T>(root: usize, path: String) -> MachineResult<T> {
         log::debug!("Jump to mpv: root={}, path={}", root, path);
-        Err(Self::Mpv(mpvstart::File { root, path }.into()).into())
+        Err(Self::Mpv(mpvstart::file::File { root, path }.into()).into())
     }
 
     fn mpv_url<T>(url: String) -> MachineResult<T> {
         log::debug!("Jump to mpv: url={}", url);
-        Err(Self::Mpv(mpvstart::Url(url).into()).into())
+        Err(Self::Mpv(mpvstart::url::Url(url).into()).into())
     }
 }
 
@@ -299,8 +277,8 @@ impl Drop for StateLogger<'_> {
 }
 
 pub async fn state_start(
-    from_conn: Receiver,
-    to_conn: Sender,
+    from_conn: caster::Receiver,
+    to_conn: caster::Sender,
     canceltoken: CancellationToken,
 ) -> MachineResult<()> {
     let mut ctrl = Control::new(from_conn, to_conn, Front::None, canceltoken);

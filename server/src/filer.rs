@@ -28,7 +28,7 @@ pub fn cache_file() -> PathBuf {
 
 pub async fn refresh_cache<F, Fut>(prog_report: F) -> FilerResult<Cache>
 where
-    F: FnMut(filesearch::Refreshing) -> Fut,
+    F: FnMut(filesearch::refreshing::Refreshing) -> Fut,
     Fut: Future<Output = ()>,
 {
     log::info!("Refreshing cache");
