@@ -63,3 +63,4 @@ rayon = "1" # searcher: search in parallel
 quote = "1" # protocol-macros
 syn = {version = "2", features=["full"]} # protocol-macros
 proc-macro2 = "1" # protocol-macros
+once_cell = "1.17" # protocol-macros: for regexes
