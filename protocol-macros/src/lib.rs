@@ -17,7 +17,14 @@ use syn::{
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn message_part(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn message_part(attr: TokenStream, item: TokenStream) -> TokenStream {
+    if !attr.is_empty() {
+        let attr: proc_macro2::TokenStream = attr.into();
+        return syn::Error::new(attr.span(), "no arguments allowed")
+            .into_compile_error()
+            .into();
+    }
+
     let mut item = parse_macro_input!(item as Item);
 
     match item {
@@ -262,15 +269,15 @@ fn create_functions_single(
 
             pub fn #take_name(self) -> std::result::Result<#variant_field, #enum_name> {
                 match self {
-                    #enum_name::#variant_name(inner) => Ok(inner),
-                    _ => Err(self),
+                    #enum_name::#variant_name(inner) => std::result::Result::Ok(inner),
+                    _ => std::result::Result::Err(self),
                 }
             }
 
             pub fn #borrow_name(&self) -> std::option::Option<&#variant_field> {
                 match self {
-                    #enum_name::#variant_name(inner) => Some(inner),
-                    _ => None,
+                    #enum_name::#variant_name(inner) => std::option::Option::Some(inner),
+                    _ => std::option::Option::None,
                 }
             }
         }

@@ -1,17 +1,12 @@
-use protocol_macros::{message_aggregator, message_part};
+pub mod file;
+pub mod url;
 
-#[message_aggregator]
+use crate::to_server::ToServer;
+use protocol_macros::message_aggregator;
+
+#[message_aggregator(ToServer)]
 enum MpvStart {
     Stop,
-    File(File),
-    Url(Url),
+    File(file::File),
+    Url(url::Url),
 }
-
-#[message_part]
-struct File {
-    root: usize,
-    path: String,
-}
-
-#[message_part]
-struct Url(String);

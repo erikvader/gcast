@@ -2,7 +2,9 @@ pub mod errormsg;
 pub mod filesearch;
 pub mod mpv;
 
-#[protocol_macros::message_aggregator]
+use crate::to_client::ToClient;
+
+#[protocol_macros::message_aggregator(ToClient)]
 enum Front {
     None,
     Spotify,
