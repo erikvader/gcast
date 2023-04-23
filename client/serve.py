@@ -12,13 +12,19 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Expires", "0")
         super().end_headers()
 
+class MyTcpServer(TCPServer):
+    def server_bind(self):
+        import socket
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        super().server_bind()
+
 def main():
     if len(sys.argv) == 2:
         port = int(sys.argv[1])
     else:
         port = 8080
 
-    with TCPServer(("", port), Handler) as httpd:
+    with MyTcpServer(("", port), Handler) as httpd:
         print(f"Serving on {port}...")
         httpd.serve_forever()
 
