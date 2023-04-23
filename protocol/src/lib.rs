@@ -4,7 +4,11 @@ pub mod to_client;
 pub mod to_server;
 pub mod util;
 
+pub use to_client::ToClient;
+pub use to_server::ToServer;
+
 #[message_aggregator]
+#[no_reexport]
 enum Message {
     ToServer(to_server::ToServer),
     ToClient(to_client::ToClient),

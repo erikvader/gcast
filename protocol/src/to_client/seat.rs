@@ -1,11 +1,5 @@
-#[protocol_macros::message_part]
+#[protocol_macros::message_aggregator]
 enum Seat {
     Accept,
     Reject,
-}
-
-impl Seat {
-    pub fn is_accepted(&self) -> bool {
-        *self == Seat::Accept
-    }
 }

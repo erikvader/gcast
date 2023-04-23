@@ -1,4 +1,4 @@
-use protocol_macros::message_part;
+use protocol_macros::{message_aggregator, message_part};
 
 #[message_part]
 struct Refreshing {
@@ -15,7 +15,7 @@ struct RootInfo {
     status: RootStatus,
 }
 
-#[message_part]
+#[message_aggregator]
 enum RootStatus {
     Pending,
     Loading,

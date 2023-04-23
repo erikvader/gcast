@@ -54,6 +54,9 @@ fn pubify_struct(struc: &mut ItemStruct) {
         Fields::Named(ref mut fields) => fields.named.iter_mut().for_each(|field| {
             field.vis = Visibility::Public(Token![pub](Span::call_site()))
         }),
+        Fields::Unnamed(ref mut fields) => fields.unnamed.iter_mut().for_each(|field| {
+            field.vis = Visibility::Public(Token![pub](Span::call_site()))
+        }),
         _ => (),
     }
 }
@@ -78,6 +81,7 @@ fn pubify_struct(struc: &mut ItemStruct) {
 ///         }
 ///
 ///         #[message_aggregator(super::Message)]
+///         #[no_reexport]
 ///         enum Control {
 ///             Play(play::Play),
 ///         }
@@ -102,14 +106,17 @@ fn pubify_struct(struc: &mut ItemStruct) {
 /// ```
 #[proc_macro_attribute]
 pub fn message_aggregator(grandparent: TokenStream, enu: TokenStream) -> TokenStream {
-    let enu = parse_macro_input!(enu as ItemEnum);
+    let mut enu = parse_macro_input!(enu as ItemEnum);
     let grandparent = if !grandparent.is_empty() {
         Some(parse_macro_input!(grandparent as Type))
     } else {
         None
     };
 
-    let generated = create_code(&enu, grandparent.as_ref());
+    let no_reexport = extract_no_reexport(&mut enu);
+    let no_intos = extract_no_intos(&mut enu);
+
+    let generated = create_code(&enu, grandparent.as_ref(), no_reexport, no_intos);
 
     let tokens = quote! {
         #[protocol_macros::message_part]
@@ -120,8 +127,35 @@ pub fn message_aggregator(grandparent: TokenStream, enu: TokenStream) -> TokenSt
     tokens.into()
 }
 
+/// Check if the attribute `#[no_reexport]` is present
+fn extract_no_reexport(enu: &mut ItemEnum) -> bool {
+    let (no_reexport, others): (Vec<_>, Vec<_>) = std::mem::take(&mut enu.attrs)
+        .into_iter()
+        .partition(|attr| attr.path().is_ident("no_reexport"));
+
+    enu.attrs = others;
+
+    !no_reexport.is_empty()
+}
+
+/// Check if the attribute `#[no_intos]` is present
+fn extract_no_intos(enu: &mut ItemEnum) -> bool {
+    let (no_intos, others): (Vec<_>, Vec<_>) = std::mem::take(&mut enu.attrs)
+        .into_iter()
+        .partition(|attr| attr.path().is_ident("no_intos"));
+
+    enu.attrs = others;
+
+    !no_intos.is_empty()
+}
+
 /// Create additional functions and trait impls for the enum.
-fn create_code(enu: &ItemEnum, grandparent: Option<&Type>) -> proc_macro2::TokenStream {
+fn create_code(
+    enu: &ItemEnum,
+    grandparent: Option<&Type>,
+    no_reexport: bool,
+    no_intos: bool,
+) -> proc_macro2::TokenStream {
     let enum_name = &enu.ident;
     enu.variants
         .iter()
@@ -146,9 +180,18 @@ fn create_code(enu: &ItemEnum, grandparent: Option<&Type>) -> proc_macro2::Token
 
                     let variant_field = &variant.ty;
 
-                    let reexport = create_reexport(enum_name, variant_name);
-                    let into_parent =
-                        create_into_parent(enum_name, variant_name, variant_field);
+                    let reexport = if no_reexport {
+                        quote! {}
+                    } else {
+                        create_reexport(enum_name, variant_name)
+                    };
+
+                    let into_parent = if no_intos {
+                        quote! {}
+                    } else {
+                        create_into_parent(enum_name, variant_name, variant_field)
+                    };
+
                     let functions =
                         create_functions_single(enum_name, variant_name, variant_field);
 
