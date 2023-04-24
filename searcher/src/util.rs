@@ -28,7 +28,7 @@ fn compact_to_ranges(indices: &[usize]) -> Vec<Range<usize>> {
 
 #[test]
 fn test_compact_ranges() {
-    assert_eq!(compact_to_ranges(&[]), vec![]);
+    assert_eq!(compact_to_ranges(&[]), Vec::<Range<usize>>::new());
     assert_eq!(compact_to_ranges(&[1, 2, 3]), vec![1..4]);
     assert_eq!(compact_to_ranges(&[1, 3, 4]), vec![1..2, 3..5]);
     assert_eq!(
