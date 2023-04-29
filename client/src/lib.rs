@@ -4,15 +4,21 @@
 #![allow(clippy::let_unit_value)]
 
 macro_rules! click_send {
-    ($send:expr) => {{
-        use $crate::websocket::websocket_send;
-        Callback::from(|_| websocket_send($send))
+    ($server:expr, $send:expr) => {{
+        let sender = $server.sender();
+        Callback::from(move |_| sender.send($send))
+    }};
+    // TODO: make prettier
+    ($server:expr, $send:expr, $arg:ident) => {{
+        let sender = $server.sender();
+        Callback::from(move |$arg| sender.send($send))
     }};
 }
 
 mod back_button;
 mod confirm_button;
 mod errormessage;
+mod hooks;
 mod mpv;
 mod nothing;
 mod pending;
@@ -21,132 +27,71 @@ mod progressbar;
 mod rejected;
 mod search;
 mod spotify;
-mod websocket;
 
 use errormessage::ErrorMessage;
+use hooks::server::UseServer;
 use mpv::Mpv;
 use nothing::Nothing;
 use pending::Pending;
 use playurl::PlayUrl;
-use protocol::{
-    to_client::{front::Front, seat::Seat, ToClient},
-    to_server::sendstatus::SendStatus,
-};
+use protocol::to_client::front::Front;
 use rejected::Rejected;
 use search::Filesearch;
 use spotify::Spotify;
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use websocket::{use_websocket, use_websocket_status, websocket_send};
 use yew::prelude::*;
 
-#[derive(PartialEq, Copy, Clone, Debug)]
-enum Accepted {
-    Pending,
-    Accepted,
-    Rejected,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum WebSockStatus {
-    Connected,
-    Disconnected,
-}
-
-impl From<bool> for WebSockStatus {
-    fn from(b: bool) -> Self {
-        if b {
-            Self::Connected
-        } else {
-            Self::Disconnected
-        }
-    }
-}
-
-impl WebSockStatus {
-    fn is_connected(self) -> bool {
-        matches!(self, WebSockStatus::Connected)
-    }
-    fn is_disconnected(self) -> bool {
-        !self.is_connected()
-    }
-}
+use crate::hooks::server::{use_server, Accepted};
 
 #[derive(PartialEq, Properties)]
 struct AppProps {
-    ws_ready: WebSockStatus,
-    accepted: Accepted,
-    front: Option<Front>,
+    server: UseServer,
 }
 
 #[rustfmt::skip::macros(html)]
 #[function_component(App)]
 fn app(props: &AppProps) -> Html {
+    let server = &props.server;
     html! {
-        <ContextProvider<WebSockStatus> context={props.ws_ready}>
+        <ContextProvider<UseServer> context={server.clone()}>
             <div class={classes!("width-limiter")}>
-                {match (props.accepted, &props.front) {
-                    (Accepted::Pending, _) | (Accepted::Accepted, None) => html! {<Pending />},
+                {match (server.accepted(), server.front()) {
+                    (Accepted::Pending, _) => html! {<Pending />},
                     (Accepted::Rejected, _) => html! {<Rejected />},
-                    (Accepted::Accepted, Some(Front::None)) => html! {<Nothing />},
-                    (Accepted::Accepted, Some(Front::Spotify)) => html! {<Spotify />},
-                    (Accepted::Accepted, Some(Front::Mpv(mpv))) => html! {<Mpv front={mpv.clone()} />},
-                    (Accepted::Accepted, Some(Front::FileSearch(fs))) => html! {<Filesearch front={fs.clone()} />},
-                    (Accepted::Accepted, Some(Front::PlayUrl)) => html! {<PlayUrl />},
-                    (Accepted::Accepted, Some(Front::ErrorMsg(em))) => html! {<ErrorMessage front={em.clone()} />},
+                    (Accepted::Accepted, Front::None) => html! {<Nothing />},
+                    (Accepted::Accepted, Front::Spotify) => html! {<Spotify />},
+                    (Accepted::Accepted, Front::Mpv(mpv)) => html! {<Mpv front={mpv.clone()} />},
+                    (Accepted::Accepted, Front::FileSearch(fs)) => html! {<Filesearch front={fs.clone()} />},
+                    (Accepted::Accepted, Front::PlayUrl) => html! {<PlayUrl />},
+                    (Accepted::Accepted, Front::ErrorMsg(em)) => html! {<ErrorMessage front={em.clone()} />},
                 }}
             </div>
-        </ContextProvider<WebSockStatus>>
+        </ContextProvider<UseServer>>
     }
 }
 
 #[rustfmt::skip::macros(html)]
 #[function_component(LiveApp)]
 fn live_app() -> Html {
-    let accepted = use_state_eq(|| Accepted::Pending);
-    let ws_ready = use_state_eq(|| WebSockStatus::Disconnected);
-    let front = use_state_eq::<Option<Front>, _>(|| None);
-    let _ws_status = {
-        let ws_ready_setter = ws_ready.setter();
-        use_websocket_status(move |b| ws_ready_setter.set(b.into()))
-    };
-    let _ws = {
-        let accepted_setter = accepted.setter();
-        let front_clone = front.clone();
-        use_websocket(move |m| match m.as_ref() {
-            ToClient::Seat(Seat::Accept) => {
-                accepted_setter.set(Accepted::Accepted);
-                websocket_send(SendStatus);
-            }
-            ToClient::Seat(Seat::Reject) => {
-                accepted_setter.set(Accepted::Rejected);
-            }
-            ToClient::Front(front) => {
-                front_clone.set(Some(front.clone()));
-            }
-        })
-    };
-
+    let server = use_server();
     html! {
-        <App ws_ready={*ws_ready}
-             accepted={*accepted}
-             front={(*front).clone()}
-         />
+        <App server={server} />
     }
 }
 
 #[wasm_bindgen(start)]
 pub fn main() {
     wasm_logger::init(wasm_logger::Config::default());
-    yew::start_app::<LiveApp>();
+    yew::Renderer::<LiveApp>::new().render();
 
     // use protocol::to_client::front::filesearch as fs;
     // use protocol::to_client::front::mpv as m;
-    // yew::start_app_with_props::<App>(AppProps {
+    // yew::Renderer::<App>::with_props(AppProps {
     //     ws_ready: WebSockStatus::Connected,
     //     accepted: Accepted::Accepted,
     //     front: Some(
-    //         m::PlayState(m::PlayState {
+    //         m::PlayState(m::playstate::PlayState {
     //             title: "hejsan hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej".to_string(),
     //             pause: true,
     //             progress: protocol::util::not_nan_or_zero(0.0),
@@ -154,40 +99,40 @@ pub fn main() {
     //             volume: protocol::util::not_nan_or_zero(0.0),
     //             chapter: None,
     //             subtitles: vec![
-    //                 m::Track {id: 0, selected: false, title: "None".to_string()},
-    //                 m::Track {id: 1, selected: false, title: "Engelska".to_string()},
-    //                 m::Track {id: 2, selected: true, title: "Svenska".to_string()},
-    //                 m::Track {id: 3, selected: false, title: "Franska".to_string()},
+    //                 m::playstate::Track {id: 0, selected: false, title: "None".to_string()},
+    //                 m::playstate::Track {id: 1, selected: false, title: "Engelska".to_string()},
+    //                 m::playstate::Track {id: 2, selected: true, title: "Svenska".to_string()},
+    //                 m::playstate::Track {id: 3, selected: false, title: "Franska".to_string()},
     //             ],
     //             audios: vec![
-    //                 m::Track {id: 0, selected: false, title: "None".to_string()},
-    //                 m::Track {id: 1, selected: false, title: "Engelska".to_string()},
-    //                 m::Track {id: 2, selected: true, title: "Japanska".to_string()},
+    //                 m::playstate::Track {id: 0, selected: false, title: "None".to_string()},
+    //                 m::playstate::Track {id: 1, selected: false, title: "Engelska".to_string()},
+    //                 m::playstate::Track {id: 2, selected: true, title: "Japanska".to_string()},
     //             ],
     //         })
     //         .into(),
     //     ), // front: Some(
-    //     fs::Refreshing(fs::Refreshing {
-    //         roots: vec![
-    //             fs::RootInfo {
-    //                 path: "root1".to_string(),
-    //                 status: fs::RootStatus::Loading,
-    //             },
-    //             fs::RootInfo {
-    //                 path: "root2".to_string(),
-    //                 status: fs::RootStatus::Pending,
-    //             },
-    //         ],
-    //         total_dirs: 80,
-    //         done_dirs: 20,
-    //         num_errors: 5,
-    //     })
-    //     fs::Results(fs::Results{
-    //         query: "testing testing".to_string(),
-    //         query_valid: true,
-    //         results: vec![fs::SearchResult{path: "/anime_cache/[EMBER] Go-Toubun no Hanayome (Movie) [1080p] [HEVC WEBRip DDP].mkv".to_string(), root: 0, indices: vec![1, 10, 21], basename: 13}],
-    //     })
-    // .into(),
-    // ),
-    // });
+    // //     fs::Refreshing(fs::Refreshing {
+    // //         roots: vec![
+    // //             fs::RootInfo {
+    // //                 path: "root1".to_string(),
+    // //                 status: fs::RootStatus::Loading,
+    // //             },
+    // //             fs::RootInfo {
+    // //                 path: "root2".to_string(),
+    // //                 status: fs::RootStatus::Pending,
+    // //             },
+    // //         ],
+    // //         total_dirs: 80,
+    // //         done_dirs: 20,
+    // //         num_errors: 5,
+    // //     })
+    // //     fs::Results(fs::Results{
+    // //         query: "testing testing".to_string(),
+    // //         query_valid: true,
+    // //         results: vec![fs::SearchResult{path: "/anime_cache/[EMBER] Go-Toubun no Hanayome (Movie) [1080p] [HEVC WEBRip DDP].mkv".to_string(), root: 0, indices: vec![1, 10, 21], basename: 13}],
+    // //     })
+    // // .into(),
+    // // )
+    // }).render();
 }

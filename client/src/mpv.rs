@@ -5,10 +5,9 @@ use protocol::{
 use yew::prelude::*;
 
 use crate::progressbar::Progressbar;
-use crate::WebSockStatus;
 use crate::{
     back_button::{BackButton, Type},
-    websocket::websocket_send,
+    hooks::server::UseServer,
 };
 
 #[derive(Properties, PartialEq, Eq)]
@@ -19,8 +18,8 @@ pub struct MpvProps {
 #[rustfmt::skip::macros(html)]
 #[function_component(Mpv)]
 pub fn mpv(props: &MpvProps) -> Html {
-    let active = use_context::<WebSockStatus>().expect("no active context found");
-    let clickable = active.is_connected() && !matches!(props.front, prot::Mpv::Load);
+    let server = use_context::<UseServer>().expect("no server context found");
+    let clickable = server.is_connected() && !matches!(props.front, prot::Mpv::Load);
 
     let (progress_min, length_min) = progress_timestamps(&props.front);
     let (chapter, chapter_total) = chapters(&props.front);
@@ -34,7 +33,7 @@ pub fn mpv(props: &MpvProps) -> Html {
     html! {
         <article class={classes!("stacker")}>
             <BackButton button_type={Type::Exit}
-                        onclick={click_send!(mpvstart::Stop)} />
+                        onclick={click_send!(server, mpvstart::Stop)} />
             // TODO: add a spinning thingy when loading
             <div class={classes!("pad")}>
                 <div class={classes!("kinda-big", "mpv-title")}>{title}</div>
@@ -49,31 +48,31 @@ pub fn mpv(props: &MpvProps) -> Html {
                              inner_class={classes!("mpv-progress-inner")}/>
             </div>
             <div class={classes!("space-evenly", "pad")}>
-                <button onclick={click_send!(mpvcontrol::PrevChapter)}
+                <button onclick={click_send!(server, mpvcontrol::PrevChapter)}
                         class={classes!("round", "icon", "icon-skip-back")}
                         disabled={!clickable || !has_chapters} />
 
-                <button onclick={click_send!(mpvcontrol::SeekBackLong)}
+                <button onclick={click_send!(server, mpvcontrol::SeekBackLong)}
                         class={classes!("round", "icon", "icon-backward30")}
                         disabled={!clickable} />
 
-                <button onclick={click_send!(mpvcontrol::SeekBack)}
+                <button onclick={click_send!(server, mpvcontrol::SeekBack)}
                         class={classes!("round", "icon", "icon-backward5")}
                         disabled={!clickable} />
 
-                <button onclick={click_send!(mpvcontrol::TogglePause)}
+                <button onclick={click_send!(server, mpvcontrol::TogglePause)}
                         class={classes!("round", "kinda-big", "icon", play_icon)}
                         disabled={!clickable} />
 
-                <button onclick={click_send!(mpvcontrol::SeekForward)}
+                <button onclick={click_send!(server, mpvcontrol::SeekForward)}
                         class={classes!("round", "icon", "icon-forward5")}
                         disabled={!clickable} />
 
-                <button onclick={click_send!(mpvcontrol::SeekForwardLong)}
+                <button onclick={click_send!(server, mpvcontrol::SeekForwardLong)}
                         class={classes!("round", "icon", "icon-forward30")}
                         disabled={!clickable} />
 
-                <button onclick={click_send!(mpvcontrol::NextChapter)}
+                <button onclick={click_send!(server, mpvcontrol::NextChapter)}
                         class={classes!("round", "icon", "icon-skip-fwd")}
                         disabled={!clickable || !has_chapters} />
             </div>
@@ -81,52 +80,52 @@ pub fn mpv(props: &MpvProps) -> Html {
                 <span>{"subtitle controls"}</span>
             </div>
             <div class={classes!("space-evenly", "pad")}>
-                <button onclick={click_send!(mpvcontrol::SubDelayEarlier)}
+                <button onclick={click_send!(server, mpvcontrol::SubDelayEarlier)}
                         class={classes!("round", "icon", "icon-back-arrow")}
                         disabled={!clickable} />
 
-                <button onclick={click_send!(mpvcontrol::SubDelayLater)}
+                <button onclick={click_send!(server, mpvcontrol::SubDelayLater)}
                         class={classes!("round", "icon", "icon-forward-arrow")}
                         disabled={!clickable} />
 
-                <button onclick={click_send!(mpvcontrol::SubLarger)}
+                <button onclick={click_send!(server, mpvcontrol::SubLarger)}
                         class={classes!("round", "icon", "icon-add")}
                         disabled={!clickable} />
 
-                <button onclick={click_send!(mpvcontrol::SubSmaller)}
+                <button onclick={click_send!(server, mpvcontrol::SubSmaller)}
                         class={classes!("round", "icon", "icon-remove")}
                         disabled={!clickable} />
 
-                <button onclick={click_send!(mpvcontrol::SubMoveUp)}
+                <button onclick={click_send!(server, mpvcontrol::SubMoveUp)}
                         class={classes!("round", "icon", "icon-up-arrow")}
                         disabled={!clickable} />
 
-                <button onclick={click_send!(mpvcontrol::SubMoveDown)}
+                <button onclick={click_send!(server, mpvcontrol::SubMoveDown)}
                         class={classes!("round", "icon", "icon-down-arrow")}
                         disabled={!clickable} />
             </div>
             <TrackSelector tracks={subtitles}
                            disabled={!clickable}
-                           onclick={Callback::from(|id| websocket_send(mpvcontrol::SetSub(id)))} />
+                           onclick={click_send!(server, mpvcontrol::SetSub(id), id)} />
             <div class={classes!("section", "pad", "small")}>
                 <span>{"Audio controls"}</span>
             </div>
             <div class={classes!("space-evenly", "pad")}>
-                <button onclick={click_send!(mpvcontrol::ToggleMute)}
+                <button onclick={click_send!(server, mpvcontrol::ToggleMute)}
                         class={classes!("round", "icon", "icon-volume-mute")}
                         disabled={!clickable} />
 
-                <button onclick={click_send!(mpvcontrol::VolumeDown)}
+                <button onclick={click_send!(server, mpvcontrol::VolumeDown)}
                         class={classes!("round", "icon", "icon-volume-down")}
                         disabled={!clickable} />
 
-                <button onclick={click_send!(mpvcontrol::VolumeUp)}
+                <button onclick={click_send!(server, mpvcontrol::VolumeUp)}
                         class={classes!("round", "icon", "icon-volume-up")}
                         disabled={!clickable} />
             </div>
             <TrackSelector tracks={audios}
                            disabled={!clickable}
-                           onclick={Callback::from(|id| websocket_send(mpvcontrol::SetAudio(id)))} />
+                           onclick={click_send!(server, mpvcontrol::SetAudio(id), id)} />
         </article>
     }
 }

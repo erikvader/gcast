@@ -1,6 +1,6 @@
 use yew::prelude::*;
 
-use crate::WebSockStatus;
+use crate::UseServer;
 
 #[derive(Properties, PartialEq)]
 pub struct ConfirmButtonProps {
@@ -18,7 +18,7 @@ pub struct ConfirmButtonProps {
 #[function_component(ConfirmButton)]
 pub fn confirmbutton(props: &ConfirmButtonProps) -> Html {
     let armed = use_state_eq(|| false);
-    let active = use_context::<WebSockStatus>().expect("no active context found");
+    let server = use_context::<UseServer>().expect("no server context found");
 
     let onclick = {
         let armed2 = armed.clone();
@@ -35,7 +35,7 @@ pub fn confirmbutton(props: &ConfirmButtonProps) -> Html {
     html! {
         <button onclick={onclick}
                 class={if *armed {props.armed_classes.clone()} else {props.unarmed_classes.clone()}}
-                disabled={active.is_disconnected()}>
+                disabled={server.is_disconnected()}>
             if !*armed {
                 {props.unarmed_text.clone()}
             } else {

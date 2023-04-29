@@ -1,4 +1,4 @@
-use crate::WebSockStatus;
+use crate::UseServer;
 use protocol::to_client::front::errormsg as prot;
 use protocol::to_server::errormsgctrl::Close;
 use yew::prelude::*;
@@ -11,7 +11,7 @@ pub struct ErrorProps {
 #[rustfmt::skip::macros(html)]
 #[function_component(ErrorMessage)]
 pub fn errormessage(props: &ErrorProps) -> Html {
-    let active = use_context::<WebSockStatus>().expect("no active context found");
+    let server = use_context::<UseServer>().expect("no server context found");
     html! {
         <article class={classes!("stacker")}>
             <h2 class={classes!("error", "pad", "white-text")}>
@@ -21,9 +21,9 @@ pub fn errormessage(props: &ErrorProps) -> Html {
                 <h2>{&props.front.header}</h2>
             </header>
             <p class={classes!("pad")}>{&props.front.body}</p>
-            <button onclick={click_send!(Close)}
+            <button onclick={click_send!(server, Close)}
                     class={classes!()}
-                    disabled={active.is_disconnected()}>
+                    disabled={server.is_disconnected()}>
                 {"Ok"}
             </button>
         </article>

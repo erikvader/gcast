@@ -8,8 +8,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 yew.workspace = true
-yew-agent.workspace = true
 wasm-bindgen.workspace = true
+
+serde.workspace = true
 
 web-sys = {workspace = true, features = ["VisibilityState"]}
 
@@ -24,3 +25,5 @@ futures.workspace = true
 
 chrono = {workspace=true, features=["wasmbind", "clock"]}
 searcher = {path="../searcher"}
+
+derivative.workspace = true

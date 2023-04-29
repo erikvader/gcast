@@ -1,3 +1,4 @@
+use super::UseServer;
 use std::ops::Range;
 
 use protocol::{
@@ -11,7 +12,6 @@ use yew::prelude::*;
 
 use crate::back_button::{BackButton, Type};
 use crate::progressbar::Progressbar;
-use crate::{websocket::websocket_send, WebSockStatus};
 
 const COLORS: &[&str] = &[
     "dracula-pink",
@@ -50,11 +50,12 @@ struct ResultsProps {
 #[rustfmt::skip::macros(html)]
 #[function_component(Results)]
 fn results(props: &ResultsProps) -> Html {
-    let active = use_context::<WebSockStatus>().expect("no active context found");
+    let server = use_context::<UseServer>().expect("no server context found");
 
     let query = use_state(|| props.front.query.to_string());
     let query_change = {
         let query_setter = query.setter();
+        let sender = server.sender();
 
         Callback::from(move |ie: InputEvent| {
             let input = ie
@@ -65,7 +66,7 @@ fn results(props: &ResultsProps) -> Html {
             match input {
                 Some(inp) => {
                     query_setter.set(inp.clone());
-                    websocket_send(fscontrol::Search(inp));
+                    sender.send(fscontrol::Search(inp));
                 }
                 None => log::error!("Could not get value from text input"),
             }
@@ -85,14 +86,14 @@ fn results(props: &ResultsProps) -> Html {
     html! {
         <>
             <BackButton button_type={Type::Back}
-                        onclick={click_send!(fscontrol::BackToTheBeginning)} />
+                        onclick={click_send!(server, fscontrol::BackToTheBeginning)} />
             <input type="text"
                    value={(*query).clone()}
                    class={classes!(invalid_class)}
                    oninput={query_change}
                    placeholder={"Search query"}
                    autocapitalize={"none"}
-                   disabled={active.is_disconnected()}
+                   disabled={server.is_disconnected()}
             />
             <div class={classes!("rows")}>
                 {results_html}
@@ -109,6 +110,7 @@ struct SearchResultProps {
 #[rustfmt::skip::macros(html)]
 #[function_component(SearchResult)]
 fn search_result(props: &SearchResultProps) -> Html {
+    let server = use_context::<UseServer>().expect("no server context found");
     let dir = search_result_substr(
         &props.front.path,
         &props.front.indices,
@@ -124,12 +126,13 @@ fn search_result(props: &SearchResultProps) -> Html {
     let on_click = {
         let root = props.front.root;
         let path = props.front.path.clone();
-        Callback::from(move |_| {
-            websocket_send(mpvstart::file::File {
+        click_send!(
+            server,
+            mpvstart::file::File {
                 root,
                 path: path.clone(),
-            })
-        })
+            }
+        )
     };
 
     let color_class = COLORS.get(props.front.root).copied().unwrap_or_else(|| {
@@ -180,6 +183,7 @@ struct RefreshingProps {
 #[rustfmt::skip::macros(html)]
 #[function_component(Refreshing)]
 fn refreshing(props: &RefreshingProps) -> Html {
+    let server = use_context::<UseServer>().expect("no server context found");
     let done_dirs = props.front.done_dirs;
     let total_dirs = props.front.total_dirs;
     let dirs_progress = if total_dirs == 0 {
@@ -202,10 +206,10 @@ fn refreshing(props: &RefreshingProps) -> Html {
         <>
             if props.front.is_done {
                 <BackButton button_type={Type::Back}
-                            onclick={click_send!(fscontrol::BackToTheBeginning)} />
+                            onclick={click_send!(server, fscontrol::BackToTheBeginning)} />
             } else {
                 <BackButton button_type={Type::Exit}
-                            onclick={click_send!(fsstart::Stop)} />
+                            onclick={click_send!(server, fsstart::Stop)} />
             }
             <article class={classes!("stacker", "pad")}>
                 <header>
@@ -233,21 +237,21 @@ struct InitProps {
 #[rustfmt::skip::macros(html)]
 #[function_component(Init)]
 fn init(props: &InitProps) -> Html {
-    let active = use_context::<WebSockStatus>().expect("no active context found");
+    let server = use_context::<UseServer>().expect("no server context found");
 
     html! {
         <>
             <BackButton button_type={Type::Exit}
-                        onclick={click_send!(fsstart::Stop)} />
+                        onclick={click_send!(server, fsstart::Stop)} />
             <div class={classes!("pad")}>{cache_date(props.front.last_cache_date)}</div>
-            <button disabled={active.is_disconnected()}
+            <button disabled={server.is_disconnected()}
                     class={classes!("icon-refresh", "icon", "icon-hspace")}
-                    onclick={click_send!(fscontrol::RefreshCache)}>
+                    onclick={click_send!(server, fscontrol::RefreshCache)}>
                 {"Refresh cache"}
             </button>
-            <button disabled={active.is_disconnected() || props.front.last_cache_date.is_none()}
+            <button disabled={server.is_disconnected() || props.front.last_cache_date.is_none()}
                     class={classes!("icon-search", "icon", "icon-hspace")}
-                    onclick={click_send!(fscontrol::Search("".to_string()))}>
+                    onclick={click_send!(server, fscontrol::Search("".to_string()))}>
                 {"Search"}
             </button>
         </>

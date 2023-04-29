@@ -1,6 +1,6 @@
 use yew::prelude::*;
 
-use crate::WebSockStatus;
+use crate::UseServer;
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Type {
@@ -17,7 +17,7 @@ pub struct BackButtonProps {
 #[rustfmt::skip::macros(html)]
 #[function_component(BackButton)]
 pub fn backbutton(props: &BackButtonProps) -> Html {
-    let active = use_context::<WebSockStatus>().expect("no active context found");
+    let server = use_context::<UseServer>().expect("no server context found");
     let (text, icon, class) = match props.button_type {
         Type::Back => ("Go back", "icon-back-arrow", None),
         Type::Exit => ("Exit", "icon-close", Some("error")),
@@ -26,7 +26,7 @@ pub fn backbutton(props: &BackButtonProps) -> Html {
     html! {
         <button onclick={props.onclick.clone()}
                 class={classes!("left", icon, "icon-right", "icon", class, "relative")}
-                disabled={active.is_disconnected()}>
+                disabled={server.is_disconnected()}>
             <span class={classes!("vertical")}>{text}</span>
         </button>
     }
