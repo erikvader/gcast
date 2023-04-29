@@ -106,7 +106,7 @@ pub fn mpv(props: &MpvProps) -> Html {
             </div>
             <TrackSelector tracks={subtitles}
                            disabled={!clickable}
-                           onclick={click_send!(server, mpvcontrol::SetSub(id), id)} />
+                           onclick={click_send!(server, id -> mpvcontrol::SetSub(id))} />
             <div class={classes!("section", "pad", "small")}>
                 <span>{"Audio controls"}</span>
             </div>
@@ -125,7 +125,7 @@ pub fn mpv(props: &MpvProps) -> Html {
             </div>
             <TrackSelector tracks={audios}
                            disabled={!clickable}
-                           onclick={click_send!(server, mpvcontrol::SetAudio(id), id)} />
+                           onclick={click_send!(server, id -> mpvcontrol::SetAudio(id))} />
         </article>
     }
 }

@@ -8,8 +8,7 @@ macro_rules! click_send {
         let sender = $server.sender();
         Callback::from(move |_| sender.send($send))
     }};
-    // TODO: make prettier
-    ($server:expr, $send:expr, $arg:ident) => {{
+    ($server:expr, $arg:ident -> $send:expr) => {{
         let sender = $server.sender();
         Callback::from(move |$arg| sender.send($send))
     }};
