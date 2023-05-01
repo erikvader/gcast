@@ -131,6 +131,7 @@ pub fn use_websocket(port: u16) -> WS {
 
                     {
                         let state = state.clone();
+                        let wish = wish.clone();
                         let (close, mut should_close) = oneshot::channel::<()>();
                         *stream_close.borrow_mut() = Some(close);
                         spawn_local(async move {
@@ -159,6 +160,7 @@ pub fn use_websocket(port: u16) -> WS {
                                     }
                                 }
                             }
+                            wish.set(Wish::ToClose);
                             state.set(State::Closing);
                             log::debug!("Receiver future closed");
                         });
@@ -194,6 +196,7 @@ pub fn use_websocket(port: u16) -> WS {
                                     }
                                 }
                             }
+                            wish.set(Wish::ToClose);
                             state.set(State::Closing);
                             log::debug!("Sender future closed");
                         });
