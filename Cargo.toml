@@ -29,6 +29,7 @@ anyhow = "1.0" # server: nice error handling
 
 libmpv = { git = "https://github.com/ParadoxSpiral/libmpv-rs.git", rev = "3e6c389" } # server: mpv support
 derive_builder = "0.11" # server: create builder used for mpv
+delegate = "0.9" # server: CacheDirEntry
 
 walkdir = "2.3" # server: visit all files in directories
 serde = {version="1.0", features=["derive"]} # server, protocol: serialize
