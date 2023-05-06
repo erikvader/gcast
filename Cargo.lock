@@ -1540,6 +1540,7 @@ dependencies = [
  "derive_builder",
  "dirs",
  "futures-util",
+ "itertools",
  "libc",
  "libmpv",
  "log",

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use std::future::Future;
+use std::{future::Future, path::Path};
 use tokio::{select, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
 
@@ -50,4 +50,16 @@ macro_rules! break_err {
             Err(e) => break Err(e.into()),
         }
     };
+}
+
+pub fn basename(path: &str) -> Option<&str> {
+    Path::new(path)
+        .file_name()
+        .map(|osstr| osstr.to_str().expect("this is a subset of a rust string"))
+}
+
+pub fn dirname(path: &str) -> Option<&str> {
+    Path::new(path)
+        .parent()
+        .map(|osstr| osstr.to_str().expect("this is a subset of a rust string"))
 }

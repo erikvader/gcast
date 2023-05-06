@@ -6,6 +6,7 @@ use std::{
 };
 
 use futures_util::{stream::FuturesUnordered, StreamExt};
+use itertools::Itertools;
 use protocol::to_client::front::filesearch;
 use std::future::Future;
 use tokio::task::spawn_blocking;
@@ -29,23 +30,20 @@ pub struct Cache {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub(super) struct CacheEntry {
-    // TODO: store as PathBuf instead, and do to_string_lossy when sending to the client.
-    // Or maybe store the path_relative_root as a String as well?
-    // Or will this just ruin mpv play? I think it requires the paths to be rust strings
-    // TODO: Varför sparar jag ens hela sökvägen? Räcker inte path relative root? Då kan
-    // root_len försvinna. Det finns väl ingenting som vill ha hela sökvägen? Det borde gå
-    // att slå ihop med Cache::roots annars.
-    path: String,
+    relative_path: String,
     root: usize,
-    // TODO: root_len could be number of segments in the path intead of the number of
-    // bytes
-    root_len: usize,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub(super) struct CacheDirEntry {
     entry: CacheEntry,
     children: Vec<Pointer>,
+}
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+struct CacheEntryBorrowed<'a> {
+    relative_path: &'a str,
+    root: usize,
 }
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
@@ -55,12 +53,16 @@ pub enum Pointer {
 }
 
 impl CacheEntry {
-    fn new(path: String, root: usize, root_len: usize) -> Self {
+    fn new(relative_path: String, root: usize) -> Self {
+        assert!(relative_path.starts_with("/"));
         Self {
-            path,
+            relative_path,
             root,
-            root_len,
         }
+    }
+
+    fn new_root(root: usize) -> Self {
+        Self::new("/".to_string(), root)
     }
 
     pub(super) fn root(&self) -> usize {
@@ -68,7 +70,7 @@ impl CacheEntry {
     }
 
     pub(super) fn path_relative_root(&self) -> &str {
-        &self.path[self.root_len..]
+        &self.relative_path
     }
 
     /// The character index in `path_relative_root` where the basename starts, i.e., the
@@ -85,12 +87,37 @@ impl CacheEntry {
             None => 0,
         }
     }
+
+    fn parent(&self) -> Option<CacheEntryBorrowed<'_>> {
+        if self.relative_path == "/" {
+            return None;
+        }
+
+        Some(CacheEntryBorrowed {
+            root: self.root,
+            relative_path: crate::util::dirname(&self.relative_path).unwrap_or("/"),
+        })
+    }
+
+    fn borrow(&self) -> CacheEntryBorrowed<'_> {
+        CacheEntryBorrowed {
+            root: self.root,
+            relative_path: &self.relative_path,
+        }
+    }
 }
 
 impl CacheDirEntry {
-    fn new(path: String, root: usize, root_len: usize) -> Self {
+    fn new(relative_path: String, root: usize) -> Self {
         Self {
-            entry: CacheEntry::new(path, root, root_len),
+            entry: CacheEntry::new(relative_path, root),
+            children: vec![],
+        }
+    }
+
+    fn new_root(root: usize) -> Self {
+        Self {
+            entry: CacheEntry::new_root(root),
             children: vec![],
         }
     }
@@ -101,9 +128,10 @@ impl CacheDirEntry {
 
     delegate::delegate! {
         to self.entry {
-            pub(super) fn root(&self) -> usize;
             pub(super) fn path_relative_root(&self) -> &str;
-            pub(super) fn basename_char(&self) -> usize;
+            #[call(borrow)]
+            fn borrow_cache_entry(&self) -> CacheEntryBorrowed<'_>;
+            fn parent(&self) -> Option<CacheEntryBorrowed<'_>>;
         }
     }
 
@@ -319,9 +347,20 @@ where
 
     cache_files
         .sort_unstable_by(|e1, e2| e1.path_relative_root().cmp(e2.path_relative_root()));
-
     cache_dirs
         .sort_unstable_by(|e1, e2| e1.path_relative_root().cmp(e2.path_relative_root()));
+
+    assert!(
+        cache_files.iter().map(|ce| ce.borrow()).all_unique(),
+        "duplicate files"
+    );
+    assert!(
+        cache_dirs
+            .iter()
+            .map(|ce| ce.borrow_cache_entry())
+            .all_unique(),
+        "duplicate dirs"
+    );
 
     let (children, root_indices) = link(&cache_files, &cache_dirs);
     children.into_iter().for_each(|(i, pointers)| {
@@ -330,6 +369,12 @@ where
             .expect("the indices came from this vec")
             .set_children(pointers)
     });
+
+    assert_eq!(
+        roots.len(),
+        root_indices.len(),
+        "did not find the correct amount of roots"
+    );
 
     let root_dir_pointers: Vec<Pointer> =
         root_indices.into_iter().map(|i| Pointer::Dir(i)).collect();
@@ -357,25 +402,33 @@ fn link(
     dirs: &[CacheDirEntry],
 ) -> (HashMap<usize, Vec<Pointer>>, Vec<usize>) {
     let mut roots = Vec::new();
-    let dirs_inverted: HashMap<&str, usize> = dirs
+    let dirs_inverted: HashMap<CacheEntryBorrowed, usize> = dirs
         .iter()
         .enumerate()
-        .map(|(i, entry)| (entry.entry.path.as_str(), i))
+        .map(|(i, entry)| (entry.borrow_cache_entry(), i))
         .collect();
-    let mut children: HashMap<&str, Vec<Pointer>> = dirs
+    let mut children: HashMap<CacheEntryBorrowed, Vec<Pointer>> = dirs
         .iter()
-        .map(|entry| (entry.entry.path.as_str(), vec![]))
+        .map(|entry| (entry.borrow_cache_entry(), vec![]))
         .collect();
 
     for (i, d) in dirs.iter().enumerate() {
-        match dirname(&d.entry.path).and_then(|parent| children.get_mut(parent)) {
+        match d
+            .parent()
+            .as_ref()
+            .and_then(|parent| children.get_mut(parent))
+        {
             Some(pointers) => pointers.push(Pointer::Dir(i)),
             None => roots.push(i),
         }
     }
 
     for (i, f) in files.iter().enumerate() {
-        match dirname(&f.path).and_then(|parent| children.get_mut(parent)) {
+        match f
+            .parent()
+            .as_ref()
+            .and_then(|parent| children.get_mut(parent))
+        {
             Some(pointers) => pointers.push(Pointer::File(i)),
             None => log::error!(
                 "The file '{:?}' does not have a parent directory for some reason",
@@ -389,7 +442,7 @@ fn link(
         .map(|(path, pointers)| {
             (
                 *dirs_inverted
-                    .get(path)
+                    .get(&path)
                     .expect("both maps have the same keys"),
                 pointers,
             )
@@ -422,12 +475,15 @@ fn create_cache_entry(
 ) -> Result<Option<CacheEntry>, ()> {
     match de.into_path().into_os_string().into_string() {
         Ok(path) if has_whitelisted_extension(&path) => Ok(Some(CacheEntry::new(
-            path,
+            {
+                let r = roots
+                    .get(i)
+                    .expect("i is from enumerate, i.e. always in range");
+                path.strip_prefix(r)
+                    .expect("Path must begin with this root")
+                    .to_string()
+            },
             i,
-            roots
-                .get(i)
-                .expect("i is from enumerate, i.e. always in range")
-                .len(),
         ))),
         Ok(_) => Ok(None),
         Err(path) => {
@@ -444,12 +500,15 @@ fn create_cache_dir_entry(
 ) -> Result<CacheDirEntry, ()> {
     match de.into_path().into_os_string().into_string() {
         Ok(path) => Ok(CacheDirEntry::new(
-            path,
+            {
+                let r = roots
+                    .get(i)
+                    .expect("i is from enumerate, i.e. always in range");
+                path.strip_prefix(r)
+                    .expect("Path must begin with this root")
+                    .to_string()
+            },
             i,
-            roots
-                .get(i)
-                .expect("i is from enumerate, i.e. always in range")
-                .len(),
         )),
         Err(path) => {
             log::error!("Failed to convert '{:?} to a String", path);
@@ -562,7 +621,7 @@ fn surface_scan(roots: &[String]) -> Vec<CacheDirEntry> {
     roots
         .iter()
         .enumerate()
-        .map(|(i, path)| CacheDirEntry::new(path.clone(), i, path.len()))
+        .map(|(i, _path)| CacheDirEntry::new_root(i))
         .collect()
 }
 
@@ -594,16 +653,4 @@ fn make_refreshing(
         is_done,
     };
     msg
-}
-
-fn basename(path: &str) -> Option<&str> {
-    Path::new(path)
-        .file_name()
-        .map(|osstr| osstr.to_str().expect("this is a subset of a rust string"))
-}
-
-fn dirname(path: &str) -> Option<&str> {
-    Path::new(path)
-        .parent()
-        .map(|osstr| osstr.to_str().expect("this is a subset of a rust string"))
 }
