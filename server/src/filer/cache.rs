@@ -19,12 +19,28 @@ use super::{FilerError, FilerResult};
 // TODO: move to config
 const EXT_WHITELIST: &[&str] = &[".mp4", ".mkv", ".wmv", ".webm", ".avi"];
 
+/// A cache of all files and directories from a list of source directories called "roots".
+/// The vectors in this struct are sorted in some "standard" order, which in this case
+/// means: ascending order by their path. The vectors can not be modified, since there are
+/// `Pointer`s and other `usize`s pointing to locations in the vectors.
+///
+/// All paths are required to be valid rust strings, i.e., be valid UTF-8. This makes it
+/// easier to use on the client, and the libmpv crate (v2.0.1) needs them to be `String`s
+/// anyway. But this is a limitation that should be fixed in the future, i.e., use
+/// `PathBuf` instead.
 #[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
 pub struct Cache {
+    /// All files found, sorted in ascending order by their path relative to their
+    /// respective root.
     files: Vec<CacheEntry>,
+    /// All dirs found, sorted in ascending order by their path relative to the respective
+    /// root.
     dirs: Vec<CacheDirEntry>,
+    /// The top most psuedo-`CacheDirEntry` containing pointers to all roots in `Dirs`.
     root_dir: Vec<Pointer>,
+    /// The date when this cache was created.
     updated: Option<SystemTime>,
+    /// The paths of all roots, not necessarily sorted.
     roots: Vec<String>,
 }
 
@@ -40,6 +56,7 @@ pub(super) struct CacheDirEntry {
     children: Vec<Pointer>,
 }
 
+// NOTE: mainly here for less copying in the function `link`.
 #[derive(Debug, Hash, PartialEq, Eq)]
 struct CacheEntryBorrowed<'a> {
     relative_path: &'a str,
@@ -128,6 +145,7 @@ impl CacheDirEntry {
 
     delegate::delegate! {
         to self.entry {
+            pub(super) fn root(&self) -> usize;
             pub(super) fn path_relative_root(&self) -> &str;
             #[call(borrow)]
             fn borrow_cache_entry(&self) -> CacheEntryBorrowed<'_>;
@@ -157,19 +175,81 @@ impl Cache {
         roots: Vec<String>,
         root_dir: Vec<Pointer>,
     ) -> Self {
-        Self {
+        let cache = Self {
             files,
             dirs,
             updated: Some(SystemTime::now()),
             roots,
             root_dir,
-        }
+        };
+
+        assert!(
+            cache
+                .dirs
+                .iter()
+                .all(|dir| dir.children.windows(2).all(|pair| {
+                    use Pointer::*;
+                    match (pair[0], pair[1]) {
+                        (File(_), Dir(_)) => false,
+                        (Dir(_), File(_)) => true,
+                        (l, r) => {
+                            cache.deref(l).path_relative_root()
+                                <= cache.deref(r).path_relative_root()
+                        }
+                    }
+                })),
+            concat!(
+                "wrong order in dirs children, dirs come first then files,",
+                " each kind sorted with themselves by path_relative_root",
+            )
+        );
+
+        assert!(
+            cache.files.iter().map(|ce| ce.borrow()).all_unique(),
+            "duplicate files"
+        );
+        assert!(
+            cache
+                .dirs
+                .iter()
+                .map(|ce| ce.borrow_cache_entry())
+                .all_unique(),
+            "duplicate dirs"
+        );
+
+        assert!(
+            cache
+                .files
+                .windows(2)
+                .all(|pair| pair[0].path_relative_root() <= pair[1].path_relative_root()),
+            "files not sorted correctly"
+        );
+
+        assert!(
+            cache
+                .dirs
+                .windows(2)
+                .all(|pair| pair[0].path_relative_root() <= pair[1].path_relative_root()),
+            "dirs not sorted correctly"
+        );
+
+        assert!(
+            cache
+                .root_dir
+                .windows(2)
+                .all(|pair| cache.deref(pair[0]).path_relative_root()
+                    <= cache.deref(pair[1]).path_relative_root()),
+            "psuedo-root dir not sorted correctly"
+        );
+
+        cache
     }
 
     pub fn updated(&self) -> Option<SystemTime> {
         self.updated
     }
 
+    /// Retrieves all files sorted by their paths relative to their respective roots.
     pub(super) fn files(&self) -> &[CacheEntry] {
         &self.files
     }
@@ -350,18 +430,6 @@ where
     cache_dirs
         .sort_unstable_by(|e1, e2| e1.path_relative_root().cmp(e2.path_relative_root()));
 
-    assert!(
-        cache_files.iter().map(|ce| ce.borrow()).all_unique(),
-        "duplicate files"
-    );
-    assert!(
-        cache_dirs
-            .iter()
-            .map(|ce| ce.borrow_cache_entry())
-            .all_unique(),
-        "duplicate dirs"
-    );
-
     let (children, root_indices) = link(&cache_files, &cache_dirs);
     children.into_iter().for_each(|(i, pointers)| {
         cache_dirs
@@ -376,8 +444,17 @@ where
         "did not find the correct amount of roots"
     );
 
-    let root_dir_pointers: Vec<Pointer> =
-        root_indices.into_iter().map(|i| Pointer::Dir(i)).collect();
+    let root_dir_pointers: Vec<Pointer> = root_indices
+        .into_iter()
+        .sorted_by(|l, r| {
+            let l = cache_dirs.get(*l).expect("must exist").root();
+            let r = cache_dirs.get(*r).expect("must exist").root();
+            let l = roots.get(l).expect("must exist");
+            let r = roots.get(r).expect("must exist");
+            l.cmp(r)
+        })
+        .map(|i| Pointer::Dir(i))
+        .collect();
 
     prog_report(make_refreshing(
         num_dirs,
