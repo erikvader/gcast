@@ -28,7 +28,7 @@ server tells it to and has minimal logic and processing.
 - =searcher=: A search engine that simply searches through a bunch of
   strings, like video file paths, using syntax inspired by [[https://github.com/abo-abo/swiper#swiper][swiper]].
 * Installation
-The missing values in =deploy-config-default.mk= needs to be filled in
+The missing values in =deploy-config.def.mk= needs to be filled in
 first and the file saved as =deploy-config.mk=. Then basically run
 ~make -C client deploy~ and ~make -C server deploy~.
 
