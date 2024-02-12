@@ -1,7 +1,7 @@
 CARGOFLAGS :=
 CARGORELEASEFLAGS := --release
 SERVICE := gcast-server.service
-AUXSOURCES = $(SERVICE) config-default.toml
+AUXSOURCES = $(SERVICE) config.def.toml
 
 .PHONY: build
 build:
