@@ -7,45 +7,48 @@ members = [
   "protocol",
   "protocol-macros",
 ]
+resolver = "2"
 
 [workspace.dependencies]
 #TODO: scale down on features on tokio
 tokio = {version="1.21", features=["full"]} # server: async runtime
 tokio-util = "0.7" # server: cancellation token
-tokio-tungstenite = "0.17" # server: websocket
+tokio-tungstenite = "0.21" # server: websocket
 futures-util = "0.3" # server: streams and sinks
+#TODO: use the new stabilized async traits in rust 1.75
 async-trait = "0.1" # server: FutureCancel trait
-toml = "0.5" # server: config file
+toml = "0.8" # server: config file
 
 libc = "0.2" # server: signal handlers
 dirs = "4.0" # server: access .config etc
 
 log = "0.4" # all: log interface
 simplelog = "0.12" # server, cli: log to stderr
+#TODO: use the new stabilized in rust blah
 atty = "0.2" # server: check if running on terminal
 
 thiserror="1.0" # server, protocol, searcher: create custom error types
 anyhow = "1.0" # server: nice error handling
 
 libmpv = { git = "https://github.com/ParadoxSpiral/libmpv-rs.git", rev = "3e6c389" } # server: mpv support
-derive_builder = "0.11" # server: create builder used for mpv
-delegate = "0.9" # server: CacheDirEntry
+derive_builder = "0.20" # server: create builder used for mpv
+delegate = "0.12" # server: CacheDirEntry
 
 walkdir = "2.3" # server: visit all files in directories
 serde = {version="1.0", features=["derive"]} # server, protocol: serialize
 bincode = "1.3" # server, protocol: serialize implemention
 
 colored = "2" # cli: terminal colors
-tungstenite = "0.17" # cli: websockets blocking
+tungstenite = "0.21" # cli: websockets blocking
 clap = {version="4.0", features=["derive"]} # cli: commandline arguments
 
-yew = {version="0.20", features=["csr"]} # client: react
+yew = {version="0.21", features=["csr"]} # client: react
 wasm-bindgen = "0.2" # client: wasm stuff
 wasm-logger = "0.2" # client: log to web browser console
 web-sys = "0.3" # client: access HtmlInputElement
 
 gloo-net = {version="0.2", default-features=false} # client: wasm websockets
-gloo-events = "0.1" # client: check for visibility
+gloo-events = "0.2" # client: check for visibility
 wasm-bindgen-futures = "0.4" # client: async integration between rust and js
 futures = "0.3" # client: streams and sinks (futures_util didn't work)
 
@@ -55,10 +58,10 @@ derivative = "2.2" # client: for the hooks
 ordered-float = {version="3.1", features=["serde"]} # protocol: NotNan
 num-traits = "0.2" # protocol: NotNan
 
-itertools = "0.10" # searcher: tuple_windows
+itertools = "0.12" # searcher: tuple_windows
 #TODO: scale down on features on regex
 regex = "1" # searcher: primary search tool
-regex-syntax = "0.6" # searcher: escape strings
+regex-syntax = "0.8" # searcher: escape strings
 rayon = "1" # searcher: search in parallel
 
 quote = "1" # protocol-macros

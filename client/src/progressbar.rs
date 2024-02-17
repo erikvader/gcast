@@ -3,7 +3,9 @@ use yew::prelude::*;
 #[derive(Properties, PartialEq)]
 pub struct ProgressProps {
     pub progress: f64,
+    #[prop_or_default]
     pub text: Option<String>,
+    #[prop_or_default]
     pub text_class: Option<Classes>,
     pub outer_class: Classes,
     pub inner_class: Classes,

@@ -266,7 +266,7 @@ fn cache_date(time: Option<std::time::SystemTime>) -> Html {
             html! {
                 <>
                     <span class={classes!("bold")}>{"Cache last updated on: "}</span>
-                    <span>{local.format("%Y-%m-%d %H:%M")}</span>
+                    <span>{local.format("%Y-%m-%d %H:%M").to_string()}</span>
                 </>
             }
         }

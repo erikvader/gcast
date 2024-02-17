@@ -6,7 +6,7 @@ use protocol::to_client;
 use protocol::to_client::front::Front;
 use protocol::to_client::seat::Seat;
 use yew::hook;
-use yew::use_effect_with_deps;
+use yew::use_effect_with;
 use yew::use_state_eq;
 
 #[derive(Clone, Derivative)]
@@ -80,16 +80,13 @@ pub fn use_server() -> UseServer {
 
     {
         let ws = ws.clone();
-        use_effect_with_deps(
-            move |visible| {
-                if *visible {
-                    ws.open();
-                } else {
-                    ws.close();
-                }
-            },
-            visible,
-        );
+        use_effect_with(visible, move |visible| {
+            if *visible {
+                ws.open();
+            } else {
+                ws.close();
+            }
+        });
     }
 
     let front = use_state_eq(|| Front::None);
@@ -100,35 +97,30 @@ pub fn use_server() -> UseServer {
         let accepted = accepted.clone();
         let ws = ws.clone();
         let sender = Sender(ws.sender());
-        use_effect_with_deps(
-            move |bytes| {
-                if let Some(bytes) = bytes {
-                    match protocol::Message::deserialize(bytes) {
-                        Err(e) => log::error!("Failed to deserialize message: {}", e),
-                        Ok(protocol::Message::ToServer(msg)) => {
-                            log::error!("Got a message for the server: {:?}", msg)
-                        }
-                        Ok(protocol::Message::ToClient(to_client::Front(new_front))) => {
-                            front.set(new_front);
-                        }
-                        Ok(protocol::Message::ToClient(to_client::Seat(seat))) => {
-                            match seat {
-                                Seat::Accept => {
-                                    accepted.set(Accepted::Accepted);
-                                    sender.send(
-                                        protocol::to_server::sendstatus::SendStatus,
-                                    );
-                                }
-                                Seat::Reject => {
-                                    accepted.set(Accepted::Rejected);
-                                }
+        use_effect_with(ws.message(), move |bytes| {
+            if let Some(bytes) = bytes {
+                match protocol::Message::deserialize(bytes) {
+                    Err(e) => log::error!("Failed to deserialize message: {}", e),
+                    Ok(protocol::Message::ToServer(msg)) => {
+                        log::error!("Got a message for the server: {:?}", msg)
+                    }
+                    Ok(protocol::Message::ToClient(to_client::Front(new_front))) => {
+                        front.set(new_front);
+                    }
+                    Ok(protocol::Message::ToClient(to_client::Seat(seat))) => {
+                        match seat {
+                            Seat::Accept => {
+                                accepted.set(Accepted::Accepted);
+                                sender.send(protocol::to_server::sendstatus::SendStatus);
+                            }
+                            Seat::Reject => {
+                                accepted.set(Accepted::Rejected);
                             }
                         }
                     }
                 }
-            },
-            ws.message(),
-        );
+            }
+        });
     }
 
     UseServer {
