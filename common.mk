@@ -1,11 +1,19 @@
 RSYNCFLAGS := -avhs --delete
 RSYNC = rsync $(RSYNCFLAGS)
 
-SERVICESTOP := systemctl --user stop
-SERVICESTART := systemctl --user start
-SERVICESTATUS := systemctl --user status
-SERVICEJOURNAL := journalctl --user --lines 100 --follow --unit
+SERVICE_STOP := systemctl --user stop
+SERVICE_START := systemctl --user start
+SERVICE_STATUS := systemctl --user status
+SERVICE_JOURNAL := journalctl --user --lines 100 --follow --unit
 
-SSH := ssh
+SSHFLAGS :=
+SSH = ssh $(SSHFLAGS)
 
-CARGO := cargo
+CARGOFLAGS :=
+CARGO = cargo $(CARGOFLAGS)
+
+CARGO_BUILDFLAGS :=
+CARGO_BUILD = $(CARGO) build $(CARGO_BUILDFLAGS)
+
+CURLFLAGS := -L
+CURL = curl $(CURLFLAGS)

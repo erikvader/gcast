@@ -1,0 +1,7 @@
+[Unit]
+Description=server for gcast
+
+[Service]
+ExecStart=%h/${IN_DEPLOY_PATH}/server/server
+WorkingDirectory=%h/${IN_DEPLOY_PATH}/server
+Environment=RUST_BACKTRACE=full

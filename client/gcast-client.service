@@ -1,7 +1,0 @@
-[Unit]
-Description=web server for gcast
-
-[Service]
-ExecStart=/bin/python ./serve.py
-#TODO: make the %h/gcast/client path configurable somehow
-WorkingDirectory=%h/gcast/client

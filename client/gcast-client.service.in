@@ -1,0 +1,6 @@
+[Unit]
+Description=web server for gcast
+
+[Service]
+ExecStart=/bin/python ./serve.py
+WorkingDirectory=%h/${IN_DEPLOY_PATH}/client
