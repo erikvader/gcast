@@ -126,7 +126,12 @@ async fn maybe_refresh_cache() {
     }
 }
 
-#[tokio::main(flavor = "current_thread")]
+// TODO: Beware of misbehaving tasks that block for too long. Disabling the LIFO slot did
+// help, but is not a solution. This is just a PSA. This comment can be removed when that
+// special slot is stealable. The mpv issue is maybe caused by this?
+// https://github.com/tokio-rs/tokio/issues/4941
+// https://github.com/tokio-rs/tokio/issues/6315#issuecomment-1920876711
+#[tokio::main]
 async fn async_main() -> ExitCode {
     maybe_refresh_cache().await;
 

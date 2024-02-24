@@ -27,7 +27,9 @@ where
     S: Sink<TungMsg> + Unpin,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    let bytes = protocol::Message::from(msg.to_client()).serialize()?;
+    let msg = msg.to_client();
+    log::trace!("Sending: {msg:?}");
+    let bytes = protocol::Message::from(msg).serialize()?;
     ws.send(TungMsg::Binary(bytes)).await?;
     Ok(())
 }
@@ -132,7 +134,7 @@ async fn handle_binary(msg: &[u8], to_cast: &mut Sender) {
     match Message::deserialize(msg) {
         Err(e) => log::warn!("Failed to deserialize message {:?} cuz {}", &msg, e),
         Ok(m) if m.is_to_server() => {
-            log::debug!("Received (caster): {:?}", m);
+            log::trace!("Received: {m:?}");
             if to_cast.send(m.take_to_server().unwrap()).await.is_err() {
                 log::warn!("Seems like caster is down");
             }

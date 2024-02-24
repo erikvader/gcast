@@ -625,18 +625,34 @@ where
         ))
         .await;
 
-        for de in WalkDir::new(dir.path()).min_depth(1) {
-            match de {
-                Err(e) => {
-                    log::error!("Failed to walk: {}", e);
-                    *num_errors += 1;
+        let root = *root;
+        let dir = dir.path().to_owned(); // NOTE: annoying that this must be cloned :(
+        let (new_errors, new_files, new_dirs) =
+            join_handle_wait_take(spawn_blocking(move || {
+                let mut new_errors = 0;
+                let mut new_files = Vec::new();
+                let mut new_dirs = Vec::new();
+
+                for de in WalkDir::new(dir).min_depth(1) {
+                    match de {
+                        Err(e) => {
+                            log::error!("Failed to walk: {}", e);
+                            new_errors += 1;
+                        }
+                        Ok(e) if e.file_type().is_file() => new_files.push((root, e)),
+                        Ok(e) if e.file_type().is_dir() => new_dirs.push((root, e)),
+                        Ok(_) => (),
+                    }
                 }
-                Ok(e) if e.file_type().is_file() => files.push((*root, e)),
-                Ok(e) if e.file_type().is_dir() => dirs.push((*root, e)),
-                Ok(_) => (),
-            }
-        }
+                (new_errors, new_files, new_dirs)
+            }))
+            .await;
+
+        *num_errors += new_errors;
+        files.extend(new_files);
+        dirs.extend(new_dirs);
     }
+
     Ok(Scan { files, dirs })
 }
 
