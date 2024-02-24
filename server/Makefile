@@ -1,9 +1,11 @@
+include ../common.mk
+
 SERVICE := gcast-server.service
 AUXSOURCES := config.def.toml
 
 RELEASE :=
 CARGO_BUILDFLAGS += $(if $(RELEASE),--release,)
-TARGET_SUBDIR += $(if $(RELEASE),release,debug)
+TARGET_SUBDIR := $(if $(RELEASE),release,debug)
 
 .PHONY: build
 build:
@@ -12,8 +14,6 @@ build:
 .PHONY: clean
 clean:
 	rm -f $(SERVICE)
-
-include ../common.mk
 
 ifneq ($(filter deploy%,$(MAKECMDGOALS)),)
 include ../deploy-config.mk

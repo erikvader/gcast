@@ -1,3 +1,5 @@
+include ../common.mk
+
 RELEASE :=
 SERVICE := gcast-client.service
 SOURCES := serve.py web-root
@@ -43,8 +45,6 @@ $(INDEXHTML): index.html.in
 .PHONY: clean
 clean:
 	rm -rf web-root/pkg web-root/deps $(SERVICE)
-
-include ../common.mk
 
 ifneq ($(filter deploy%,$(MAKECMDGOALS)),)
 include ../deploy-config.mk
