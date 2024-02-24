@@ -4,7 +4,7 @@ RSYNC = rsync $(RSYNCFLAGS)
 SERVICE_STOP := systemctl --user stop
 SERVICE_START := systemctl --user start
 SERVICE_STATUS := systemctl --user status
-SERVICE_JOURNAL := journalctl --user --lines 100 --follow --unit
+SERVICE_JOURNAL := journalctl --user --lines 100 --follow --output short-precise --unit
 
 SSHFLAGS := -t
 SSH = ssh $(SSHFLAGS)
