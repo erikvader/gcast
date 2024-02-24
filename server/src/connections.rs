@@ -19,8 +19,6 @@ use crate::{
 type Sender = mpsc::Sender<protocol::ToServer>;
 type Receiver = mpsc::Receiver<protocol::ToClient>;
 
-mod tractor;
-
 async fn ws_send<T, S>(msg: T, ws: &mut S) -> anyhow::Result<()>
 where
     T: ToClientable,
@@ -93,8 +91,6 @@ async fn handle_accept(
     log::debug!("Sending accept...");
     ws_send(Seat::Accept, &mut sink).await?;
 
-    let tractor = tractor::Tractor::new(sink);
-
     loop {
         select! {
             next = stream.try_next() => {
@@ -112,13 +108,12 @@ async fn handle_accept(
                 log::debug!("Handle_accept got cancelled");
                 break;
             },
-            Some(msg) = from_cast.recv() => if tractor.send(msg).await.is_err() {
+            Some(msg) = from_cast.recv() => if ws_send(msg, &mut sink).await.is_err() {
                 break
             },
         }
     }
 
-    let mut sink = tractor.close().await?;
     log::debug!("Disconnecting: {}", addr);
     if let Err(e) = sink.close().await {
         log::warn!(

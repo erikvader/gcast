@@ -6,7 +6,6 @@ mod connections;
 mod filer;
 mod mpv;
 mod process;
-mod repeatable_oneshot;
 mod signal;
 mod state_machine;
 
