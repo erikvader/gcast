@@ -3,6 +3,7 @@ AUXSOURCES := config.def.toml
 
 RELEASE :=
 CARGO_BUILDFLAGS += $(if $(RELEASE),--release,)
+TARGET_SUBDIR += $(if $(RELEASE),release,debug)
 
 .PHONY: build
 build:
@@ -43,7 +44,7 @@ deploy-journal:
 .PHONY: deploy-sync
 deploy-sync: $(SERVICE)
 # NOTE: colon is included here because of annoying syntax highlighting in emacs
-	$(RSYNC) $^ $(AUXSOURCES) ../target/$(DEPLOY_TARGET)/release/server $(DEPLOY_HOST)':$(DEPLOY_PATH)'/server/
+	$(RSYNC) $^ $(AUXSOURCES) ../target/$(DEPLOY_TARGET)/$(TARGET_SUBDIR)/server $(DEPLOY_HOST)':$(DEPLOY_PATH)'/server/
 
 .PHONY: deploy
 deploy: deploy-build deploy-stop deploy-sync deploy-start
@@ -65,7 +66,7 @@ deploy-remote-clean:
 
 .PHONY: deploy-remote-copy
 deploy-remote-copy:
-	$(SSH) $(DEPLOY_HOST) cp -f '$(DEPLOY_PATH)'/build/target/release/server '$(DEPLOY_PATH)'/server/server
+	$(SSH) $(DEPLOY_HOST) cp -f '$(DEPLOY_PATH)'/build/target/$(TARGET_SUBDIR)/server '$(DEPLOY_PATH)'/server/server
 
 .PHONY: deploy-remote
 deploy-remote: deploy-remote-sync deploy-remote-build deploy-stop deploy-remote-copy deploy-start

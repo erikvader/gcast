@@ -22,41 +22,74 @@ use crate::{
 
 const CHANNEL_SIZE: usize = 1024;
 
-fn started_by_systemd() -> bool {
-    // TODO: use https://docs.rs/systemd-journal-logger/latest/systemd_journal_logger/index.html instead?
-    // NOTE: man 5 systemd.exec
-    match std::env::var("JOURNAL_STREAM") {
-        Ok(_) | Err(std::env::VarError::NotUnicode(_)) => true,
-        Err(std::env::VarError::NotPresent) => false,
-    }
-}
-
 fn init_logger() {
     use simplelog::*;
+    use std::io::IsTerminal;
+    use systemd_journal_logger::{connected_to_journal, JournalLog};
 
-    let mut builder = ConfigBuilder::new();
-    builder.add_filter_allow_str("server");
+    const SERVER: &str = "server";
 
-    if started_by_systemd() {
-        builder.set_time_level(LevelFilter::Off);
-    } else {
+    fn install_systemd_logger() -> bool {
+        struct FilteringJournalLog(JournalLog);
+        impl log::Log for FilteringJournalLog {
+            fn enabled(&self, metadata: &log::Metadata) -> bool {
+                log::Log::enabled(&self.0, metadata)
+            }
+
+            fn log(&self, record: &log::Record) {
+                if self.enabled(record.metadata()) {
+                    if record.target().starts_with(SERVER) {
+                        log::Log::log(&self.0, record);
+                    }
+                }
+            }
+
+            fn flush(&self) {
+                log::Log::flush(&self.0)
+            }
+        }
+
+        let logger = match JournalLog::new() {
+            Ok(logger) => logger,
+            Err(e) => {
+                eprintln!("Failed to create the systemd logger: {e:?}");
+                return false;
+            }
+        };
+
+        log::set_max_level(LevelFilter::Trace);
+        log::set_boxed_logger(Box::new(FilteringJournalLog(logger)))
+            .expect("no logger should have been set yet");
+        true
+    }
+
+    fn install_stdout_logger() {
+        let mut builder = ConfigBuilder::new();
+        builder.add_filter_allow_str(SERVER);
+
         // NOTE: set_time_offset_to_local can only be run when there is only on thread active.
         if builder.set_time_offset_to_local().is_err() {
+            // TODO: save the result in a variable and print the error with `log::error!`
+            // after the logger has initialized
             eprintln!(
                 "Failed to set time zone for the logger, using UTC instead (I think)"
             );
         }
+
+        let level = LevelFilter::Debug;
+        let colors = if std::io::stdout().is_terminal() {
+            ColorChoice::Auto
+        } else {
+            ColorChoice::Never
+        };
+
+        TermLogger::init(level, builder.build(), TerminalMode::Stdout, colors)
+            .expect("no logger should have been set yet");
     }
 
-    let level = LevelFilter::Debug;
-    let colors = if atty::is(atty::Stream::Stdout) {
-        ColorChoice::Auto
-    } else {
-        ColorChoice::Never
-    };
-
-    TermLogger::init(level, builder.build(), TerminalMode::Stdout, colors)
-        .expect("could not init logger");
+    if !connected_to_journal() || !install_systemd_logger() {
+        install_stdout_logger();
+    }
 }
 
 fn log_actor_error(res: Result<Result<(), anyhow::Error>, JoinError>, name: &str) {

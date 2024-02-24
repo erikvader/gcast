@@ -24,8 +24,7 @@ dirs = "4.0" # server: access .config etc
 
 log = "0.4" # all: log interface
 simplelog = "0.12" # server, cli: log to stderr
-#TODO: use the new stabilized in rust blah
-atty = "0.2" # server: check if running on terminal
+systemd-journal-logger = "2.1" # server: log to systemd
 
 thiserror="1.0" # server, protocol, searcher: create custom error types
 anyhow = "1.0" # server: nice error handling

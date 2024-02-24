@@ -15,7 +15,7 @@ dirs.workspace = true
 
 log.workspace = true
 simplelog.workspace = true
-atty.workspace = true
+systemd-journal-logger.workspace = true
 
 protocol = {path="../protocol"}
 thiserror.workspace = true

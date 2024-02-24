@@ -6,7 +6,7 @@ SERVICE_START := systemctl --user start
 SERVICE_STATUS := systemctl --user status
 SERVICE_JOURNAL := journalctl --user --lines 100 --follow --unit
 
-SSHFLAGS :=
+SSHFLAGS := -t
 SSH = ssh $(SSHFLAGS)
 
 CARGOFLAGS :=
