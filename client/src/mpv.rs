@@ -77,7 +77,7 @@ pub fn mpv(props: &MpvProps) -> Html {
                         disabled={!clickable || !has_chapters} />
             </div>
             <div class={classes!("section", "pad", "small")}>
-                <span>{"subtitle controls"}</span>
+                <span>{"Subtitle controls"}</span>
             </div>
             <div class={classes!("space-evenly", "pad")}>
                 <button onclick={click_send!(server, mpvcontrol::SubDelayEarlier)}
