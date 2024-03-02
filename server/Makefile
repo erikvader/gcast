@@ -11,6 +11,10 @@ TARGET_SUBDIR := $(if $(RELEASE),release,debug)
 build:
 	$(CARGO_BUILD)
 
+.PHONY: run
+run:
+	$(CARGO_RUN) --bin server
+
 .PHONY: clean
 clean:
 	rm -f $(SERVICE)

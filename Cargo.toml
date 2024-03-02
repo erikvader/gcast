@@ -23,7 +23,8 @@ libc = "0.2" # server: signal handlers
 dirs = "4.0" # server: access .config etc
 
 log = "0.4" # all: log interface
-simplelog = "0.12" # server, cli: log to stderr
+fern-format = {git = "https://github.com/erikvader/fern-format.git", tag = "0.2.0"} # server, cli: log to stderr
+fern = "0.6" # server, cli: log to stderr
 systemd-journal-logger = "2.1" # server: log to systemd
 
 thiserror="1.0" # server, protocol, searcher: create custom error types

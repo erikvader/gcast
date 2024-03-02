@@ -22,8 +22,7 @@ use crate::{
 const CHANNEL_SIZE: usize = 1024;
 
 fn init_logger() {
-    use simplelog::*;
-    use std::io::IsTerminal;
+    use log::LevelFilter;
     use systemd_journal_logger::{connected_to_journal, JournalLog};
 
     const SERVER: &str = "server";
@@ -63,26 +62,13 @@ fn init_logger() {
     }
 
     fn install_stdout_logger() {
-        let mut builder = ConfigBuilder::new();
-        builder.add_filter_allow_str(SERVER);
-
-        // NOTE: set_time_offset_to_local can only be run when there is only on thread active.
-        if builder.set_time_offset_to_local().is_err() {
-            // TODO: save the result in a variable and print the error with `log::error!`
-            // after the logger has initialized
-            eprintln!(
-                "Failed to set time zone for the logger, using UTC instead (I think)"
-            );
-        }
-
-        let level = LevelFilter::Debug;
-        let colors = if std::io::stdout().is_terminal() {
-            ColorChoice::Auto
-        } else {
-            ColorChoice::Never
-        };
-
-        TermLogger::init(level, builder.build(), TerminalMode::Stdout, colors)
+        use fern_format::{Format, Stream};
+        fern::Dispatch::new()
+            .level(LevelFilter::Off)
+            .level_for(SERVER, LevelFilter::Trace)
+            .format(Format::new().color_if_supported(Stream::Stdout).callback())
+            .chain(std::io::stdout())
+            .apply()
             .expect("no logger should have been set yet");
     }
 

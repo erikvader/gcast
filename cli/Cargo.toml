@@ -11,7 +11,8 @@ protocol = {path="../protocol"}
 tungstenite.workspace = true
 
 log.workspace = true
-simplelog.workspace = true
+fern.workspace = true
+fern-format.workspace = true
 
 clap.workspace = true
 

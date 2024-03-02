@@ -29,16 +29,14 @@ enum Commands {
 }
 
 fn init_logger() {
-    use simplelog::*;
-
-    let level = LevelFilter::Debug;
-    let config = ConfigBuilder::new()
-        .add_filter_allow_str("test_client")
-        .build();
-    let colors = ColorChoice::Auto;
-
-    TermLogger::init(level, config, TerminalMode::Stdout, colors)
-        .expect("could not init logger");
+    use fern_format::{Format, Stream};
+    fern::Dispatch::new()
+        .level(log::LevelFilter::Off)
+        .level_for("test_client", log::LevelFilter::Trace)
+        .format(Format::new().color_if_supported(Stream::Stdout).callback())
+        .chain(std::io::stdout())
+        .apply()
+        .expect("no logger should have been set yet");
 }
 
 fn main() {
