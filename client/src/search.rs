@@ -241,7 +241,7 @@ fn init(props: &InitProps) -> Html {
 
     html! {
         <>
-            <BackButton button_type={Type::Exit}
+            <BackButton button_type={Type::Back}
                         onclick={click_send!(server, fsstart::Stop)} />
             <div class={classes!("pad")}>{cache_date(props.front.last_cache_date)}</div>
             <button disabled={server.is_disconnected()}
