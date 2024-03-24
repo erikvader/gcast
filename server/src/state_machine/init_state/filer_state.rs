@@ -136,23 +136,28 @@ fn create_tree_state(tree: &Tree) -> prot_tree::Tree {
             .files()
             .enumerate()
             .map(|(i, file)| match file {
-                filer::tree::File::Regular(path) => prot_tree::Entry::File {
-                    path: path.to_string(),
+                filer::tree::File {
+                    name,
+                    path_relative_root,
+                    ty: filer::tree::Type::Regular,
+                } => prot_tree::Entry::File {
+                    path: path_relative_root.to_string(),
                     root: tree
                         .root()
                         .expect("this is non-None if there are files available"),
-                    name: basename(path)
-                        .map(str::to_string)
-                        .unwrap_or_else(|| format!("file??")),
+                    name: name.to_string(),
                 },
-                filer::tree::File::Directory(path) => prot_tree::Entry::Dir {
-                    name: basename(path)
-                        .map(str::to_string)
-                        .unwrap_or_else(|| format!("dir??")),
-                    id: i,
-                },
-                filer::tree::File::Root(path) => prot_tree::Entry::Dir {
-                    name: path.to_string(),
+                filer::tree::File {
+                    name,
+                    ty: filer::tree::Type::Directory,
+                    ..
+                }
+                | filer::tree::File {
+                    name,
+                    ty: filer::tree::Type::Root,
+                    ..
+                } => prot_tree::Entry::Dir {
+                    name: name.to_string(),
                     id: i,
                 },
             })

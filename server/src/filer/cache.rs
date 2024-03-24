@@ -69,6 +69,10 @@ impl CacheEntry {
         Self::new("/".to_string(), root)
     }
 
+    pub(super) fn is_root(&self) -> bool {
+        self.relative_path == "/"
+    }
+
     pub(super) fn root(&self) -> usize {
         self.root
     }
@@ -93,7 +97,7 @@ impl CacheEntry {
     }
 
     fn parent(&self) -> Option<CacheEntryBorrowed<'_>> {
-        if self.relative_path == "/" {
+        if self.is_root() {
             return None;
         }
 
@@ -133,6 +137,7 @@ impl CacheDirEntry {
     delegate::delegate! {
         to self.entry {
             pub(super) fn root(&self) -> usize;
+            pub(super) fn is_root(&self) -> bool;
             pub(super) fn path_relative_root(&self) -> &str;
             #[call(borrow)]
             fn borrow_cache_entry(&self) -> CacheEntryBorrowed<'_>;
@@ -251,10 +256,6 @@ impl Cache {
         &self.root_dir
     }
 
-    pub(super) fn points_to_a_root(&self, pointer: Pointer) -> bool {
-        self.root_dir.contains(&pointer)
-    }
-
     pub fn is_outdated(&self, roots: &[String]) -> bool {
         self.roots != roots
     }
@@ -286,8 +287,11 @@ impl Cache {
         }
     }
 
-    pub(super) fn root_path(&self, pointer: Pointer) -> Option<&str> {
-        let i = self.deref(pointer).root();
-        self.roots.get(i).map(String::as_str)
+    pub(super) fn root_path(&self, entry: &CacheEntry) -> &str {
+        let i = entry.root();
+        self.roots
+            .get(i)
+            .map(String::as_str)
+            .expect("there will always be a root")
     }
 }

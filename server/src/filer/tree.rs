@@ -8,10 +8,16 @@ pub struct Tree<'a> {
     root: Option<usize>, // None iff path is empty
 }
 
-pub enum File<'a> {
-    Regular(&'a str),
-    Directory(&'a str),
-    Root(&'a str),
+pub enum Type {
+    Regular,
+    Directory,
+    Root,
+}
+
+pub struct File<'a> {
+    pub name: &'a str,
+    pub path_relative_root: &'a str,
+    pub ty: Type,
 }
 
 impl<'a> Tree<'a> {
@@ -27,13 +33,25 @@ impl<'a> Tree<'a> {
         let pointers = self.top_pointers();
 
         pointers.into_iter().map(|point| {
-            if self.cache.points_to_a_root(*point) {
-                File::Root(self.cache.root_path(*point).expect("is a root"))
+            let entry = self.cache.deref(*point);
+            let relative_root = entry.path_relative_root();
+
+            if entry.is_root() {
+                File {
+                    ty: Type::Root,
+                    name: self.cache.root_path(entry),
+                    path_relative_root: relative_root,
+                }
             } else {
-                let path = self.cache.deref(*point).path_relative_root();
-                match point {
-                    Pointer::File(_) => File::Regular(path),
-                    Pointer::Dir(_) => File::Directory(path),
+                let name = basename(relative_root).expect("is not root");
+                let ty = match point {
+                    Pointer::File(_) => Type::Regular,
+                    Pointer::Dir(_) => Type::Directory,
+                };
+                File {
+                    ty,
+                    name,
+                    path_relative_root: relative_root,
                 }
             }
         })
@@ -78,18 +96,7 @@ impl<'a> Tree<'a> {
         let mut bread = Vec::new();
 
         if let Some(direntry) = self.path.first() {
-            let root_pointer = self
-                .cache
-                .roots()
-                .get(direntry.root())
-                .expect("should exist");
-
-            bread.push(
-                self.cache
-                    .root_path(*root_pointer)
-                    .expect("should exist")
-                    .to_string(),
-            );
+            bread.push(self.cache.root_path(direntry.cache_entry()).to_string());
         }
 
         bread.extend(self.path.iter().skip(1).map(|p| {
