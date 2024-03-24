@@ -1,5 +1,6 @@
 pub mod cache;
 pub mod search;
+pub mod tree;
 
 use std::{
     io,

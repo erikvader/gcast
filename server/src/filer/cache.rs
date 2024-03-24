@@ -28,6 +28,7 @@ const EXT_WHITELIST: &[&str] = &[".mp4", ".mkv", ".wmv", ".webm", ".avi"];
 /// easier to use on the client, and the libmpv crate (v2.0.1) needs them to be `String`s
 /// anyway. But this is a limitation that should be fixed in the future, i.e., use
 /// `PathBuf` instead.
+// TODO: make this partially updateable, i.e., update the files of a subfolder
 #[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
 pub struct Cache {
     /// All files found, sorted in ascending order by their path relative to their
@@ -63,7 +64,7 @@ struct CacheEntryBorrowed<'a> {
     root: usize,
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub enum Pointer {
     File(usize),
     Dir(usize),
@@ -168,6 +169,12 @@ impl AsRef<str> for CacheEntry {
     }
 }
 
+impl Pointer {
+    pub fn is_dir(self) -> bool {
+        matches!(self, Pointer::Dir(_))
+    }
+}
+
 impl Cache {
     fn new(
         files: Vec<CacheEntry>,
@@ -254,6 +261,14 @@ impl Cache {
         &self.files
     }
 
+    pub(super) fn roots(&self) -> &[Pointer] {
+        &self.root_dir
+    }
+
+    pub(super) fn points_to_a_root(&self, pointer: Pointer) -> bool {
+        self.root_dir.contains(&pointer)
+    }
+
     pub fn is_outdated(&self, roots: &[String]) -> bool {
         self.roots != roots
     }
@@ -269,11 +284,29 @@ impl Cache {
         }
     }
 
-    pub(super) fn deref_dir_raw(&self, pointer: usize) -> Option<&CacheDirEntry> {
-        self.dirs.get(pointer)
+    pub(super) fn deref_dir(&self, pointer: Pointer) -> Option<&CacheDirEntry> {
+        match pointer {
+            Pointer::Dir(i) => Some(self.dirs.get(i).expect("a pointer is always valid")),
+            Pointer::File(_) => None,
+        }
+    }
+
+    pub(super) fn deref_file(&self, pointer: Pointer) -> Option<&CacheEntry> {
+        match pointer {
+            Pointer::Dir(_) => None,
+            Pointer::File(i) => {
+                Some(self.files.get(i).expect("a pointer is always valid"))
+            }
+        }
+    }
+
+    pub(super) fn root_path(&self, pointer: Pointer) -> Option<&str> {
+        let i = self.deref(pointer).root();
+        self.roots.get(i).map(String::as_str)
     }
 }
 
+// TODO: all of this io-stuff to its own module
 pub async fn read_cache(path: &Path) -> FilerResult<Cache> {
     // NOTE: tokio is doing this itself, i.e., creating a PathBuf
     // https://docs.rs/tokio/1.26.0/src/tokio/fs/read.rs.html#48-51

@@ -20,6 +20,9 @@ build:
 serve:
 	@python serve.py
 
+.PHONY: devel
+devel: build serve
+
 $(DEPSFOLDER):
 	mkdir -p $@
 

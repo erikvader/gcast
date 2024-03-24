@@ -1,7 +1,23 @@
-#[protocol_macros::message_aggregator]
-#[no_intos]
+use crate::ToServer;
+
+// TODO: move to separate files? Like Mpv
+pub mod search_ctrl {
+    #[protocol_macros::message_aggregator]
+    enum SearchCtrl {
+        Search(String),
+    }
+}
+
+pub mod tree_ctrl {
+    #[protocol_macros::message_aggregator]
+    enum TreeCtrl {
+        Cd(usize),
+        CdDotDot,
+    }
+}
+
+#[protocol_macros::message_aggregator(ToServer)]
 enum FsControl {
-    Search(String),
-    RefreshCache,
-    BackToTheBeginning,
+    SearchCtrl(search_ctrl::SearchCtrl),
+    TreeCtrl(tree_ctrl::TreeCtrl),
 }

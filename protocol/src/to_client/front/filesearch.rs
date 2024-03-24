@@ -1,6 +1,7 @@
 pub mod init;
 pub mod refreshing;
 pub mod results;
+pub mod tree;
 
 use crate::to_client::ToClient;
 use protocol_macros::message_aggregator;
@@ -9,5 +10,6 @@ use protocol_macros::message_aggregator;
 enum FileSearch {
     Refreshing(refreshing::Refreshing),
     Results(results::Results),
+    Tree(tree::Tree),
     Init(init::Init),
 }

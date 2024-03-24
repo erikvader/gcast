@@ -1,7 +1,10 @@
 use clap::{Parser, Subcommand};
 use protocol::{
     to_client::{seat, ToClient},
-    to_server::{fscontrol, fsstart, mpvcontrol, mpvstart, sendstatus, spotifystart},
+    to_server::{
+        fscontrol::{self, search_ctrl, tree_ctrl},
+        fsstart, mpvcontrol, mpvstart, sendstatus, spotifystart,
+    },
     ToServerable,
 };
 use tungstenite::connect;
@@ -22,6 +25,9 @@ enum Commands {
     FilerStop,
     FilerRefreshCache,
     FilerSearch { query: String },
+    FilerTree,
+    FilerCd { i: usize },
+    FilerCdUp,
     MpvPlayUrl { url: String },
     MpvPlayFile { root: usize, path: String },
     MpvStop,
@@ -62,9 +68,9 @@ fn main() {
         Commands::SpotifyStop => spotifystart::Stop.to_server(),
         Commands::FilerStart => fsstart::Start.to_server(),
         Commands::FilerStop => fsstart::Stop.to_server(),
-        Commands::FilerRefreshCache => fscontrol::RefreshCache.to_server(),
+        Commands::FilerRefreshCache => fsstart::RefreshCache.to_server(),
         Commands::FilerSearch { query } => {
-            fscontrol::Search(query.to_string()).to_server()
+            search_ctrl::Search(query.to_string()).to_server()
         }
         Commands::MpvPlayUrl { url } => mpvstart::url::Url(url.clone()).to_server(),
         Commands::MpvPlayFile { root, path } => mpvstart::file::File {
@@ -74,6 +80,9 @@ fn main() {
         .to_server(),
         Commands::MpvStop => mpvstart::Stop.to_server(),
         Commands::MpvPause => mpvcontrol::TogglePause.to_server(),
+        Commands::FilerCd { i } => tree_ctrl::Cd(*i).to_server(),
+        Commands::FilerCdUp => tree_ctrl::CdDotDot.to_server(),
+        Commands::FilerTree => fsstart::Tree.to_server(),
     }
     .into();
 

@@ -26,7 +26,10 @@ def main():
 
     with MyTcpServer(("", port), Handler) as httpd:
         print(f"Serving on {port}...")
-        httpd.serve_forever()
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("Exiting, bye bye")
 
 if __name__ == "__main__":
     main()

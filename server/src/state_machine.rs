@@ -210,6 +210,7 @@ where
     }
 }
 
+// TODO: this thing can be replaced by the tracing crate I think
 struct StateLogger<'a> {
     name: &'a str,
 }

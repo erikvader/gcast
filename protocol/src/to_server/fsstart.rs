@@ -2,4 +2,7 @@
 enum FsStart {
     Start,
     Stop,
+    RefreshCache,
+    Search,
+    Tree,
 }

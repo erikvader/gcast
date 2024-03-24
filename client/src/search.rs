@@ -37,6 +37,7 @@ pub fn filesearch(props: &FilesearchProps) -> Html {
                 prot::FileSearch::Init(init) => html!{<Init front={init.clone()} />},
                 prot::FileSearch::Refreshing(refr) => html!{<Refreshing front={refr.clone()} />},
                 prot::FileSearch::Results(res) => html!(<Results front={res.clone()} />),
+                prot::FileSearch::Tree(tree) => html!(), // TODO: 
             }}
         </article>
     }

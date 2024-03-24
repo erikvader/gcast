@@ -1,9 +1,17 @@
+use anyhow::Context;
 use protocol::{
     to_client::front::filesearch,
-    to_server::{fscontrol, fsstart, mpvstart, ToServer},
+    to_client::front::filesearch::tree as prot_tree,
+    to_server::{
+        fscontrol::{self, search_ctrl, tree_ctrl},
+        fsstart, mpvstart, ToServer,
+    },
 };
 
-use crate::filer::{self, cache::Cache, cache_file, read_cache, refresh_cache};
+use crate::{
+    filer::{self, cache::Cache, cache_file, read_cache, refresh_cache, tree::Tree},
+    util::basename,
+};
 
 use super::{Control, Jump, LockedControl, MachineResult, StateLogger};
 
@@ -19,11 +27,20 @@ pub(super) async fn filer_state(ctrl: &mut Control) -> MachineResult<()> {
     {
         match msg {
             ToServer::FsStart(fsstart::Stop) => break,
-            ToServer::FsControl(fscontrol::RefreshCache) => {
-                cache = filer_refresh_cache_state(ctrl).await?;
+            ToServer::FsStart(fsstart::RefreshCache) => {
+                cache = filer_refresh_cache_state(ctrl)
+                    .await
+                    .context("filer refresh cache state")?;
             }
-            ToServer::FsControl(fscontrol::Search(search)) if search.is_empty() => {
-                filer_search_state(ctrl, &cache).await?;
+            ToServer::FsStart(fsstart::Search) => {
+                filer_search_state(ctrl, &cache)
+                    .await
+                    .context("filer search state")?;
+            }
+            ToServer::FsStart(fsstart::Tree) => {
+                filer_tree_state(ctrl, &cache)
+                    .await
+                    .context("filer tree state")?;
             }
             m => logger.invalid_message(&m),
         }
@@ -55,7 +72,7 @@ async fn filer_refresh_cache_state(ctrl: &mut Control) -> MachineResult<Cache> {
 
     while let Some(msg) = ctrl.recv().await {
         match msg {
-            ToServer::FsControl(fscontrol::BackToTheBeginning) => break,
+            ToServer::FsStart(fsstart::Stop) => break,
             m => logger.invalid_message(&m),
         }
     }
@@ -71,8 +88,8 @@ async fn filer_search_state(ctrl: &mut Control, cache: &Cache) -> MachineResult<
 
     while let Some(msg) = ctrl.recv().await {
         match msg {
-            ToServer::FsControl(fscontrol::BackToTheBeginning) => break,
-            ToServer::FsControl(fscontrol::Search(search)) => {
+            ToServer::FsStart(fsstart::Stop) => break,
+            ToServer::FsControl(fscontrol::SearchCtrl(search_ctrl::Search(search))) => {
                 ctrl.send(filer::search::search(search, cache)).await;
             }
             ToServer::MpvStart(mpvstart::File(file)) => {
@@ -83,4 +100,62 @@ async fn filer_search_state(ctrl: &mut Control, cache: &Cache) -> MachineResult<
     }
 
     Ok(())
+}
+
+async fn filer_tree_state(ctrl: &mut Control, cache: &Cache) -> MachineResult<()> {
+    let logger = StateLogger::new("FilerTree");
+    let mut tree = Tree::new(cache);
+
+    while let Some(msg) = ctrl.send_recv(create_tree_state(&tree)).await {
+        match msg {
+            ToServer::FsStart(fsstart::Stop) => break,
+            ToServer::FsControl(fscontrol::TreeCtrl(tree_ctrl::Cd(i))) => {
+                if let Err(()) = tree.cd(i) {
+                    logger.error(format!("can't cd, invalid i={i}"));
+                }
+            }
+            ToServer::FsControl(fscontrol::TreeCtrl(tree_ctrl::CdDotDot)) => {
+                if let Err(()) = tree.cd_up() {
+                    logger.warn("can't cd up, already at the top");
+                }
+            }
+            ToServer::MpvStart(mpvstart::File(file)) => {
+                return Jump::mpv_file(file.root, file.path);
+            }
+            m => logger.invalid_message(&m),
+        }
+    }
+
+    Ok(())
+}
+
+fn create_tree_state(tree: &Tree) -> prot_tree::Tree {
+    prot_tree::Tree {
+        breadcrumbs: tree.breadcrumbs(),
+        contents: tree
+            .files()
+            .enumerate()
+            .map(|(i, file)| match file {
+                filer::tree::File::Regular(path) => prot_tree::Entry::File {
+                    path: path.to_string(),
+                    root: tree
+                        .root()
+                        .expect("this is non-None if there are files available"),
+                    name: basename(path)
+                        .map(str::to_string)
+                        .unwrap_or_else(|| format!("file??")),
+                },
+                filer::tree::File::Directory(path) => prot_tree::Entry::Dir {
+                    name: basename(path)
+                        .map(str::to_string)
+                        .unwrap_or_else(|| format!("dir??")),
+                    id: i,
+                },
+                filer::tree::File::Root(path) => prot_tree::Entry::Dir {
+                    name: path.to_string(),
+                    id: i,
+                },
+            })
+            .collect(),
+    }
 }

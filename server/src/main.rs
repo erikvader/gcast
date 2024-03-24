@@ -163,6 +163,7 @@ async fn async_main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
+// TODO: re-organize all modules so that mostly leaf modules contain most of the code
 fn main() -> ExitCode {
     init_logger();
     log::info!("Welcome");

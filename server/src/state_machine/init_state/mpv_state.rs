@@ -20,7 +20,7 @@ pub(super) async fn mpv_file_state(
     path: String,
 ) -> MachineResult<()> {
     let logger = StateLogger::new("MpvFile");
-    let roots = crate::config::root_dirs();
+    let roots = crate::config::root_dirs(); // TODO: should ideally use the cache
 
     match roots.get(root) {
         None => {
