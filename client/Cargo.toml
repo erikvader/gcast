@@ -27,3 +27,4 @@ chrono = {workspace=true, features=["wasmbind", "clock"]}
 searcher = {path="../searcher"}
 
 derivative.workspace = true
+itertools.workspace = true

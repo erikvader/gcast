@@ -3,7 +3,10 @@ use std::ops::Range;
 
 use protocol::{
     to_client::front::filesearch as prot,
-    to_server::{fscontrol, fsstart, mpvstart},
+    to_server::{
+        fscontrol::{self, search_ctrl, tree_ctrl},
+        fsstart, mpvstart,
+    },
 };
 
 use wasm_bindgen::JsCast;
@@ -37,9 +40,86 @@ pub fn filesearch(props: &FilesearchProps) -> Html {
                 prot::FileSearch::Init(init) => html!{<Init front={init.clone()} />},
                 prot::FileSearch::Refreshing(refr) => html!{<Refreshing front={refr.clone()} />},
                 prot::FileSearch::Results(res) => html!(<Results front={res.clone()} />),
-                prot::FileSearch::Tree(tree) => html!(), // TODO: 
+                prot::FileSearch::Tree(tree) => html!{<Tree front={tree.clone()} />}
             }}
         </article>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct TreeProps {
+    front: prot::tree::Tree,
+}
+
+#[rustfmt::skip::macros(html)]
+#[function_component(Tree)]
+fn tree(props: &TreeProps) -> Html {
+    let server = use_context::<UseServer>().expect("no server context found");
+    let is_toplevel = props.front.breadcrumbs.is_empty();
+
+    let files: Vec<Html> = props
+        .front
+        .contents
+        .iter()
+        .map(|entry| match entry {
+            prot::tree::Entry::File { path, root, name } => {
+                let path = path.clone();
+                let root = *root;
+                html! {
+                    <div class={classes!("search-res")}
+                         onclick={click_send!(server,
+                             mpvstart::file::File {
+                                 root: root,
+                                 path: path.clone(),
+                             })}>
+                        <span class={classes!("search-detail", "dracula-green")}></span>
+                        <span class={classes!("search-content")}>{name}</span>
+                    </div>
+                }
+            }
+            prot::tree::Entry::Dir { name, id } => {
+                let id = *id;
+                html! {
+                    <div class={classes!("search-res")}
+                         onclick={click_send!(server, tree_ctrl::Cd(id))}>
+                        <span class={classes!("search-detail", "dracula-orange")}></span>
+                        <span class={classes!("search-content")}>{name}</span>
+                    </div>
+                }
+            }
+        })
+        .collect();
+
+    // TODO: use the one in the standard lib
+    // https://github.com/rust-lang/rust/issues/79524
+    let bread: Vec<Html> = itertools::Itertools::intersperse(
+        props
+            .front
+            .breadcrumbs
+            .iter()
+            .map(|b| html!{<span class={classes!("pad-small", "box")}>{b}</span>}),
+        html!{<span class={classes!("icon-navigate-next", "icon")}></span>},
+    )
+    .collect();
+
+    html! {
+        <>
+            if is_toplevel {
+                <BackButton button_type={Type::Exit}
+                            onclick={click_send!(server, fsstart::Stop)} />
+            } else {
+                <BackButton button_type={Type::Back}
+                            onclick={click_send!(server, tree_ctrl::CdDotDot)} />
+            }
+            if !is_toplevel {
+                <div class={classes!("fill-nicely", "kinda-small", "pad")}>
+                    {bread}
+                </div>
+            }
+            <div class={classes!("rows")}>
+                {files}
+            </div>
+        </>
     }
 }
 
@@ -67,7 +147,7 @@ fn results(props: &ResultsProps) -> Html {
             match input {
                 Some(inp) => {
                     query_setter.set(inp.clone());
-                    sender.send(fscontrol::Search(inp));
+                    sender.send(search_ctrl::Search(inp));
                 }
                 None => log::error!("Could not get value from text input"),
             }
@@ -87,7 +167,7 @@ fn results(props: &ResultsProps) -> Html {
     html! {
         <>
             <BackButton button_type={Type::Back}
-                        onclick={click_send!(server, fscontrol::BackToTheBeginning)} />
+                        onclick={click_send!(server, fsstart::Stop)} />
             <input type="text"
                    value={(*query).clone()}
                    class={classes!(invalid_class)}
@@ -207,7 +287,7 @@ fn refreshing(props: &RefreshingProps) -> Html {
         <>
             if props.front.is_done {
                 <BackButton button_type={Type::Back}
-                            onclick={click_send!(server, fscontrol::BackToTheBeginning)} />
+                            onclick={click_send!(server, fsstart::Stop)} />
             } else {
                 <BackButton button_type={Type::Exit}
                             onclick={click_send!(server, fsstart::Stop)} />
@@ -247,13 +327,18 @@ fn init(props: &InitProps) -> Html {
             <div class={classes!("pad")}>{cache_date(props.front.last_cache_date)}</div>
             <button disabled={server.is_disconnected()}
                     class={classes!("icon-refresh", "icon", "icon-hspace")}
-                    onclick={click_send!(server, fscontrol::RefreshCache)}>
+                    onclick={click_send!(server, fsstart::RefreshCache)}>
                 {"Refresh cache"}
             </button>
             <button disabled={server.is_disconnected() || props.front.last_cache_date.is_none()}
                     class={classes!("icon-search", "icon", "icon-hspace")}
-                    onclick={click_send!(server, fscontrol::Search("".to_string()))}>
+                    onclick={click_send!(server, fsstart::Search)}>
                 {"Search"}
+            </button>
+            <button disabled={server.is_disconnected() || props.front.last_cache_date.is_none()}
+                    class={classes!("icon-tree", "icon", "icon-hspace")}
+                    onclick={click_send!(server, fsstart::Tree)}>
+                {"Browse"}
             </button>
         </>
     }

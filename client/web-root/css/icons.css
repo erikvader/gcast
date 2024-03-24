@@ -106,12 +106,20 @@
     content: "arrow_downward";
 }
 
+.icon-navigate-next::after {
+    content: "navigate_next";
+}
+
 .icon-remove::after {
     content: "remove";
 }
 
 .icon-add::after {
     content: "add";
+}
+
+.icon-tree::after {
+    content: "account_tree";
 }
 
 .icon::after {

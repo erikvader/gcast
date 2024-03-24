@@ -10,6 +10,7 @@
     font-size: 0.8em;
     position: relative;
     display: flex;
+    min-height: 6ex;
 }
 
 body.no-touch .search-res:hover, body.no-touch .rows > *:nth-child(odd):hover {

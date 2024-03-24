@@ -158,7 +158,7 @@ pub fn track_selector(props: &TrackSelectorProps) -> Html {
         .collect();
 
     html! {
-        <div class={classes!("pad", "fill-nicely")}>
+        <div class={classes!("pad", "fill-nicely", "gap")}>
             {contents}
         </div>
     }

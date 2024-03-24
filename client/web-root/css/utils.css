@@ -30,6 +30,10 @@
     padding: 0.3em 0.9em;
 }
 
+.pad-small {
+    padding: 0em 0.2em;
+}
+
 .mono {
     /* Can't use monospace alone: https://github.com/necolas/normalize.css/issues/519 */
     /* Some browsers set a smaller font size if they see 'font-family: monospace'. */
@@ -165,5 +169,12 @@
 .fill-nicely {
     display: flex;
     flex-wrap: wrap;
+}
+
+.gap {
     gap: 0.5em;
+}
+
+.box {
+    border: thin solid;
 }
