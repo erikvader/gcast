@@ -137,6 +137,7 @@ impl CacheDirEntry {
     delegate::delegate! {
         to self.entry {
             pub(super) fn root(&self) -> usize;
+            #[allow(dead_code)]
             pub(super) fn is_root(&self) -> bool;
             pub(super) fn path_relative_root(&self) -> &str;
             #[call(borrow)]
@@ -157,12 +158,6 @@ impl CacheDirEntry {
 impl AsRef<str> for CacheEntry {
     fn as_ref(&self) -> &str {
         self.path_relative_root()
-    }
-}
-
-impl Pointer {
-    pub fn is_dir(self) -> bool {
-        matches!(self, Pointer::Dir(_))
     }
 }
 
@@ -278,6 +273,7 @@ impl Cache {
         }
     }
 
+    #[allow(dead_code)]
     pub(super) fn deref_file(&self, pointer: Pointer) -> Option<&CacheEntry> {
         match pointer {
             Pointer::Dir(_) => None,

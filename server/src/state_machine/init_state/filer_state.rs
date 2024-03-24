@@ -8,9 +8,8 @@ use protocol::{
     },
 };
 
-use crate::{
-    filer::{self, cache::Cache, cache_file, read_cache, refresh_cache, tree::Tree},
-    util::basename,
+use crate::filer::{
+    self, cache::Cache, cache_file, read_cache, refresh_cache, tree::Tree,
 };
 
 use super::{Control, Jump, LockedControl, MachineResult, StateLogger};

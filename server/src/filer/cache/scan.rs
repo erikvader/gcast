@@ -2,7 +2,6 @@ use std::{
     collections::HashMap,
     fs::{create_dir_all, File},
     path::{Path, PathBuf},
-    time::SystemTime,
 };
 
 use futures_util::{stream::FuturesUnordered, StreamExt};

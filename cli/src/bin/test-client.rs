@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use protocol::{
     to_client::{seat, ToClient},
     to_server::{
-        fscontrol::{self, search_ctrl, tree_ctrl},
+        fscontrol::{search_ctrl, tree_ctrl},
         fsstart, mpvcontrol, mpvstart, sendstatus, spotifystart,
     },
     ToServerable,
@@ -90,7 +90,7 @@ fn main() {
     let data = tosend.serialize().expect("serialization failed");
     for _ in 0..1 {
         socket
-            .write_message(tungstenite::Message::Binary(data.clone()))
+            .write(tungstenite::Message::Binary(data.clone()))
             .expect("could not send");
         log::info!("Sent");
     }
@@ -98,7 +98,7 @@ fn main() {
     if cli.listen {
         log::info!("Listening for all replies...");
         loop {
-            let msg = socket.read_message().expect("could not read");
+            let msg = socket.read().expect("could not read");
             // log::info!("Received raw: {:?}", msg);
 
             if msg.is_close() {
@@ -127,7 +127,7 @@ type WS =
 
 fn read_seat(socket: &mut WS) -> bool {
     loop {
-        let msg = parse_tung_msg(socket.read_message().expect("could not read message"));
+        let msg = parse_tung_msg(socket.read().expect("could not read message"));
         match msg.take_to_client() {
             Ok(ToClient::Seat(seat::Accept)) => {
                 log::info!("Got accepted");
@@ -147,11 +147,11 @@ fn send_read_state(socket: &mut WS) {
         .serialize()
         .expect("ser failed");
     socket
-        .write_message(tungstenite::Message::Binary(data))
+        .write(tungstenite::Message::Binary(data))
         .expect("could not send");
 
     loop {
-        let msg = parse_tung_msg(socket.read_message().expect("could not read message"));
+        let msg = parse_tung_msg(socket.read().expect("could not read message"));
         if let Ok(ToClient::Front(f)) = msg.take_to_client() {
             log::info!("Got state {:?}", f);
             break;

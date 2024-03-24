@@ -4,7 +4,7 @@ use std::ops::Range;
 use protocol::{
     to_client::front::filesearch as prot,
     to_server::{
-        fscontrol::{self, search_ctrl, tree_ctrl},
+        fscontrol::{search_ctrl, tree_ctrl},
         fsstart, mpvstart,
     },
 };
