@@ -18,6 +18,7 @@ pub struct File<'a> {
     pub name: &'a str,
     pub path_relative_root: &'a str,
     pub ty: Type,
+    pub id: usize,
 }
 
 impl<'a> Tree<'a> {
@@ -33,25 +34,30 @@ impl<'a> Tree<'a> {
         let pointers = self.top_pointers();
 
         pointers.into_iter().map(|point| {
-            let entry = self.cache.deref(*point);
+            let entry = self
+                .cache
+                .deref(*point)
+                .expect("all pointers in the cache are valid");
             let relative_root = entry.path_relative_root();
+            let (id, ty) = match point {
+                Pointer::File(i) => (*i, Type::Regular),
+                Pointer::Dir(i) => (*i, Type::Directory),
+            };
 
             if entry.is_root() {
                 File {
                     ty: Type::Root,
                     name: self.cache.root_path(entry),
                     path_relative_root: relative_root,
+                    id,
                 }
             } else {
                 let name = basename(relative_root).expect("is not root");
-                let ty = match point {
-                    Pointer::File(_) => Type::Regular,
-                    Pointer::Dir(_) => Type::Directory,
-                };
                 File {
                     ty,
                     name,
                     path_relative_root: relative_root,
+                    id,
                 }
             }
         })
@@ -69,14 +75,10 @@ impl<'a> Tree<'a> {
         Ok(())
     }
 
-    pub fn cd(&mut self, i: usize) -> Result<(), ()> {
-        let pointers = self.top_pointers();
+    pub fn cd(&mut self, dir_id: usize) -> Result<(), ()> {
+        let dir_pointer = Pointer::Dir(dir_id);
 
-        let Some(dir_pointer) = pointers.into_iter().skip(i).next() else {
-            return Err(());
-        };
-
-        let Some(entry) = self.cache.deref_dir(*dir_pointer) else {
+        let Some(entry) = self.cache.deref_dir(dir_pointer) else {
             return Err(());
         };
 

@@ -27,7 +27,7 @@ pub struct Cache {
     root_dir: Vec<Pointer>,
     /// The date when this cache was created.
     updated: Option<SystemTime>,
-    /// The paths of all roots, not necessarily sorted.
+    /// The paths of all roots
     roots: Vec<String>,
 }
 
@@ -185,15 +185,18 @@ impl Cache {
                     match (pair[0], pair[1]) {
                         (File(_), Dir(_)) => false,
                         (Dir(_), File(_)) => true,
-                        (l, r) => {
-                            cache.deref(l).path_relative_root()
-                                <= cache.deref(r).path_relative_root()
-                        }
+                        (l, r) => match (cache.deref(l), cache.deref(r)) {
+                            (Some(l), Some(r)) => {
+                                l.path_relative_root() <= r.path_relative_root()
+                            }
+                            _ => false,
+                        },
                     }
                 })),
             concat!(
                 "wrong order in dirs children, dirs come first then files,",
-                " each kind sorted with themselves by path_relative_root",
+                " each kind sorted with themselves by path_relative_root. Some pointer",
+                " could also be invalid.",
             )
         );
 
@@ -227,12 +230,17 @@ impl Cache {
         );
 
         assert!(
-            cache
-                .root_dir
-                .windows(2)
-                .all(|pair| cache.deref(pair[0]).path_relative_root()
-                    <= cache.deref(pair[1]).path_relative_root()),
-            "psuedo-root dir not sorted correctly"
+            cache.root_dir.windows(2).all(|pair| {
+                let l = cache.deref(pair[0]);
+                let r = cache.deref(pair[1]);
+                match (l, r) {
+                    (Some(l), Some(r)) => {
+                        l.path_relative_root() <= r.path_relative_root()
+                    }
+                    _ => false,
+                }
+            }),
+            "psuedo-root dir not sorted correctly, or some pointers are invalid"
         );
 
         cache
@@ -255,20 +263,16 @@ impl Cache {
         self.roots != roots
     }
 
-    pub(super) fn deref(&self, pointer: Pointer) -> &CacheEntry {
+    pub(super) fn deref(&self, pointer: Pointer) -> Option<&CacheEntry> {
         match pointer {
-            Pointer::Dir(i) => self
-                .dirs
-                .get(i)
-                .expect("a pointer is always valid")
-                .cache_entry(),
-            Pointer::File(i) => self.files.get(i).expect("a pointer is always valid"),
+            Pointer::Dir(i) => self.dirs.get(i).map(CacheDirEntry::cache_entry),
+            Pointer::File(i) => self.files.get(i),
         }
     }
 
     pub(super) fn deref_dir(&self, pointer: Pointer) -> Option<&CacheDirEntry> {
         match pointer {
-            Pointer::Dir(i) => Some(self.dirs.get(i).expect("a pointer is always valid")),
+            Pointer::Dir(i) => self.dirs.get(i),
             Pointer::File(_) => None,
         }
     }
@@ -277,9 +281,7 @@ impl Cache {
     pub(super) fn deref_file(&self, pointer: Pointer) -> Option<&CacheEntry> {
         match pointer {
             Pointer::Dir(_) => None,
-            Pointer::File(i) => {
-                Some(self.files.get(i).expect("a pointer is always valid"))
-            }
+            Pointer::File(i) => self.files.get(i),
         }
     }
 
@@ -288,6 +290,6 @@ impl Cache {
         self.roots
             .get(i)
             .map(String::as_str)
-            .expect("there will always be a root")
+            .expect("there will always be a root (lich king)")
     }
 }

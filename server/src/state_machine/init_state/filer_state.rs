@@ -133,12 +133,12 @@ fn create_tree_state(tree: &Tree) -> prot_tree::Tree {
         breadcrumbs: tree.breadcrumbs(),
         contents: tree
             .files()
-            .enumerate()
-            .map(|(i, file)| match file {
+            .map(|file| match file {
                 filer::tree::File {
                     name,
                     path_relative_root,
                     ty: filer::tree::Type::Regular,
+                    ..
                 } => prot_tree::Entry::File {
                     path: path_relative_root.to_string(),
                     root: tree
@@ -149,15 +149,17 @@ fn create_tree_state(tree: &Tree) -> prot_tree::Tree {
                 filer::tree::File {
                     name,
                     ty: filer::tree::Type::Directory,
+                    id,
                     ..
                 }
                 | filer::tree::File {
                     name,
                     ty: filer::tree::Type::Root,
+                    id,
                     ..
                 } => prot_tree::Entry::Dir {
                     name: name.to_string(),
-                    id: i,
+                    id,
                 },
             })
             .collect(),
