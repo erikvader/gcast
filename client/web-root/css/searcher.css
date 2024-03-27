@@ -48,4 +48,7 @@ body.no-touch .search-res:hover, body.no-touch .rows > *:nth-child(odd):hover {
 .search-content {
     padding: 0.2em;
     margin-left: 0.1em;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }

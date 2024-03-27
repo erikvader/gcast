@@ -175,6 +175,10 @@
     gap: 0.5em;
 }
 
+.row-gap {
+    row-gap: 0.5em;
+}
+
 .box {
     border: thin solid;
 }

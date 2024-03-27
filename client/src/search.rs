@@ -112,7 +112,7 @@ fn tree(props: &TreeProps) -> Html {
                             onclick={click_send!(server, tree_ctrl::CdDotDot)} />
             }
             if !is_toplevel {
-                <div class={classes!("fill-nicely", "kinda-small", "pad")}>
+                <div class={classes!("fill-nicely", "kinda-small", "pad", "row-gap")}>
                     {bread}
                 </div>
             }
@@ -227,7 +227,6 @@ fn search_result(props: &SearchResultProps) -> Html {
             <span class={classes!("search-detail", color_class)}></span>
             <span class={classes!("search-content")}>
                 <span class={classes!("kinda-small", "italic")}>{dir}</span>
-                <br />
                 <span>{base}</span>
             </span>
         </div>
