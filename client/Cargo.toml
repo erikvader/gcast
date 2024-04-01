@@ -12,7 +12,7 @@ wasm-bindgen.workspace = true
 
 serde.workspace = true
 
-web-sys = {workspace = true, features = ["VisibilityState"]}
+web-sys = {workspace = true, features = ["VisibilityState", "HtmlDocument"]}
 
 wasm-logger.workspace = true
 log.workspace = true

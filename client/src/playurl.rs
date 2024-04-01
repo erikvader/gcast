@@ -2,7 +2,7 @@ use super::UseServer;
 use protocol::to_server::{mpvstart, playurlstart};
 
 use wasm_bindgen::JsCast;
-use web_sys::HtmlInputElement;
+use web_sys::{window, HtmlDocument, HtmlInputElement};
 use yew::prelude::*;
 
 use crate::back_button::{BackButton, Type};
@@ -11,9 +11,8 @@ use crate::back_button::{BackButton, Type};
 #[function_component(PlayUrl)]
 pub fn playurl() -> Html {
     let server = use_context::<UseServer>().expect("no server context found");
+    let input_ref = use_node_ref();
 
-    // TODO: initialize with clipboard contents if it as an URL. Probably use a lib for
-    // this since checking if a string is a URL is done in multiple places
     let url = use_state(|| "".to_string());
     let url_change = {
         let url_setter = url.setter();
@@ -36,11 +35,33 @@ pub fn playurl() -> Html {
         click_send!(server, mpvstart::url::Url((*url).clone()))
     };
 
+    let paste_click = {
+        let input_ref = input_ref.clone();
+        Callback::from(move |_| {
+            focus(&input_ref);
+            let doc: HtmlDocument = window()
+                .expect("failed to get window")
+                .document()
+                .expect("failed to get document")
+                .dyn_into()
+                .expect("failed to cast into html document");
+
+            match doc.exec_command("paste") {
+                Ok(true) => (),
+                Ok(false) => log::error!("Not allowed to paste"),
+                Err(e) => log::error!("Failed to paste: {e:?}"),
+            };
+        })
+    };
+
+    use_effect_with(input_ref.clone(), |input_ref| focus(input_ref));
+
     html! {
         <article class={classes!("stacker")}>
             <BackButton button_type={Type::Back}
                         onclick={click_send!(server, playurlstart::Stop)} />
             <input type="url"
+                   ref={input_ref}
                    value={(*url).clone()}
                    class={classes!()}
                    oninput={url_change}
@@ -52,6 +73,21 @@ pub fn playurl() -> Html {
                     onclick={play_click}>
                 {"Play"}
             </button>
+            <button class={classes!()}
+                    disabled={!url.is_empty()}
+                    onclick={paste_click}>
+                {"Paste"}
+            </button>
         </article>
+    }
+}
+
+fn focus(input_ref: &NodeRef) {
+    let input = input_ref
+        .cast::<HtmlInputElement>()
+        .expect("ref not attached");
+
+    if let Err(e) = input.focus() {
+        log::error!("Failed to focus the input field: {e:?}");
     }
 }
