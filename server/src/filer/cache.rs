@@ -259,6 +259,10 @@ impl Cache {
         &self.root_dir
     }
 
+    pub fn roots_path(&self) -> &[String] {
+        &self.roots
+    }
+
     pub fn is_outdated(&self, roots: &[String]) -> bool {
         self.roots != roots
     }

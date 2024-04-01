@@ -57,7 +57,9 @@ async fn filer_read_cache_state(ctrl: &mut Control) -> MachineResult<Cache> {
     })
     .await;
 
-    let cache = read_cache(&cache_file()).await;
+    let cache = read_cache(&cache_file())
+        .await
+        .context("failed to read the cache");
 
     Ok(cache?)
 }

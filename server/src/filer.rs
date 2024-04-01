@@ -22,7 +22,6 @@ pub enum FilerError {
     Bincode(#[from] bincode::Error),
 }
 
-// TODO: lazy_static?
 pub fn cache_file() -> PathBuf {
     config::cache_dir().join("files_cache")
 }

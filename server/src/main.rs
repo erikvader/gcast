@@ -111,7 +111,7 @@ async fn maybe_refresh_cache() {
     }
 }
 
-// TODO: Beware of misbehaving tasks that block for too long. Disabling the LIFO slot did
+// NOTE: Beware of misbehaving tasks that block for too long. Disabling the LIFO slot did
 // help, but is not a solution. This is just a PSA. This comment can be removed when that
 // special slot is stealable. The mpv issue is maybe caused by this?
 // https://github.com/tokio-rs/tokio/issues/4941

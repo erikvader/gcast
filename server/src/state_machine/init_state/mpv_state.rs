@@ -5,7 +5,10 @@ use protocol::{
 };
 use tokio::select;
 
-use crate::mpv::{self, MpvError};
+use crate::{
+    filer::{cache_file, read_cache},
+    mpv::{self, MpvError},
+};
 
 use super::{Control, Jump, MachineResult, StateLogger};
 
@@ -20,15 +23,18 @@ pub(super) async fn mpv_file_state(
     path: String,
 ) -> MachineResult<()> {
     let logger = StateLogger::new("MpvFile");
-    let roots = crate::config::root_dirs(); // TODO: should ideally use the cache
+
+    // TODO: the whole cache is re-read over and over, so cache the cache somehow? Maybe
+    // save the roots in another file?
+    let cache = read_cache(&cache_file())
+        .await
+        .context("failed to read the cache")?;
+    let roots = cache.roots_path();
 
     match roots.get(root) {
         None => {
             logger.error(format!("Root {} out of range of 0..{}", root, roots.len()));
-            Jump::user_error(
-                "Could not find file to play",
-                "Root dir is out of range, try to refresh the cache",
-            )
+            Jump::user_error("Could not find file to play", "Root dir is out of range")
         }
         Some(r) => {
             assert!(path.starts_with('/'));
