@@ -34,7 +34,7 @@ type HandleResp = oneshot::Sender<MpvResult<()>>;
 type HandleSnd = mpsc::Sender<(Command, HandleResp)>;
 
 const EV_CTX_WAIT: f64 = 5.0;
-const BANNED_PROPERTIES: &[&str] = &["idle"];
+const BANNED_PROPERTIES: &[&str] = &["idle", "pause"];
 
 static MPV_THREAD_ON: AtomicBool = AtomicBool::new(false);
 
@@ -227,7 +227,9 @@ fn observe_some_properties(ctx: &libmpv::events::EventContext<'_>) -> libmpv::Re
     Ok(())
 }
 
-pub fn mpv(path: &str) -> MpvResult<MpvHandle> {
+// TODO: make paused an enum?
+// TODO: create a MpvOptions instead of having multiple arguments?
+pub fn mpv(path: &str, paused: bool) -> MpvResult<MpvHandle> {
     if MPV_THREAD_ON.swap(true, Ordering::SeqCst) {
         return Err(MpvError::AlreadyRunning);
     }
@@ -237,6 +239,7 @@ pub fn mpv(path: &str) -> MpvResult<MpvHandle> {
 
     let mpv = Mpv::with_initializer(|x| {
         x.set_property("idle", "once")?; // NOTE: needed for the correct events to appear
+        x.set_property("pause", if paused { "yes" } else { "no" })?;
         for (key, value) in crate::config::mpv_options() {
             if BANNED_PROPERTIES.contains(&key.as_str()) {
                 log::warn!("It is not allowed to change '{}'", key);

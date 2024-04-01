@@ -12,9 +12,13 @@ use crate::{
 
 use super::{Control, Jump, MachineResult, StateLogger};
 
-pub(super) async fn mpv_url_state(ctrl: &mut Control, url: String) -> MachineResult<()> {
+pub(super) async fn mpv_url_state(
+    ctrl: &mut Control,
+    url: String,
+    paused: bool,
+) -> MachineResult<()> {
     let _logger = StateLogger::new("MpvUrl");
-    mpv_state(ctrl, url).await
+    mpv_state(ctrl, url, paused).await
 }
 
 pub(super) async fn mpv_file_state(
@@ -39,17 +43,17 @@ pub(super) async fn mpv_file_state(
         Some(r) => {
             assert!(path.starts_with('/'));
             assert!(!r.ends_with('/'));
-            mpv_state(ctrl, r.to_string() + &path).await
+            mpv_state(ctrl, r.to_string() + &path, false).await
         }
     }
 }
 
-async fn mpv_state(ctrl: &mut Control, path: String) -> MachineResult<()> {
+async fn mpv_state(ctrl: &mut Control, path: String, paused: bool) -> MachineResult<()> {
     let logger = StateLogger::new("Mpv");
 
     ctrl.send(front::mpv::Load).await;
 
-    let mut handle = mpv::mpv(&path).context("creating mpv handle")?;
+    let mut handle = mpv::mpv(&path, paused).context("creating mpv handle")?;
 
     let retval: MachineResult<()> = loop {
         select! {

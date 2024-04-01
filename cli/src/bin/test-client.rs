@@ -72,7 +72,11 @@ fn main() {
         Commands::FilerSearch { query } => {
             search_ctrl::Search(query.to_string()).to_server()
         }
-        Commands::MpvPlayUrl { url } => mpvstart::url::Url(url.clone()).to_server(),
+        Commands::MpvPlayUrl { url } => mpvstart::url::Url {
+            url: url.clone(),
+            paused: false,
+        }
+        .to_server(),
         Commands::MpvPlayFile { root, path } => mpvstart::file::File {
             root: *root,
             path: path.to_string(),

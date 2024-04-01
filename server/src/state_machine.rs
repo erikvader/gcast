@@ -183,13 +183,13 @@ impl Jump {
     }
 
     fn mpv_file<T>(root: usize, path: String) -> MachineResult<T> {
-        log::debug!("Jump to mpv: root={}, path={}", root, path);
+        log::debug!("Jump to mpv: root={root}, path={path}");
         Err(Self::Mpv(mpvstart::file::File { root, path }.into()).into())
     }
 
-    fn mpv_url<T>(url: String) -> MachineResult<T> {
-        log::debug!("Jump to mpv: url={}", url);
-        Err(Self::Mpv(mpvstart::url::Url(url).into()).into())
+    fn mpv_url<T>(url: String, paused: bool) -> MachineResult<T> {
+        log::debug!("Jump to mpv: url={url}, paused={paused}");
+        Err(Self::Mpv(mpvstart::url::Url { url, paused }.into()).into())
     }
 }
 

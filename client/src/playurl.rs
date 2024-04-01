@@ -32,7 +32,26 @@ pub fn playurl() -> Html {
 
     let play_click = {
         let url = url.clone();
-        click_send!(server, mpvstart::url::Url((*url).clone()))
+        click_send!(
+            server,
+            mpvstart::url::Url {
+                url: (*url).clone(),
+                paused: false
+            }
+            .clone()
+        )
+    };
+
+    let play_paused_click = {
+        let url = url.clone();
+        click_send!(
+            server,
+            mpvstart::url::Url {
+                url: (*url).clone(),
+                paused: true
+            }
+            .clone()
+        )
     };
 
     let paste_click = {
@@ -72,6 +91,11 @@ pub fn playurl() -> Html {
                     disabled={server.is_disconnected() || url.is_empty()}
                     onclick={play_click}>
                 {"Play"}
+            </button>
+            <button class={classes!()}
+                    disabled={server.is_disconnected() || url.is_empty()}
+                    onclick={play_paused_click}>
+                {"Play paused"}
             </button>
             <button class={classes!()}
                     disabled={!url.is_empty()}
