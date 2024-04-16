@@ -25,7 +25,7 @@ pub fn search(query: String, cache: &Cache) -> filesearch::results::Results {
             let searchres = top
                 .iter_mut()
                 .map(|r| {
-                    let c_entry = cache.files().get(r.get_index()).unwrap();
+                    let c_entry = r.get_inner();
                     filesearch::results::SearchResult {
                         path: c_entry.path_relative_root().to_string(),
                         root: c_entry.root(),

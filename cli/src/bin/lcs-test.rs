@@ -67,7 +67,7 @@ fn main() {
                 println!(
                     "{}",
                     stylize::<_, _, _, String>(
-                        x.get_string(),
+                        x.get_inner(),
                         x.get_match().indices(),
                         |c| c.to_string().red().to_string(),
                         |c| c.to_string()

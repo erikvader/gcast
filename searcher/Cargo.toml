@@ -7,9 +7,8 @@ edition = "2021"
 itertools = {workspace = true, optional = true}
 regex = {workspace = true, optional = true}
 regex-syntax = {workspace = true, optional = true}
-rayon = {workspace = true, optional = true}
 thiserror = {workspace = true, optional = true}
 
 [features]
 default = []
-search-fun = ["itertools", "regex", "regex-syntax", "rayon", "thiserror"]
+search-fun = ["itertools", "regex", "regex-syntax", "thiserror"]

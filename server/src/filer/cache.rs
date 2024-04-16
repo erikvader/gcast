@@ -251,8 +251,8 @@ impl Cache {
     }
 
     /// Retrieves all files sorted by their paths relative to their respective roots.
-    pub(super) fn files(&self) -> &[CacheEntry] {
-        &self.files
+    pub(super) fn files(&self) -> impl Iterator<Item = &CacheEntry> {
+        self.files.iter()
     }
 
     pub(super) fn roots(&self) -> &[Pointer] {

@@ -62,7 +62,6 @@ itertools = "0.12" # searcher: tuple_windows, client: intersperse divs
 #TODO: scale down on features on regex
 regex = "1" # searcher: primary search tool
 regex-syntax = "0.8" # searcher: escape strings
-rayon = "1" # searcher: search in parallel
 
 quote = "1" # protocol-macros
 syn = {version = "2", features=["full"]} # protocol-macros
