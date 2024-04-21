@@ -6,6 +6,7 @@ members = [
   "client",
   "protocol",
   "protocol-macros",
+  "libmpv",
 ]
 resolver = "2"
 
