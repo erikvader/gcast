@@ -1,4 +1,10 @@
-use std::{ffi::CStr, marker::PhantomData, mem::ManuallyDrop};
+use std::{
+    ffi::{CStr, CString},
+    marker::PhantomData,
+    mem::ManuallyDrop,
+    path::{Path, PathBuf},
+    ptr,
+};
 
 use crate::bindings::*;
 
@@ -8,8 +14,8 @@ pub enum MpvError {
     NullPtr,
     #[error("mpv error: {0}")]
     ErrorCode(ErrorCode),
-    #[error("the linked against mpv is too old")]
-    LibMpvTooOld,
+    #[error("the linked against mpv is too old {0} < {}", MINIMUM_MPV_API_VERSION)]
+    LibMpvTooOld(libc::c_ulong),
 }
 
 pub type Result<T> = std::result::Result<T, MpvError>;
@@ -124,10 +130,17 @@ macro_rules! mpv_try_null {
     }};
 }
 
+const MINIMUM_MPV_API_VERSION: libc::c_ulong = mpv_make_version(2, 2);
+
 /// Make sure that the major version of the C api is greater than the minimum supported
 /// version
-pub fn meets_required_mpv_api_version() -> bool {
-    (unsafe { mpv_client_api_version() }) >= mpv_make_version(2, 3)
+pub fn meets_required_mpv_api_version() -> Option<libc::c_ulong> {
+    let version = unsafe { mpv_client_api_version() };
+    if version >= MINIMUM_MPV_API_VERSION {
+        None
+    } else {
+        Some(version)
+    }
 }
 
 mod private {
@@ -147,8 +160,8 @@ pub struct MpvHandle<T: private::InitState> {
 
 impl MpvHandle<Uninit> {
     pub fn new() -> Result<MpvHandle<Uninit>> {
-        if !meets_required_mpv_api_version() {
-            return Err(MpvError::LibMpvTooOld);
+        if let Some(oldversion) = meets_required_mpv_api_version() {
+            return Err(MpvError::LibMpvTooOld(oldversion));
         }
         let ctx = mpv_try_null! {unsafe { mpv_create() }}?;
         Ok(MpvHandle {
@@ -167,28 +180,26 @@ impl MpvHandle<Uninit> {
         })
         // TODO: add a check to make sure the version is at least 0.37.0
     }
-}
 
-impl<T: private::InitState> Drop for MpvHandle<T> {
-    fn drop(&mut self) {
-        unsafe { mpv_destroy(self.ctx) };
+    pub fn set_audio_device(&mut self, device: impl Into<String>) -> Result<()> {
+        self.set_property_string(Property::AudioDevice, device)
     }
 }
 
-pub enum Property {
-    MpvVersion,
-}
-
-impl Property {
-    fn as_cstr(self) -> &'static CStr {
-        match self {
-            Property::MpvVersion => CStr::from_bytes_with_nul(b"mpv-version\0").unwrap(),
-        }
+impl<T: private::InitState> MpvHandle<T> {
+    fn set_property_string(
+        &mut self,
+        prop: Property,
+        value: impl Into<String>,
+    ) -> Result<()> {
+        let value = CString::new(value.into()).expect("Strings do not contain a null");
+        mpv_try! {unsafe { mpv_set_property_string(self.ctx, prop.as_cstr().as_ptr(), value.as_ptr()) }}?;
+        Ok(())
     }
-}
 
-impl MpvHandle<Init> {
-    pub fn get_property_string(&mut self, prop: Property) -> Result<String> {
+    /// The returned property should be UTF-8 except for a few things, see the header
+    /// file.
+    fn get_property_string(&mut self, prop: Property) -> Result<String> {
         let retval = mpv_try_null! {unsafe { mpv_get_property_string(self.ctx, prop.as_cstr().as_ptr()) }}?;
         let cstr = unsafe { CStr::from_ptr(retval) };
         let rust_str = cstr.to_string_lossy().to_string();
@@ -198,15 +209,87 @@ impl MpvHandle<Init> {
     }
 }
 
+impl<T: private::InitState> Drop for MpvHandle<T> {
+    fn drop(&mut self) {
+        unsafe { mpv_destroy(self.ctx) };
+    }
+}
+
+enum Property {
+    MpvVersion,
+    AudioDevice,
+}
+
+impl Property {
+    fn as_cstr(self) -> &'static CStr {
+        match self {
+            Property::MpvVersion => CStr::from_bytes_with_nul(b"mpv-version\0").unwrap(),
+            Property::AudioDevice => {
+                CStr::from_bytes_with_nul(b"audio-device\0").unwrap()
+            }
+        }
+    }
+}
+
+impl MpvHandle<Init> {
+    pub fn create_client(&mut self) -> Result<MpvHandle<Init>> {
+        let ctx = mpv_try_null! {unsafe{mpv_create_client(self.ctx, ptr::null())}}?;
+        Ok(MpvHandle {
+            ctx,
+            _init: PhantomData,
+        })
+    }
+
+    pub fn terminate(self) {
+        // Avoid mpv_destroying ctx when self is dropped
+        let s = ManuallyDrop::new(self);
+        unsafe { mpv_terminate_destroy(s.ctx) };
+    }
+
+    /// returns immediately
+    #[cfg(unix)]
+    pub fn loadfile(&mut self, file: PathBuf) -> Result<()> {
+        use std::os::unix::ffi::OsStringExt;
+        let file = CString::new(file.into_os_string().into_vec())
+            .expect("PathBuf does not contain a null");
+        let loadfile = CStr::from_bytes_with_nul(b"loadfile\0").unwrap();
+
+        let mut args = [loadfile.as_ptr(), file.as_ptr(), ptr::null()];
+        mpv_try! {unsafe { mpv_command(self.ctx, args.as_mut_ptr()) }}?;
+        Ok(())
+    }
+
+    // TODO: URL type
+    pub fn loadurl(&mut self, url: impl Into<String>) -> Result<()> {
+        let url = CString::new(url.into()).expect("Strings do not contain a null");
+        let loadfile = CStr::from_bytes_with_nul(b"loadfile\0").unwrap();
+
+        let mut args = [loadfile.as_ptr(), url.as_ptr(), ptr::null()];
+        mpv_try! {unsafe { mpv_command(self.ctx, args.as_mut_ptr()) }}?;
+        Ok(())
+    }
+
+    pub fn version(&mut self) -> Result<String> {
+        self.get_property_string(Property::MpvVersion)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
     pub fn test() -> Result<()> {
-        let mut handle = MpvHandle::new()?.init()?;
+        let mut handle = MpvHandle::new()?;
+        handle.set_property_string(Property::AudioDevice, "pulse")?;
+        let mut handle = handle.init()?;
         let version = handle.get_property_string(Property::MpvVersion)?;
         println!("{}", version);
+
+        handle.loadurl("https://www.twitch.tv/divvity")?;
+
+        std::thread::sleep(std::time::Duration::from_secs(5));
+
         assert!(false);
         Ok(())
     }

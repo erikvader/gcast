@@ -1,5 +1,6 @@
 #![allow(non_camel_case_types)]
 // /usr/include/mpv/client.h
+// https://github.com/mpv-player/mpv/blob/v0.37.0/libmpv/client.h
 
 pub type mpv_error = libc::c_int;
 pub const MPV_ERROR_SUCCESS: mpv_error = 0;
@@ -71,6 +72,10 @@ pub const MPV_EVENT_HOOK: mpv_event_id = 25;
 extern "C" {
     pub fn mpv_client_api_version() -> libc::c_ulong;
     pub fn mpv_create() -> *mut mpv_handle;
+    pub fn mpv_create_client(
+        ctx: *mut mpv_handle,
+        name: *const libc::c_char,
+    ) -> *mut mpv_handle;
     pub fn mpv_initialize(ctx: *mut mpv_handle) -> libc::c_int;
     pub fn mpv_destroy(ctx: *mut mpv_handle);
     pub fn mpv_terminate_destroy(ctx: *mut mpv_handle);
@@ -79,10 +84,11 @@ extern "C" {
     /// the returned string is static
     pub fn mpv_error_string(error: libc::c_int) -> *const libc::c_char;
 
-    // pub fn mpv_command(
-    //     ctx: *mut mpv_handle,
-    //     args: *mut *const libc::c_char,
-    // ) -> libc::c_int;
+    pub fn mpv_command(
+        ctx: *mut mpv_handle,
+        args: *mut *const libc::c_char,
+    ) -> libc::c_int;
+
     pub fn mpv_command_async(
         ctx: *mut mpv_handle,
         reply_userdata: u64,
@@ -96,11 +102,12 @@ extern "C" {
     //     data: *mut libc::c_void,
     // ) -> libc::c_int;
 
-    // pub fn mpv_set_property_string(
-    //     ctx: *mut mpv_handle,
-    //     name: *const libc::c_char,
-    //     data: *const libc::c_char,
-    // ) -> ::std::os::raw::c_int;
+    pub fn mpv_set_property_string(
+        ctx: *mut mpv_handle,
+        name: *const libc::c_char,
+        data: *const libc::c_char,
+    ) -> libc::c_int;
+
     pub fn mpv_set_property_async(
         ctx: *mut mpv_handle,
         reply_userdata: u64,
@@ -131,7 +138,10 @@ extern "C" {
 }
 
 /// Port of the macro MPV_MAKE_VERSION
-pub fn mpv_make_version(major: libc::c_ulong, minor: libc::c_ulong) -> libc::c_ulong {
+pub const fn mpv_make_version(
+    major: libc::c_ulong,
+    minor: libc::c_ulong,
+) -> libc::c_ulong {
     (major << 16) | minor
 }
 
