@@ -5,6 +5,7 @@ use std::{
     path::{Path, PathBuf},
     ptr,
 };
+use YesNo::*;
 
 use crate::bindings::*;
 
@@ -207,6 +208,29 @@ impl<T: private::InitState> MpvHandle<T> {
         unsafe { mpv_free(retval as *mut libc::c_void) };
         Ok(rust_str)
     }
+
+    fn command<const N: usize>(
+        &mut self,
+        command: Command,
+        args: [&CStr; N],
+    ) -> Result<()> {
+        unsafe { self.command_ptr(command, args.map(CStr::as_ptr)) }
+    }
+
+    unsafe fn command_ptr<const N: usize>(
+        &mut self,
+        command: Command,
+        args: [*const libc::c_char; N],
+    ) -> Result<()> {
+        // TODO: can't use full_args = [ptr::null; {N+2}] yet
+        let mut full_args = Vec::new();
+        full_args.push(command.as_cstr().as_ptr());
+        full_args.extend(args);
+        full_args.push(ptr::null());
+
+        mpv_try! {mpv_command(self.ctx, full_args.as_mut_ptr())}?;
+        Ok(())
+    }
 }
 
 impl<T: private::InitState> Drop for MpvHandle<T> {
@@ -218,16 +242,43 @@ impl<T: private::InitState> Drop for MpvHandle<T> {
 enum Property {
     MpvVersion,
     AudioDevice,
+    Pause,
 }
 
 impl Property {
     fn as_cstr(self) -> &'static CStr {
         match self {
-            Property::MpvVersion => CStr::from_bytes_with_nul(b"mpv-version\0").unwrap(),
-            Property::AudioDevice => {
-                CStr::from_bytes_with_nul(b"audio-device\0").unwrap()
-            }
+            Property::MpvVersion => c"mpv-version",
+            Property::AudioDevice => c"audio-device",
+            Property::Pause => c"pause",
         }
+    }
+}
+
+enum Command {
+    LoadFile,
+}
+
+impl Command {
+    fn as_cstr(self) -> &'static CStr {
+        match self {
+            Command::LoadFile => c"loadfile",
+        }
+    }
+}
+
+enum YesNo {
+    Yes,
+    No,
+}
+
+impl From<YesNo> for String {
+    fn from(value: YesNo) -> Self {
+        match value {
+            YesNo::Yes => "yes",
+            YesNo::No => "no",
+        }
+        .to_string()
     }
 }
 
@@ -252,25 +303,27 @@ impl MpvHandle<Init> {
         use std::os::unix::ffi::OsStringExt;
         let file = CString::new(file.into_os_string().into_vec())
             .expect("PathBuf does not contain a null");
-        let loadfile = CStr::from_bytes_with_nul(b"loadfile\0").unwrap();
 
-        let mut args = [loadfile.as_ptr(), file.as_ptr(), ptr::null()];
-        mpv_try! {unsafe { mpv_command(self.ctx, args.as_mut_ptr()) }}?;
-        Ok(())
+        // filenames are passed as-is to fdopen and the like, mpv does not touch it.
+        unsafe { self.command_ptr(Command::LoadFile, [file.as_ptr()]) }
     }
 
     // TODO: URL type
     pub fn loadurl(&mut self, url: impl Into<String>) -> Result<()> {
         let url = CString::new(url.into()).expect("Strings do not contain a null");
-        let loadfile = CStr::from_bytes_with_nul(b"loadfile\0").unwrap();
-
-        let mut args = [loadfile.as_ptr(), url.as_ptr(), ptr::null()];
-        mpv_try! {unsafe { mpv_command(self.ctx, args.as_mut_ptr()) }}?;
-        Ok(())
+        self.command(Command::LoadFile, [&url])
     }
 
     pub fn version(&mut self) -> Result<String> {
         self.get_property_string(Property::MpvVersion)
+    }
+
+    pub fn pause(&mut self) -> Result<()> {
+        self.set_property_string(Property::Pause, Yes)
+    }
+
+    pub fn play(&mut self) -> Result<()> {
+        self.set_property_string(Property::Pause, No)
     }
 }
 
@@ -286,8 +339,11 @@ mod test {
         let version = handle.get_property_string(Property::MpvVersion)?;
         println!("{}", version);
 
+        handle.pause()?;
         handle.loadurl("https://www.twitch.tv/divvity")?;
 
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        handle.play()?;
         std::thread::sleep(std::time::Duration::from_secs(5));
 
         assert!(false);
