@@ -2,8 +2,9 @@ use std::{
     ffi::{CStr, CString},
     marker::PhantomData,
     mem::ManuallyDrop,
-    path::{Path, PathBuf},
+    path::PathBuf,
     ptr,
+    time::Duration,
 };
 use YesNo::*;
 
@@ -13,6 +14,8 @@ use crate::bindings::*;
 pub enum MpvError {
     #[error("Some mpv library function returned NULL")]
     NullPtr,
+    #[error("Trying to use an unknown enum variant")]
+    Unknown,
     #[error("mpv error: {0}")]
     ErrorCode(ErrorCode),
     #[error("the linked against mpv is too old {0} < {}", MINIMUM_MPV_API_VERSION)]
@@ -21,82 +24,129 @@ pub enum MpvError {
 
 pub type Result<T> = std::result::Result<T, MpvError>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ErrorCode {
-    EventQueueFull,
-    Nomem,
-    Uninitialized,
-    InvalidParameter,
-    OptionNotFound,
-    OptionFormat,
-    OptionError,
-    PropertyNotFound,
-    PropertyFormat,
-    PropertyUnavailable,
-    PropertyError,
-    Command,
-    LoadingFailed,
-    AoInitFailed,
-    VoInitFailed,
-    NothingToPlay,
-    UnknownFormat,
-    Unsupported,
-    NotImplemented,
-    Generic,
-    Unknown,
+macro_rules! enum_int_map {
+    ($name:ident ($type:ty) {$(($r:ident, $c:ident)),* $(,)*}) => {
+        #[derive(Debug, Copy, Clone)]
+        pub enum $name {
+            $($r),*,
+            Unknown($type),
+        }
+
+        impl $name {
+            pub const fn from_int(int: $type) -> Self {
+                match () {
+                    $(_ if int == $c => Self::$r),*,
+                    _ => Self::Unknown(int),
+                }
+            }
+
+            pub const fn to_int(self) -> $type {
+                match self {
+                    $(Self::$r => $c),*,
+                    Self::Unknown(int) => int,
+                }
+            }
+
+            pub const fn is_unknown(self) -> bool {
+                matches!(self, Self::Unknown(_))
+            }
+        }
+
+        impl From<$type> for $name {
+            fn from(int: $type) -> Self {
+                Self::from_int(int)
+            }
+        }
+
+        impl From<$name> for $type {
+            fn from(e: $name) -> Self {
+                e.to_int()
+            }
+        }
+    };
 }
 
-const ERROR_CODE_MAP: &[(ErrorCode, mpv_error)] = &[
-    (ErrorCode::EventQueueFull, MPV_ERROR_EVENT_QUEUE_FULL),
-    (ErrorCode::Nomem, MPV_ERROR_NOMEM),
-    (ErrorCode::Uninitialized, MPV_ERROR_UNINITIALIZED),
-    (ErrorCode::InvalidParameter, MPV_ERROR_INVALID_PARAMETER),
-    (ErrorCode::OptionNotFound, MPV_ERROR_OPTION_NOT_FOUND),
-    (ErrorCode::OptionFormat, MPV_ERROR_OPTION_FORMAT),
-    (ErrorCode::OptionError, MPV_ERROR_OPTION_ERROR),
-    (ErrorCode::PropertyNotFound, MPV_ERROR_PROPERTY_NOT_FOUND),
-    (ErrorCode::PropertyFormat, MPV_ERROR_PROPERTY_FORMAT),
-    (
-        ErrorCode::PropertyUnavailable,
-        MPV_ERROR_PROPERTY_UNAVAILABLE,
-    ),
-    (ErrorCode::PropertyError, MPV_ERROR_PROPERTY_ERROR),
-    (ErrorCode::Command, MPV_ERROR_COMMAND),
-    (ErrorCode::LoadingFailed, MPV_ERROR_LOADING_FAILED),
-    (ErrorCode::AoInitFailed, MPV_ERROR_AO_INIT_FAILED),
-    (ErrorCode::VoInitFailed, MPV_ERROR_VO_INIT_FAILED),
-    (ErrorCode::NothingToPlay, MPV_ERROR_NOTHING_TO_PLAY),
-    (ErrorCode::UnknownFormat, MPV_ERROR_UNKNOWN_FORMAT),
-    (ErrorCode::Unsupported, MPV_ERROR_UNSUPPORTED),
-    (ErrorCode::NotImplemented, MPV_ERROR_NOT_IMPLEMENTED),
-    (ErrorCode::Generic, MPV_ERROR_GENERIC),
-];
+macro_rules! enum_cstr_map {
+    ($name:ident {$(($r:ident, $c:literal)),* $(,)*}) => {
+        #[derive(Debug, Copy, Clone)]
+        pub enum $name {
+            $($r),*,
+            Unknown,
+        }
+
+        impl $name {
+            pub fn from_cstr(cstr: &CStr) -> Self {
+                match () {
+                    $(_ if cstr == $c => Self::$r),*,
+                    _ => Self::Unknown,
+                }
+            }
+
+            pub fn from_ptr(ptr: *const libc::c_char) -> Self {
+                assert!(!ptr.is_null());
+                Self::from_cstr(unsafe{CStr::from_ptr(ptr)})
+            }
+
+            pub const fn as_cstr(self) -> &'static CStr {
+                match self {
+                    $(Self::$r => $c),*,
+                    Self::Unknown => c"<UNKNOWN>",
+                }
+            }
+
+            pub const fn as_ptr(self) -> *const libc::c_char {
+                self.as_cstr().as_ptr()
+            }
+
+            pub const fn is_unknown(self) -> bool {
+                matches!(self, Self::Unknown)
+            }
+        }
+
+        impl From<&CStr> for $name {
+            fn from(int: &CStr) -> Self {
+                Self::from_cstr(int)
+            }
+        }
+
+        impl From<$name> for &'static CStr {
+            fn from(e: $name) -> Self {
+                e.as_cstr()
+            }
+        }
+
+        impl AsRef<CStr> for $name {
+            fn as_ref(&self) -> &'static CStr {
+                self.as_cstr()
+            }
+        }
+    };
+}
+
+enum_int_map! {ErrorCode (mpv_error) {
+    (EventQueueFull, MPV_ERROR_EVENT_QUEUE_FULL),
+    (Nomem, MPV_ERROR_NOMEM),
+    (Uninitialized, MPV_ERROR_UNINITIALIZED),
+    (InvalidParameter, MPV_ERROR_INVALID_PARAMETER),
+    (OptionNotFound, MPV_ERROR_OPTION_NOT_FOUND),
+    (OptionFormat, MPV_ERROR_OPTION_FORMAT),
+    (OptionError, MPV_ERROR_OPTION_ERROR),
+    (PropertyNotFound, MPV_ERROR_PROPERTY_NOT_FOUND),
+    (PropertyFormat, MPV_ERROR_PROPERTY_FORMAT),
+    (PropertyUnavailable, MPV_ERROR_PROPERTY_UNAVAILABLE),
+    (PropertyError, MPV_ERROR_PROPERTY_ERROR),
+    (Command, MPV_ERROR_COMMAND),
+    (LoadingFailed, MPV_ERROR_LOADING_FAILED),
+    (AoInitFailed, MPV_ERROR_AO_INIT_FAILED),
+    (VoInitFailed, MPV_ERROR_VO_INIT_FAILED),
+    (NothingToPlay, MPV_ERROR_NOTHING_TO_PLAY),
+    (UnknownFormat, MPV_ERROR_UNKNOWN_FORMAT),
+    (Unsupported, MPV_ERROR_UNSUPPORTED),
+    (NotImplemented, MPV_ERROR_NOT_IMPLEMENTED),
+    (Generic, MPV_ERROR_GENERIC),
+}}
 
 impl ErrorCode {
-    fn from_int(int: mpv_error) -> Option<Self> {
-        let common = match int {
-            0.. => None,
-            _ => Some(Self::Unknown),
-        };
-
-        for (rust, c) in ERROR_CODE_MAP {
-            if int == *c {
-                return Some(*rust);
-            }
-        }
-
-        common
-    }
-
-    fn to_int(self) -> mpv_error {
-        for (rust, c) in ERROR_CODE_MAP {
-            if self == *rust {
-                return *c;
-            }
-        }
-        mpv_error::MIN
-    }
-
     pub fn as_str(self) -> &'static str {
         let cstr = unsafe { mpv_error_string(self.to_int()) };
         assert!(!cstr.is_null());
@@ -114,9 +164,9 @@ impl std::fmt::Display for ErrorCode {
 macro_rules! mpv_try {
     ($expr:expr) => {{
         let int = ($expr);
-        match ErrorCode::from_int(int) {
-            None => Ok(int),
-            Some(err) => Err(MpvError::ErrorCode(err)),
+        match int {
+            0.. => Ok(int),
+            _ => Err(MpvError::ErrorCode(ErrorCode::from_int(int))),
         }
     }};
 }
@@ -128,6 +178,16 @@ macro_rules! mpv_try_null {
             return Err(MpvError::NullPtr);
         }
         Ok(ptr)
+    }};
+}
+
+macro_rules! mpv_try_unknown {
+    ($expr:expr) => {{
+        let val = ($expr);
+        if val.is_unknown() {
+            return Err(MpvError::Unknown);
+        }
+        Ok(val)
     }};
 }
 
@@ -153,6 +213,8 @@ pub struct Uninit;
 
 impl private::InitState for Init {}
 impl private::InitState for Uninit {}
+
+unsafe impl Send for MpvHandle<Init> {}
 
 pub struct MpvHandle<T: private::InitState> {
     ctx: *mut mpv_handle,
@@ -182,7 +244,8 @@ impl MpvHandle<Uninit> {
         // TODO: add a check to make sure the version is at least 0.37.0
     }
 
-    pub fn set_audio_device(&mut self, device: impl Into<String>) -> Result<()> {
+    pub fn set_audio_device(&mut self, device: AudioDevice) -> Result<()> {
+        mpv_try_unknown!(device)?;
         self.set_property_string(Property::AudioDevice, device)
     }
 }
@@ -191,9 +254,10 @@ impl<T: private::InitState> MpvHandle<T> {
     fn set_property_string(
         &mut self,
         prop: Property,
-        value: impl Into<String>,
+        value: impl AsRef<CStr>,
     ) -> Result<()> {
-        let value = CString::new(value.into()).expect("Strings do not contain a null");
+        mpv_try_unknown!(prop)?;
+        let value = value.as_ref();
         mpv_try! {unsafe { mpv_set_property_string(self.ctx, prop.as_cstr().as_ptr(), value.as_ptr()) }}?;
         Ok(())
     }
@@ -201,9 +265,10 @@ impl<T: private::InitState> MpvHandle<T> {
     /// The returned property should be UTF-8 except for a few things, see the header
     /// file.
     fn get_property_string(&mut self, prop: Property) -> Result<String> {
+        mpv_try_unknown!(prop)?;
         let retval = mpv_try_null! {unsafe { mpv_get_property_string(self.ctx, prop.as_cstr().as_ptr()) }}?;
         let cstr = unsafe { CStr::from_ptr(retval) };
-        let rust_str = cstr.to_string_lossy().to_string();
+        let rust_str = cstr.to_string_lossy().into_owned();
         assert_ne!(retval as *const u8, rust_str.as_ptr());
         unsafe { mpv_free(retval as *mut libc::c_void) };
         Ok(rust_str)
@@ -222,6 +287,7 @@ impl<T: private::InitState> MpvHandle<T> {
         command: Command,
         args: [*const libc::c_char; N],
     ) -> Result<()> {
+        mpv_try_unknown!(command)?;
         // TODO: can't use full_args = [ptr::null; {N+2}] yet
         let mut full_args = Vec::new();
         full_args.push(command.as_cstr().as_ptr());
@@ -239,48 +305,24 @@ impl<T: private::InitState> Drop for MpvHandle<T> {
     }
 }
 
-enum Property {
-    MpvVersion,
-    AudioDevice,
-    Pause,
-}
+enum_cstr_map! {Property {
+    (MpvVersion, c"mpv-version"),
+    (AudioDevice, c"audio-device"),
+    (Pause, c"pause"),
+}}
 
-impl Property {
-    fn as_cstr(self) -> &'static CStr {
-        match self {
-            Property::MpvVersion => c"mpv-version",
-            Property::AudioDevice => c"audio-device",
-            Property::Pause => c"pause",
-        }
-    }
-}
+enum_cstr_map! {Command {
+    (LoadFile, c"loadfile"),
+}}
 
-enum Command {
-    LoadFile,
-}
+enum_cstr_map! {YesNo {
+    (Yes, c"yes"),
+    (No, c"no"),
+}}
 
-impl Command {
-    fn as_cstr(self) -> &'static CStr {
-        match self {
-            Command::LoadFile => c"loadfile",
-        }
-    }
-}
-
-enum YesNo {
-    Yes,
-    No,
-}
-
-impl From<YesNo> for String {
-    fn from(value: YesNo) -> Self {
-        match value {
-            YesNo::Yes => "yes",
-            YesNo::No => "no",
-        }
-        .to_string()
-    }
-}
+enum_cstr_map! {AudioDevice {
+    (Pulse, c"pulse"),
+}}
 
 impl MpvHandle<Init> {
     pub fn create_client(&mut self) -> Result<MpvHandle<Init>> {
@@ -325,7 +367,144 @@ impl MpvHandle<Init> {
     pub fn play(&mut self) -> Result<()> {
         self.set_property_string(Property::Pause, No)
     }
+
+    pub fn observe_property(&mut self, prop: Property, format: Format) -> Result<()> {
+        mpv_try_unknown!(prop)?;
+        mpv_try_unknown!(format)?;
+        mpv_try!(unsafe {
+            mpv_observe_property(self.ctx, 0, prop.as_ptr(), format.to_int())
+        })?;
+        Ok(())
+    }
+
+    pub fn wait_event(&mut self, timeout: Duration) -> Event {
+        unsafe { self.wait_event_raw(timeout.as_secs_f64()) }
+    }
+
+    pub fn wait_event_infinite(&mut self) -> Event {
+        unsafe { self.wait_event_raw(-1.0) }
+    }
+
+    unsafe fn wait_event_raw(&mut self, timeout: f64) -> Event {
+        let event = unsafe { mpv_wait_event(self.ctx, timeout) };
+        assert!(!event.is_null(), "is never null");
+        match EventID::from_int((*event).event_id) {
+            EventID::None => Event::None,
+            EventID::Shutdown => Event::Shutdown,
+            EventID::LogMessage => todo!(),
+            EventID::StartFile => Event::StartFile,
+            EventID::EndFile => todo!(),
+            EventID::FileLoaded => Event::FileLoaded,
+            EventID::PropertyChange => {
+                let data = (*event).data;
+                assert!(!data.is_null());
+                let data = data as *const mpv_event_property;
+                match (
+                    Property::from_ptr((*data).name),
+                    Format::from_int((*data).format),
+                ) {
+                    (property, Format::String) if !property.is_unknown() => {
+                        let value = (*data).data as *const *const libc::c_char;
+                        assert!(!value.is_null());
+                        let value = *value;
+                        // NOTE: From the doc of MPV_FORMAT_STRING: although the encoding
+                        // is usually UTF-8, this is not always the case. File tags often
+                        // store strings in some legacy codepage, and even filenames don't
+                        // necessarily have to be in UTF-8 (at least on Linux).
+                        let value = CStr::from_ptr(value).to_string_lossy().into_owned();
+                        Event::PropertyChange {
+                            property,
+                            value: PropertyValue::String(value),
+                        }
+                    }
+                    (property, Format::None) => Event::PropertyChange {
+                        property,
+                        value: PropertyValue::None,
+                    },
+                    (property, format) => Event::PropertyChange {
+                        property,
+                        value: PropertyValue::Unsupported(format),
+                    },
+                }
+            }
+            EventID::QueueOverflow => Event::QueueOverflow,
+            EventID::Unknown(id) => Event::UnsupportedEvent(id.into()),
+        }
+    }
 }
+
+enum_int_map! {EventID (mpv_event_id) {
+    (None, MPV_EVENT_NONE),
+    (Shutdown, MPV_EVENT_SHUTDOWN),
+    (LogMessage, MPV_EVENT_LOG_MESSAGE),
+    (StartFile, MPV_EVENT_START_FILE),
+    (EndFile, MPV_EVENT_END_FILE),
+    (FileLoaded, MPV_EVENT_FILE_LOADED),
+    (PropertyChange, MPV_EVENT_PROPERTY_CHANGE),
+    (QueueOverflow, MPV_EVENT_QUEUE_OVERFLOW),
+}}
+
+#[derive(Debug)]
+pub enum Event {
+    None,
+    Shutdown,
+    Log {
+        prefix: String,
+        level: LogLevel,
+        text: String,
+    },
+    QueueOverflow,
+    PropertyChange {
+        property: Property,
+        value: PropertyValue,
+    },
+    StartFile,
+    EndFile {
+        reason: EndReason,
+        error: Option<ErrorCode>,
+    },
+    FileLoaded,
+    UnsupportedEvent(EventID),
+}
+
+#[derive(Debug)]
+pub enum PropertyValue {
+    String(String),
+    None,
+    Unsupported(Format),
+}
+
+enum_int_map! {EndReason (mpv_end_file_reason) {
+    (EOF, MPV_END_FILE_REASON_EOF),
+    (Stop, MPV_END_FILE_REASON_STOP),
+    (Quit, MPV_END_FILE_REASON_QUIT),
+    (Error, MPV_END_FILE_REASON_ERROR),
+    (Redirect, MPV_END_FILE_REASON_REDIRECT),
+}}
+
+enum_int_map! {LogLevel (mpv_log_level) {
+    (None, MPV_LOG_LEVEL_NONE),
+    (Fatal, MPV_LOG_LEVEL_FATAL),
+    (Error, MPV_LOG_LEVEL_ERROR),
+    (Warn, MPV_LOG_LEVEL_WARN),
+    (Info, MPV_LOG_LEVEL_INFO),
+    (V, MPV_LOG_LEVEL_V),
+    (Debug, MPV_LOG_LEVEL_DEBUG),
+    (Trace, MPV_LOG_LEVEL_TRACE),
+}}
+
+enum_int_map! {Format (mpv_format) {
+    (None, MPV_FORMAT_NONE),
+    (String, MPV_FORMAT_STRING),
+    (OsdString, MPV_FORMAT_OSD_STRING),
+    (Flag, MPV_FORMAT_FLAG),
+    (Int64, MPV_FORMAT_INT64),
+    (Double, MPV_FORMAT_DOUBLE),
+    (Node, MPV_FORMAT_NODE),
+    (NodeArray, MPV_FORMAT_NODE_ARRAY),
+    (NodeMap, MPV_FORMAT_NODE_MAP),
+    (ByteArray, MPV_FORMAT_BYTE_ARRAY),
+}}
 
 #[cfg(test)]
 mod test {
@@ -334,18 +513,26 @@ mod test {
     #[test]
     pub fn test() -> Result<()> {
         let mut handle = MpvHandle::new()?;
-        handle.set_property_string(Property::AudioDevice, "pulse")?;
+        handle.set_audio_device(AudioDevice::Pulse)?;
         let mut handle = handle.init()?;
         let version = handle.get_property_string(Property::MpvVersion)?;
         println!("{}", version);
 
-        handle.pause()?;
         handle.loadurl("https://www.twitch.tv/divvity")?;
 
-        std::thread::sleep(std::time::Duration::from_secs(5));
-        handle.play()?;
-        std::thread::sleep(std::time::Duration::from_secs(5));
+        let mut handle2 = handle.create_client()?;
+        std::thread::spawn(move || loop {
+            handle2
+                .observe_property(Property::Pause, Format::String)
+                .unwrap();
+            let event = handle2.wait_event_infinite();
+            println!("{event:#?}");
+        });
 
+        std::thread::sleep(Duration::from_secs(5));
+        handle.pause()?;
+        std::thread::sleep(Duration::from_secs(5));
+        handle.terminate();
         assert!(false);
         Ok(())
     }

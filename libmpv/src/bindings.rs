@@ -50,6 +50,13 @@ pub struct mpv_event {
     pub data: *mut libc::c_void,
 }
 
+#[repr(C)]
+pub struct mpv_event_property {
+    pub name: *const libc::c_char,
+    pub format: mpv_format,
+    pub data: *mut libc::c_void,
+}
+
 pub type mpv_event_id = libc::c_uint;
 pub const MPV_EVENT_NONE: mpv_event_id = 0;
 pub const MPV_EVENT_SHUTDOWN: mpv_event_id = 1;
@@ -68,6 +75,31 @@ pub const MPV_EVENT_PLAYBACK_RESTART: mpv_event_id = 21;
 pub const MPV_EVENT_PROPERTY_CHANGE: mpv_event_id = 22;
 pub const MPV_EVENT_QUEUE_OVERFLOW: mpv_event_id = 24;
 pub const MPV_EVENT_HOOK: mpv_event_id = 25;
+
+pub type mpv_log_level = libc::c_uint;
+/// "no"    - disable absolutely all messages
+pub const MPV_LOG_LEVEL_NONE: mpv_log_level = 0;
+/// "fatal" - critical/aborting errors
+pub const MPV_LOG_LEVEL_FATAL: mpv_log_level = 10;
+/// "error" - simple errors
+pub const MPV_LOG_LEVEL_ERROR: mpv_log_level = 20;
+/// "warn"  - possible problems
+pub const MPV_LOG_LEVEL_WARN: mpv_log_level = 30;
+/// "info"  - informational message
+pub const MPV_LOG_LEVEL_INFO: mpv_log_level = 40;
+/// "v"     - noisy informational message
+pub const MPV_LOG_LEVEL_V: mpv_log_level = 50;
+/// "debug" - very noisy technical information
+pub const MPV_LOG_LEVEL_DEBUG: mpv_log_level = 60;
+/// "trace" - extremely noisy
+pub const MPV_LOG_LEVEL_TRACE: mpv_log_level = 70;
+
+pub type mpv_end_file_reason = libc::c_uint;
+pub const MPV_END_FILE_REASON_EOF: mpv_end_file_reason = 0;
+pub const MPV_END_FILE_REASON_STOP: mpv_end_file_reason = 2;
+pub const MPV_END_FILE_REASON_QUIT: mpv_end_file_reason = 3;
+pub const MPV_END_FILE_REASON_ERROR: mpv_end_file_reason = 4;
+pub const MPV_END_FILE_REASON_REDIRECT: mpv_end_file_reason = 5;
 
 extern "C" {
     pub fn mpv_client_api_version() -> libc::c_ulong;
