@@ -10,6 +10,9 @@ enum MpvStart {
 
 pub mod file {
     #[protocol_macros::message_part]
+    // TODO: It's risky to allow the client to play an arbitrary filepath. Each file
+    // option sent to the client should have some abstract id that represents it instead,
+    // like the root has in this case.
     struct File {
         root: usize,
         path: String,

@@ -244,9 +244,9 @@ impl MpvHandle<Uninit> {
         // TODO: add a check to make sure the version is at least 0.37.0
     }
 
-    pub fn set_audio_device(&mut self, device: AudioDevice) -> Result<()> {
+    pub fn set_audio_driver(&mut self, device: AudioDriver) -> Result<()> {
         mpv_try_unknown!(device)?;
-        self.set_property_string(Property::AudioDevice, device)
+        self.set_property_string(Property::AudioDriver, device)
     }
 }
 
@@ -307,8 +307,10 @@ impl<T: private::InitState> Drop for MpvHandle<T> {
 
 enum_cstr_map! {Property {
     (MpvVersion, c"mpv-version"),
-    (AudioDevice, c"audio-device"),
+    (AudioDriver, c"ao"),
     (Pause, c"pause"),
+    (InputDefaultBindings, c"input-default-bindings"),
+    (InputVoKeyboard, c"input-vo-keyboard"),
 }}
 
 enum_cstr_map! {Command {
@@ -320,7 +322,7 @@ enum_cstr_map! {YesNo {
     (No, c"no"),
 }}
 
-enum_cstr_map! {AudioDevice {
+enum_cstr_map! {AudioDriver {
     (Pulse, c"pulse"),
 }}
 
@@ -340,10 +342,11 @@ impl MpvHandle<Init> {
     }
 
     /// returns immediately
+    // NOTE: needs a pathbuf because a null-terminated string needs to be allocated anyway
     #[cfg(unix)]
-    pub fn loadfile(&mut self, file: PathBuf) -> Result<()> {
+    pub fn loadfile(&mut self, file: impl Into<PathBuf>) -> Result<()> {
         use std::os::unix::ffi::OsStringExt;
-        let file = CString::new(file.into_os_string().into_vec())
+        let file = CString::new(file.into().into_os_string().into_vec())
             .expect("PathBuf does not contain a null");
 
         // filenames are passed as-is to fdopen and the like, mpv does not touch it.
@@ -366,6 +369,12 @@ impl MpvHandle<Init> {
 
     pub fn play(&mut self) -> Result<()> {
         self.set_property_string(Property::Pause, No)
+    }
+
+    pub fn enable_default_bindings(&mut self) -> Result<()> {
+        self.set_property_string(Property::InputDefaultBindings, Yes)?;
+        self.set_property_string(Property::InputVoKeyboard, Yes)?;
+        Ok(())
     }
 
     pub fn observe_property(&mut self, prop: Property, format: Format) -> Result<()> {
@@ -393,7 +402,11 @@ impl MpvHandle<Init> {
             EventID::Shutdown => Event::Shutdown,
             EventID::LogMessage => todo!(),
             EventID::StartFile => Event::StartFile,
-            EventID::EndFile => todo!(),
+            EventID::EndFile => Event::EndFile {
+                // TODO:
+                reason: EndReason::Unknown(0),
+                error: None,
+            },
             EventID::FileLoaded => Event::FileLoaded,
             EventID::PropertyChange => {
                 let data = (*event).data;
@@ -482,6 +495,7 @@ enum_int_map! {EndReason (mpv_end_file_reason) {
     (Redirect, MPV_END_FILE_REASON_REDIRECT),
 }}
 
+// TODO: make private?
 enum_int_map! {LogLevel (mpv_log_level) {
     (None, MPV_LOG_LEVEL_NONE),
     (Fatal, MPV_LOG_LEVEL_FATAL),
@@ -505,35 +519,3 @@ enum_int_map! {Format (mpv_format) {
     (NodeMap, MPV_FORMAT_NODE_MAP),
     (ByteArray, MPV_FORMAT_BYTE_ARRAY),
 }}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    pub fn test() -> Result<()> {
-        let mut handle = MpvHandle::new()?;
-        handle.set_audio_device(AudioDevice::Pulse)?;
-        let mut handle = handle.init()?;
-        let version = handle.get_property_string(Property::MpvVersion)?;
-        println!("{}", version);
-
-        handle.loadurl("https://www.twitch.tv/divvity")?;
-
-        let mut handle2 = handle.create_client()?;
-        std::thread::spawn(move || loop {
-            handle2
-                .observe_property(Property::Pause, Format::String)
-                .unwrap();
-            let event = handle2.wait_event_infinite();
-            println!("{event:#?}");
-        });
-
-        std::thread::sleep(Duration::from_secs(5));
-        handle.pause()?;
-        std::thread::sleep(Duration::from_secs(5));
-        handle.terminate();
-        assert!(false);
-        Ok(())
-    }
-}
