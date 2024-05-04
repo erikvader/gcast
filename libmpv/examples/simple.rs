@@ -23,7 +23,9 @@ fn inner_main(file: PathBuf) -> libmpv::Result<()> {
 
     handle.enable_default_bindings()?;
 
-    handle.observe_property(Property::Pause, Format::String)?;
+    handle.observe_paused()?;
+    handle.observe_playback_time()?;
+    handle.observe_media_title()?;
     handle.loadfile(file)?;
 
     loop {

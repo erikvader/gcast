@@ -6,7 +6,6 @@ use std::{
     ptr,
     time::Duration,
 };
-use YesNo::*;
 
 use crate::bindings::*;
 
@@ -122,6 +121,104 @@ macro_rules! enum_cstr_map {
         }
     };
 }
+
+macro_rules! properties {
+    (@inner () -> ($(($name: ident, $type:ty))*)) => {
+        #[derive(Debug, Clone)]
+        pub enum PropertyValue {
+            $($name($type)),*
+        }
+    };
+    (@inner ((Flag,
+              $prop:ident,
+              $(Get $getter:ident $(,)*)*
+              $(Set $setter:ident $(,)*)*
+              $(Obs $obs:ident $(,)*)*
+    ) $($rest:tt)*) -> ($($arms:tt)*)) => {
+        impl MpvHandle<Init> {
+            $(
+                pub fn $getter(&mut self) -> Result<bool> {
+                    self.get_property_flag(Property::$prop)
+                }
+            )*
+            $(
+                pub fn $setter(&mut self, value: bool) -> Result<()> {
+                    self.set_property_flag(Property::$prop, value)
+                }
+            )*
+            $(
+                pub fn $obs(&mut self) -> Result<()> {
+                    self.observe_property(Property::$prop, Format::Flag)
+                }
+            )*
+        }
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, bool))}
+    };
+    (@inner ((Double,
+              $prop:ident,
+              $(Get $getter:ident $(,)*)*
+              $(Set $setter:ident $(,)*)*
+              $(Obs $obs:ident $(,)*)*
+    ) $($rest:tt)*) -> ($($arms:tt)*)) => {
+        impl MpvHandle<Init> {
+            $(
+                pub fn $getter(&mut self) -> Result<f64> {
+                    self.get_property_double(Property::$prop)
+                }
+            )*
+            $(
+                pub fn $setter(&mut self, value: f64) -> Result<()> {
+                    self.set_property_double(Property::$prop, value)
+                }
+            )*
+            $(
+                pub fn $obs(&mut self) -> Result<()> {
+                    self.observe_property(Property::$prop, Format::Double)
+                }
+            )*
+        }
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, f64))}
+    };
+    (@inner ((String,
+              $prop:ident,
+              $(Get $getter:ident $(,)*)*
+              $(Obs $obs:ident $(,)*)*
+    ) $($rest:tt)*) -> ($($arms:tt)*)) => {
+        impl MpvHandle<Init> {
+            $(
+                pub fn $getter(&mut self) -> Result<String> {
+                    self.get_property_string(Property::$prop)
+                }
+            )*
+            $(
+                pub fn $obs(&mut self) -> Result<()> {
+                    self.observe_property(Property::$prop, Format::String)
+                }
+            )*
+        }
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, String))}
+    };
+    ($($rest:tt),* $(,)*) => {
+        properties!{@inner ($($rest)*) -> ()}
+    };
+}
+
+properties! {
+    (Flag, Pause, Get is_paused, Set set_paused, Obs observe_paused),
+    (String, MpvVersion, Get version),
+    (String, MediaTitle, Get media_title, Obs observe_media_title),
+    (Double, PlaybackTime, Get playback_time, Obs observe_playback_time),
+}
+
+enum_cstr_map! {Property {
+    (MpvVersion, c"mpv-version"),
+    (AudioDriver, c"ao"),
+    (Pause, c"pause"),
+    (InputDefaultBindings, c"input-default-bindings"),
+    (InputVoKeyboard, c"input-vo-keyboard"),
+    (MediaTitle, c"media-title"),
+    (PlaybackTime, c"playback-time"),
+}}
 
 enum_int_map! {ErrorCode (mpv_error) {
     (EventQueueFull, MPV_ERROR_EVENT_QUEUE_FULL),
@@ -266,12 +363,68 @@ impl<T: private::InitState> MpvHandle<T> {
     /// file.
     fn get_property_string(&mut self, prop: Property) -> Result<String> {
         mpv_try_unknown!(prop)?;
-        let retval = mpv_try_null! {unsafe { mpv_get_property_string(self.ctx, prop.as_cstr().as_ptr()) }}?;
+        let retval =
+            mpv_try_null! {unsafe { mpv_get_property_string(self.ctx, prop.as_ptr()) }}?;
         let cstr = unsafe { CStr::from_ptr(retval) };
         let rust_str = cstr.to_string_lossy().into_owned();
         assert_ne!(retval as *const u8, rust_str.as_ptr());
         unsafe { mpv_free(retval as *mut libc::c_void) };
         Ok(rust_str)
+    }
+
+    fn get_property_flag(&mut self, prop: Property) -> Result<bool> {
+        mpv_try_unknown!(prop)?;
+        let mut flag: libc::c_int = 0;
+        mpv_try!(unsafe {
+            mpv_get_property(
+                self.ctx,
+                prop.as_ptr(),
+                Format::Flag.to_int(),
+                ptr::from_mut(&mut flag) as *mut libc::c_void,
+            )
+        })?;
+        Ok(flag >= 1)
+    }
+
+    fn set_property_flag(&mut self, prop: Property, flag: bool) -> Result<()> {
+        mpv_try_unknown!(prop)?;
+        let mut flag: libc::c_int = if flag { 1 } else { 0 };
+        mpv_try!(unsafe {
+            mpv_set_property(
+                self.ctx,
+                prop.as_ptr(),
+                Format::Flag.to_int(),
+                ptr::from_mut(&mut flag) as *mut libc::c_void,
+            )
+        })?;
+        Ok(())
+    }
+
+    fn get_property_double(&mut self, prop: Property) -> Result<f64> {
+        mpv_try_unknown!(prop)?;
+        let mut double: libc::c_double = 0.0;
+        mpv_try!(unsafe {
+            mpv_get_property(
+                self.ctx,
+                prop.as_ptr(),
+                Format::Double.to_int(),
+                ptr::from_mut(&mut double) as *mut libc::c_void,
+            )
+        })?;
+        Ok(double)
+    }
+
+    fn set_property_double(&mut self, prop: Property, mut double: f64) -> Result<()> {
+        mpv_try_unknown!(prop)?;
+        mpv_try!(unsafe {
+            mpv_set_property(
+                self.ctx,
+                prop.as_ptr(),
+                Format::Double.to_int(),
+                ptr::from_mut(&mut double) as *mut libc::c_void,
+            )
+        })?;
+        Ok(())
     }
 
     fn command<const N: usize>(
@@ -305,21 +458,8 @@ impl<T: private::InitState> Drop for MpvHandle<T> {
     }
 }
 
-enum_cstr_map! {Property {
-    (MpvVersion, c"mpv-version"),
-    (AudioDriver, c"ao"),
-    (Pause, c"pause"),
-    (InputDefaultBindings, c"input-default-bindings"),
-    (InputVoKeyboard, c"input-vo-keyboard"),
-}}
-
 enum_cstr_map! {Command {
     (LoadFile, c"loadfile"),
-}}
-
-enum_cstr_map! {YesNo {
-    (Yes, c"yes"),
-    (No, c"no"),
 }}
 
 enum_cstr_map! {AudioDriver {
@@ -359,25 +499,13 @@ impl MpvHandle<Init> {
         self.command(Command::LoadFile, [&url])
     }
 
-    pub fn version(&mut self) -> Result<String> {
-        self.get_property_string(Property::MpvVersion)
-    }
-
-    pub fn pause(&mut self) -> Result<()> {
-        self.set_property_string(Property::Pause, Yes)
-    }
-
-    pub fn play(&mut self) -> Result<()> {
-        self.set_property_string(Property::Pause, No)
-    }
-
     pub fn enable_default_bindings(&mut self) -> Result<()> {
-        self.set_property_string(Property::InputDefaultBindings, Yes)?;
-        self.set_property_string(Property::InputVoKeyboard, Yes)?;
+        self.set_property_flag(Property::InputDefaultBindings, true)?;
+        self.set_property_flag(Property::InputVoKeyboard, true)?;
         Ok(())
     }
 
-    pub fn observe_property(&mut self, prop: Property, format: Format) -> Result<()> {
+    fn observe_property(&mut self, prop: Property, format: Format) -> Result<()> {
         mpv_try_unknown!(prop)?;
         mpv_try_unknown!(format)?;
         mpv_try!(unsafe {
@@ -412,36 +540,64 @@ impl MpvHandle<Init> {
                 let data = (*event).data;
                 assert!(!data.is_null());
                 let data = data as *const mpv_event_property;
-                match (
-                    Property::from_ptr((*data).name),
-                    Format::from_int((*data).format),
-                ) {
-                    (property, Format::String) if !property.is_unknown() => {
+                let property = Property::from_ptr((*data).name);
+                let format = Format::from_int((*data).format);
+
+                let property_value = match format {
+                    Format::String => {
+                        // TODO: this interprets the pointer in the same as way
+                        // `get_property_string`, create a helper function?
                         let value = (*data).data as *const *const libc::c_char;
                         assert!(!value.is_null());
                         let value = *value;
-                        // NOTE: From the doc of MPV_FORMAT_STRING: although the encoding
-                        // is usually UTF-8, this is not always the case. File tags often
-                        // store strings in some legacy codepage, and even filenames don't
-                        // necessarily have to be in UTF-8 (at least on Linux).
                         let value = CStr::from_ptr(value).to_string_lossy().into_owned();
-                        Event::PropertyChange {
-                            property,
-                            value: PropertyValue::String(value),
+                        match property {
+                            Property::MediaTitle => {
+                                Some(PropertyValue::MediaTitle(value))
+                            }
+                            _ => None,
                         }
                     }
-                    (property, Format::None) => Event::PropertyChange {
-                        property,
-                        value: PropertyValue::None,
-                    },
-                    (property, format) => Event::PropertyChange {
-                        property,
-                        value: PropertyValue::Unsupported(format),
-                    },
+                    Format::Flag => {
+                        let value = (*data).data as *const libc::c_int;
+                        assert!(!value.is_null());
+                        let value = *value;
+                        let value = value >= 1;
+                        match property {
+                            Property::Pause => Some(PropertyValue::Pause(value)),
+                            _ => None,
+                        }
+                    }
+                    Format::Int64 => {
+                        let value = (*data).data as *const i64; // int64_t
+                        assert!(!value.is_null());
+                        let value = *value;
+                        match property {
+                            _ => None,
+                        }
+                    }
+                    Format::Double => {
+                        let value = (*data).data as *const libc::c_double;
+                        assert!(!value.is_null());
+                        let value = *value;
+                        match property {
+                            Property::PlaybackTime => {
+                                Some(PropertyValue::PlaybackTime(value))
+                            }
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                };
+
+                if let Some(value) = property_value {
+                    Event::PropertyChange(value)
+                } else {
+                    Event::PropertyChangeError(format, property)
                 }
             }
             EventID::QueueOverflow => Event::QueueOverflow,
-            EventID::Unknown(id) => Event::UnsupportedEvent(id.into()),
+            unsupported => Event::UnsupportedEvent(unsupported),
         }
     }
 }
@@ -450,11 +606,20 @@ enum_int_map! {EventID (mpv_event_id) {
     (None, MPV_EVENT_NONE),
     (Shutdown, MPV_EVENT_SHUTDOWN),
     (LogMessage, MPV_EVENT_LOG_MESSAGE),
+    (GetPropertyReply, MPV_EVENT_GET_PROPERTY_REPLY),
+    (SetPropertyReply, MPV_EVENT_SET_PROPERTY_REPLY),
+    (CommandReply, MPV_EVENT_COMMAND_REPLY),
     (StartFile, MPV_EVENT_START_FILE),
     (EndFile, MPV_EVENT_END_FILE),
     (FileLoaded, MPV_EVENT_FILE_LOADED),
+    (ClientMessage, MPV_EVENT_CLIENT_MESSAGE),
+    (VideoReconfig, MPV_EVENT_VIDEO_RECONFIG),
+    (AudioReconfig, MPV_EVENT_AUDIO_RECONFIG),
+    (Seek, MPV_EVENT_SEEK),
+    (PlaybackRestart, MPV_EVENT_PLAYBACK_RESTART),
     (PropertyChange, MPV_EVENT_PROPERTY_CHANGE),
     (QueueOverflow, MPV_EVENT_QUEUE_OVERFLOW),
+    (Hook, MPV_EVENT_HOOK),
 }}
 
 #[derive(Debug)]
@@ -467,10 +632,8 @@ pub enum Event {
         text: String,
     },
     QueueOverflow,
-    PropertyChange {
-        property: Property,
-        value: PropertyValue,
-    },
+    PropertyChange(PropertyValue),
+    PropertyChangeError(Format, Property),
     StartFile,
     EndFile {
         reason: EndReason,
@@ -478,13 +641,6 @@ pub enum Event {
     },
     FileLoaded,
     UnsupportedEvent(EventID),
-}
-
-#[derive(Debug)]
-pub enum PropertyValue {
-    String(String),
-    None,
-    Unsupported(Format),
 }
 
 enum_int_map! {EndReason (mpv_end_file_reason) {
