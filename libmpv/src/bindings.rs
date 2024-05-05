@@ -5,7 +5,7 @@
 pub type int64_t = i64;
 
 pub type mpv_error = libc::c_int;
-pub const MPV_ERROR_SUCCESS: mpv_error = 0;
+// pub const MPV_ERROR_SUCCESS: mpv_error = 0;
 pub const MPV_ERROR_EVENT_QUEUE_FULL: mpv_error = -1;
 pub const MPV_ERROR_NOMEM: mpv_error = -2;
 pub const MPV_ERROR_UNINITIALIZED: mpv_error = -3;
@@ -165,11 +165,11 @@ extern "C" {
         args: *mut *const libc::c_char,
     ) -> libc::c_int;
 
-    pub fn mpv_command_async(
-        ctx: *mut mpv_handle,
-        reply_userdata: u64,
-        args: *mut *const libc::c_char,
-    ) -> libc::c_int;
+    // pub fn mpv_command_async(
+    //     ctx: *mut mpv_handle,
+    //     reply_userdata: u64,
+    //     args: *mut *const libc::c_char,
+    // ) -> libc::c_int;
 
     pub fn mpv_set_property(
         ctx: *mut mpv_handle,
@@ -184,13 +184,13 @@ extern "C" {
         data: *const libc::c_char,
     ) -> libc::c_int;
 
-    pub fn mpv_set_property_async(
-        ctx: *mut mpv_handle,
-        reply_userdata: u64,
-        name: *const libc::c_char,
-        format: mpv_format,
-        data: *mut libc::c_void,
-    ) -> libc::c_int;
+    // pub fn mpv_set_property_async(
+    //     ctx: *mut mpv_handle,
+    //     reply_userdata: u64,
+    //     name: *const libc::c_char,
+    //     format: mpv_format,
+    //     data: *mut libc::c_void,
+    // ) -> libc::c_int;
 
     pub fn mpv_get_property(
         ctx: *mut mpv_handle,
@@ -204,12 +204,12 @@ extern "C" {
         name: *const libc::c_char,
     ) -> *mut libc::c_char;
 
-    pub fn mpv_get_property_async(
-        ctx: *mut mpv_handle,
-        reply_userdata: u64,
-        name: *const libc::c_char,
-        format: mpv_format,
-    ) -> libc::c_int;
+    // pub fn mpv_get_property_async(
+    //     ctx: *mut mpv_handle,
+    //     reply_userdata: u64,
+    //     name: *const libc::c_char,
+    //     format: mpv_format,
+    // ) -> libc::c_int;
 
     pub fn mpv_observe_property(
         mpv: *mut mpv_handle,
