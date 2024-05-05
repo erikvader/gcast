@@ -1,6 +1,6 @@
 use std::{error::Error, ffi::OsString, path::PathBuf, thread, time::Duration};
 
-use libmpv::{AudioDriver, Event, Format, MpvHandle, Property};
+use libmpv::{AudioDriver, Event, Format, Handle, LogLevel, Property};
 
 pub fn main() -> Result<(), Box<dyn Error>> {
     let mut args: Vec<OsString> = std::env::args_os().collect();
@@ -15,17 +15,19 @@ pub fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn inner_main(file: PathBuf) -> libmpv::Result<()> {
-    let mut handle = MpvHandle::new()?;
+    let mut handle = Handle::new()?;
     handle.set_audio_driver(AudioDriver::Pulse)?;
+    handle.request_log_messages(LogLevel::Info)?;
     let mut handle = handle.init()?;
     let version = handle.version()?;
-    println!("{}", version);
+    println!("{:#?}", version);
 
     handle.enable_default_bindings()?;
 
     handle.observe_paused()?;
-    handle.observe_playback_time()?;
+    // handle.observe_playback_time()?;
     handle.observe_media_title()?;
+    // handle.observe_track_list()?;
     handle.loadfile(file)?;
 
     loop {

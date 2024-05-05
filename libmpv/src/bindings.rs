@@ -2,6 +2,8 @@
 // /usr/include/mpv/client.h
 // https://github.com/mpv-player/mpv/blob/v0.37.0/libmpv/client.h
 
+pub type int64_t = i64;
+
 pub type mpv_error = libc::c_int;
 pub const MPV_ERROR_SUCCESS: mpv_error = 0;
 pub const MPV_ERROR_EVENT_QUEUE_FULL: mpv_error = -1;
@@ -57,6 +59,23 @@ pub struct mpv_event_property {
     pub data: *mut libc::c_void,
 }
 
+#[repr(C)]
+pub struct mpv_event_end_file {
+    pub reason: mpv_end_file_reason,
+    pub error: libc::c_int,
+    pub playlist_entry_id: i64,
+    pub playlist_insert_id: i64,
+    pub playlist_insert_num_entries: libc::c_int,
+}
+
+#[repr(C)]
+pub struct mpv_event_log_message {
+    pub prefix: *const libc::c_char,
+    pub level: *const libc::c_char,
+    pub text: *const libc::c_char,
+    pub log_level: mpv_log_level,
+}
+
 pub type mpv_event_id = libc::c_uint;
 pub const MPV_EVENT_NONE: mpv_event_id = 0;
 pub const MPV_EVENT_SHUTDOWN: mpv_event_id = 1;
@@ -101,6 +120,30 @@ pub const MPV_END_FILE_REASON_QUIT: mpv_end_file_reason = 3;
 pub const MPV_END_FILE_REASON_ERROR: mpv_end_file_reason = 4;
 pub const MPV_END_FILE_REASON_REDIRECT: mpv_end_file_reason = 5;
 
+#[repr(C)]
+pub struct mpv_node {
+    pub u: mpv_node_u,
+    pub format: mpv_format,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union mpv_node_u {
+    pub string: *mut libc::c_char,
+    pub flag: libc::c_int,
+    pub int64: i64,
+    pub double: f64,
+    pub list: *mut mpv_node_list,
+    // pub ba: *mut mpv_byte_array, // NOTE: purposfully ignoring
+}
+
+#[repr(C)]
+pub struct mpv_node_list {
+    pub num: libc::c_int,
+    pub values: *mut mpv_node,
+    pub keys: *mut *mut libc::c_char,
+}
+
 extern "C" {
     pub fn mpv_client_api_version() -> libc::c_ulong;
     pub fn mpv_create() -> *mut mpv_handle;
@@ -112,6 +155,7 @@ extern "C" {
     pub fn mpv_destroy(ctx: *mut mpv_handle);
     pub fn mpv_terminate_destroy(ctx: *mut mpv_handle);
     pub fn mpv_free(data: *mut libc::c_void);
+    pub fn mpv_free_node_contents(node: *mut mpv_node);
 
     /// the returned string is static
     pub fn mpv_error_string(error: libc::c_int) -> *const libc::c_char;
@@ -174,6 +218,11 @@ extern "C" {
         format: mpv_format,
     ) -> libc::c_int;
     pub fn mpv_wait_event(ctx: *mut mpv_handle, timeout: f64) -> *mut mpv_event;
+
+    pub fn mpv_request_log_messages(
+        ctx: *mut mpv_handle,
+        min_level: *const libc::c_char,
+    ) -> libc::c_int;
 }
 
 /// Port of the macro MPV_MAKE_VERSION

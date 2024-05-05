@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     ffi::{CStr, CString},
     marker::PhantomData,
     mem::ManuallyDrop,
@@ -10,7 +11,7 @@ use std::{
 use crate::bindings::*;
 
 #[derive(thiserror::Error, Debug)]
-pub enum MpvError {
+pub enum Error {
     #[error("Some mpv library function returned NULL")]
     NullPtr,
     #[error("Trying to use an unknown enum variant")]
@@ -21,7 +22,7 @@ pub enum MpvError {
     LibMpvTooOld(libc::c_ulong),
 }
 
-pub type Result<T> = std::result::Result<T, MpvError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 macro_rules! enum_int_map {
     ($name:ident ($type:ty) {$(($r:ident, $c:ident)),* $(,)*}) => {
@@ -135,7 +136,7 @@ macro_rules! properties {
               $(Set $setter:ident $(,)*)*
               $(Obs $obs:ident $(,)*)*
     ) $($rest:tt)*) -> ($($arms:tt)*)) => {
-        impl MpvHandle<Init> {
+        impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<bool> {
                     self.get_property_flag(Property::$prop)
@@ -154,13 +155,38 @@ macro_rules! properties {
         }
         properties!{@inner ($($rest)*) -> ($($arms)* ($prop, bool))}
     };
+    (@inner ((Int64,
+              $prop:ident,
+              $(Get $getter:ident $(,)*)*
+              $(Set $setter:ident $(,)*)*
+              $(Obs $obs:ident $(,)*)*
+    ) $($rest:tt)*) -> ($($arms:tt)*)) => {
+        impl Handle<Init> {
+            $(
+                pub fn $getter(&mut self) -> Result<i64> {
+                    self.get_property_int(Property::$prop)
+                }
+            )*
+            $(
+                pub fn $setter(&mut self, value: i64) -> Result<()> {
+                    self.set_property_int(Property::$prop, value)
+                }
+            )*
+            $(
+                pub fn $obs(&mut self) -> Result<()> {
+                    self.observe_property(Property::$prop, Format::Int64)
+                }
+            )*
+        }
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, i64))}
+    };
     (@inner ((Double,
               $prop:ident,
               $(Get $getter:ident $(,)*)*
               $(Set $setter:ident $(,)*)*
               $(Obs $obs:ident $(,)*)*
     ) $($rest:tt)*) -> ($($arms:tt)*)) => {
-        impl MpvHandle<Init> {
+        impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<f64> {
                     self.get_property_double(Property::$prop)
@@ -184,7 +210,7 @@ macro_rules! properties {
               $(Get $getter:ident $(,)*)*
               $(Obs $obs:ident $(,)*)*
     ) $($rest:tt)*) -> ($($arms:tt)*)) => {
-        impl MpvHandle<Init> {
+        impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<String> {
                     self.get_property_string(Property::$prop)
@@ -198,6 +224,25 @@ macro_rules! properties {
         }
         properties!{@inner ($($rest)*) -> ($($arms)* ($prop, String))}
     };
+    (@inner ((Node,
+              $prop:ident,
+              $(Get $getter:ident $(,)*)*
+              $(Obs $obs:ident $(,)*)*
+    ) $($rest:tt)*) -> ($($arms:tt)*)) => {
+        impl Handle<Init> {
+            $(
+                pub fn $getter(&mut self) -> Result<Node> {
+                    self.get_property_node(Property::$prop)
+                }
+            )*
+            $(
+                pub fn $obs(&mut self) -> Result<()> {
+                    self.observe_property(Property::$prop, Format::Node)
+                }
+            )*
+        }
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, Node))}
+    };
     ($($rest:tt),* $(,)*) => {
         properties!{@inner ($($rest)*) -> ()}
     };
@@ -208,6 +253,11 @@ properties! {
     (String, MpvVersion, Get version),
     (String, MediaTitle, Get media_title, Obs observe_media_title),
     (Double, PlaybackTime, Get playback_time, Obs observe_playback_time),
+    (Double, Duration, Get duration, Obs observe_duration),
+    (Double, Volume, Get volume, Obs observe_volume),
+    (Int64, Chapters, Get chapters, Obs observe_chapters),
+    (Int64, Chapter, Get chapter, Obs observe_chapter),
+    (Node, TrackList, Get track_list, Obs observe_track_list),
 }
 
 enum_cstr_map! {Property {
@@ -218,6 +268,11 @@ enum_cstr_map! {Property {
     (InputVoKeyboard, c"input-vo-keyboard"),
     (MediaTitle, c"media-title"),
     (PlaybackTime, c"playback-time"),
+    (Duration, c"duration"),
+    (Volume, c"volume"),
+    (Chapters, c"chapters"),
+    (Chapter, c"chapter"),
+    (TrackList, c"track-list"),
 }}
 
 enum_int_map! {ErrorCode (mpv_error) {
@@ -263,7 +318,7 @@ macro_rules! mpv_try {
         let int = ($expr);
         match int {
             0.. => Ok(int),
-            _ => Err(MpvError::ErrorCode(ErrorCode::from_int(int))),
+            _ => Err(Error::ErrorCode(ErrorCode::from_int(int))),
         }
     }};
 }
@@ -272,7 +327,7 @@ macro_rules! mpv_try_null {
     ($expr:expr) => {{
         let ptr = ($expr);
         if ptr.is_null() {
-            return Err(MpvError::NullPtr);
+            return Err(Error::NullPtr);
         }
         Ok(ptr)
     }};
@@ -282,7 +337,7 @@ macro_rules! mpv_try_unknown {
     ($expr:expr) => {{
         let val = ($expr);
         if val.is_unknown() {
-            return Err(MpvError::Unknown);
+            return Err(Error::Unknown);
         }
         Ok(val)
     }};
@@ -311,34 +366,36 @@ pub struct Uninit;
 impl private::InitState for Init {}
 impl private::InitState for Uninit {}
 
-unsafe impl Send for MpvHandle<Init> {}
+unsafe impl Send for Handle<Init> {}
 
-pub struct MpvHandle<T: private::InitState> {
+pub struct Handle<T: private::InitState> {
     ctx: *mut mpv_handle,
     _init: PhantomData<T>,
 }
 
-impl MpvHandle<Uninit> {
-    pub fn new() -> Result<MpvHandle<Uninit>> {
+impl Handle<Uninit> {
+    pub fn new() -> Result<Handle<Uninit>> {
         if let Some(oldversion) = meets_required_mpv_api_version() {
-            return Err(MpvError::LibMpvTooOld(oldversion));
+            return Err(Error::LibMpvTooOld(oldversion));
         }
         let ctx = mpv_try_null! {unsafe { mpv_create() }}?;
-        Ok(MpvHandle {
+        Ok(Handle {
             ctx,
             _init: PhantomData,
         })
     }
 
-    pub fn init(self) -> Result<MpvHandle<Init>> {
+    pub fn init(self) -> Result<Handle<Init>> {
         mpv_try! {unsafe { mpv_initialize(self.ctx) }}?;
-        // Avoid mpv_destroying ctx when self is dropped
+        // NOTE: Avoid mpv_destroying ctx when self is dropped
         let s = ManuallyDrop::new(self);
-        Ok(MpvHandle {
+        let handle = Handle {
             ctx: s.ctx,
             _init: PhantomData,
-        })
+        };
         // TODO: add a check to make sure the version is at least 0.37.0
+        // TODO: the mpv-version property can return git hashes and stuff, so it is not so easy...
+        Ok(handle)
     }
 
     pub fn set_audio_driver(&mut self, device: AudioDriver) -> Result<()> {
@@ -347,7 +404,7 @@ impl MpvHandle<Uninit> {
     }
 }
 
-impl<T: private::InitState> MpvHandle<T> {
+impl<T: private::InitState> Handle<T> {
     fn set_property_string(
         &mut self,
         prop: Property,
@@ -359,17 +416,31 @@ impl<T: private::InitState> MpvHandle<T> {
         Ok(())
     }
 
-    /// The returned property should be UTF-8 except for a few things, see the header
-    /// file.
     fn get_property_string(&mut self, prop: Property) -> Result<String> {
         mpv_try_unknown!(prop)?;
         let retval =
             mpv_try_null! {unsafe { mpv_get_property_string(self.ctx, prop.as_ptr()) }}?;
-        let cstr = unsafe { CStr::from_ptr(retval) };
-        let rust_str = cstr.to_string_lossy().into_owned();
+        let rust_str = unsafe { ptr_to_string(retval) };
         assert_ne!(retval as *const u8, rust_str.as_ptr());
         unsafe { mpv_free(retval as *mut libc::c_void) };
         Ok(rust_str)
+    }
+
+    fn get_property_node(&mut self, prop: Property) -> Result<Node> {
+        mpv_try_unknown!(prop)?;
+        let mut node = mpv_node {
+            u: mpv_node_u { int64: 0 },
+            format: Format::None.to_int(),
+        };
+        mpv_try! {unsafe { mpv_get_property(
+            self.ctx,
+            prop.as_ptr(),
+            Format::Node.to_int(),
+            ptr::from_mut(&mut node) as *mut libc::c_void
+        ) }}?;
+        let rust_node = unsafe { ptr_to_node(ptr::from_ref(&node)) };
+        unsafe { mpv_free_node_contents(ptr::from_mut(&mut node)) };
+        Ok(rust_node)
     }
 
     fn get_property_flag(&mut self, prop: Property) -> Result<bool> {
@@ -383,7 +454,7 @@ impl<T: private::InitState> MpvHandle<T> {
                 ptr::from_mut(&mut flag) as *mut libc::c_void,
             )
         })?;
-        Ok(flag >= 1)
+        Ok(flag != 0)
     }
 
     fn set_property_flag(&mut self, prop: Property, flag: bool) -> Result<()> {
@@ -414,14 +485,43 @@ impl<T: private::InitState> MpvHandle<T> {
         Ok(double)
     }
 
-    fn set_property_double(&mut self, prop: Property, mut double: f64) -> Result<()> {
+    fn set_property_double(&mut self, prop: Property, double: f64) -> Result<()> {
         mpv_try_unknown!(prop)?;
+        let mut double: libc::c_double = double;
         mpv_try!(unsafe {
             mpv_set_property(
                 self.ctx,
                 prop.as_ptr(),
                 Format::Double.to_int(),
                 ptr::from_mut(&mut double) as *mut libc::c_void,
+            )
+        })?;
+        Ok(())
+    }
+
+    fn get_property_int(&mut self, prop: Property) -> Result<i64> {
+        mpv_try_unknown!(prop)?;
+        let mut int: int64_t = 0;
+        mpv_try!(unsafe {
+            mpv_get_property(
+                self.ctx,
+                prop.as_ptr(),
+                Format::Int64.to_int(),
+                ptr::from_mut(&mut int) as *mut libc::c_void,
+            )
+        })?;
+        Ok(int)
+    }
+
+    fn set_property_int(&mut self, prop: Property, int: i64) -> Result<()> {
+        mpv_try_unknown!(prop)?;
+        let mut int: int64_t = int;
+        mpv_try!(unsafe {
+            mpv_set_property(
+                self.ctx,
+                prop.as_ptr(),
+                Format::Int64.to_int(),
+                ptr::from_mut(&mut int) as *mut libc::c_void,
             )
         })?;
         Ok(())
@@ -450,9 +550,35 @@ impl<T: private::InitState> MpvHandle<T> {
         mpv_try! {mpv_command(self.ctx, full_args.as_mut_ptr())}?;
         Ok(())
     }
+
+    fn observe_property(&mut self, prop: Property, format: Format) -> Result<()> {
+        mpv_try_unknown!(prop)?;
+        mpv_try_unknown!(format)?;
+        mpv_try!(unsafe {
+            mpv_observe_property(self.ctx, 0, prop.as_ptr(), format.to_int())
+        })?;
+        Ok(())
+    }
+
+    pub fn request_log_messages(&mut self, level: LogLevel) -> Result<()> {
+        mpv_try_unknown!(level)?;
+        let level_string = match level {
+            LogLevel::None => c"no",
+            LogLevel::Fatal => c"fatal",
+            LogLevel::Error => c"error",
+            LogLevel::Warn => c"warn",
+            LogLevel::Info => c"info",
+            LogLevel::V => c"v",
+            LogLevel::Debug => c"debug",
+            LogLevel::Trace => c"trace",
+            LogLevel::Unknown(_) => unreachable!(),
+        };
+        mpv_try! {unsafe {mpv_request_log_messages(self.ctx, level_string.as_ptr())}}?;
+        Ok(())
+    }
 }
 
-impl<T: private::InitState> Drop for MpvHandle<T> {
+impl<T: private::InitState> Drop for Handle<T> {
     fn drop(&mut self) {
         unsafe { mpv_destroy(self.ctx) };
     }
@@ -466,10 +592,10 @@ enum_cstr_map! {AudioDriver {
     (Pulse, c"pulse"),
 }}
 
-impl MpvHandle<Init> {
-    pub fn create_client(&mut self) -> Result<MpvHandle<Init>> {
+impl Handle<Init> {
+    pub fn create_client(&mut self) -> Result<Handle<Init>> {
         let ctx = mpv_try_null! {unsafe{mpv_create_client(self.ctx, ptr::null())}}?;
-        Ok(MpvHandle {
+        Ok(Handle {
             ctx,
             _init: PhantomData,
         })
@@ -505,15 +631,6 @@ impl MpvHandle<Init> {
         Ok(())
     }
 
-    fn observe_property(&mut self, prop: Property, format: Format) -> Result<()> {
-        mpv_try_unknown!(prop)?;
-        mpv_try_unknown!(format)?;
-        mpv_try!(unsafe {
-            mpv_observe_property(self.ctx, 0, prop.as_ptr(), format.to_int())
-        })?;
-        Ok(())
-    }
-
     pub fn wait_event(&mut self, timeout: Duration) -> Event {
         unsafe { self.wait_event_raw(timeout.as_secs_f64()) }
     }
@@ -528,13 +645,19 @@ impl MpvHandle<Init> {
         match EventID::from_int((*event).event_id) {
             EventID::None => Event::None,
             EventID::Shutdown => Event::Shutdown,
-            EventID::LogMessage => todo!(),
             EventID::StartFile => Event::StartFile,
-            EventID::EndFile => Event::EndFile {
-                // TODO:
-                reason: EndReason::Unknown(0),
-                error: None,
-            },
+            EventID::EndFile => {
+                let data = (*event).data;
+                assert!(!data.is_null());
+                let data = data as *const mpv_event_end_file;
+                let reason = EndReason::from_int((*data).reason);
+                let error = if matches!(reason, EndReason::Error) {
+                    Some(ErrorCode::from_int((*data).error))
+                } else {
+                    None
+                };
+                Event::EndFile { reason, error }
+            }
             EventID::FileLoaded => Event::FileLoaded,
             EventID::PropertyChange => {
                 let data = (*event).data;
@@ -545,12 +668,10 @@ impl MpvHandle<Init> {
 
                 let property_value = match format {
                     Format::String => {
-                        // TODO: this interprets the pointer in the same as way
-                        // `get_property_string`, create a helper function?
                         let value = (*data).data as *const *const libc::c_char;
                         assert!(!value.is_null());
                         let value = *value;
-                        let value = CStr::from_ptr(value).to_string_lossy().into_owned();
+                        let value = ptr_to_string(value);
                         match property {
                             Property::MediaTitle => {
                                 Some(PropertyValue::MediaTitle(value))
@@ -562,7 +683,7 @@ impl MpvHandle<Init> {
                         let value = (*data).data as *const libc::c_int;
                         assert!(!value.is_null());
                         let value = *value;
-                        let value = value >= 1;
+                        let value = value != 0;
                         match property {
                             Property::Pause => Some(PropertyValue::Pause(value)),
                             _ => None,
@@ -573,6 +694,8 @@ impl MpvHandle<Init> {
                         assert!(!value.is_null());
                         let value = *value;
                         match property {
+                            Property::Chapter => Some(PropertyValue::Chapter(value)),
+                            Property::Chapters => Some(PropertyValue::Chapters(value)),
                             _ => None,
                         }
                     }
@@ -584,6 +707,17 @@ impl MpvHandle<Init> {
                             Property::PlaybackTime => {
                                 Some(PropertyValue::PlaybackTime(value))
                             }
+                            Property::Duration => Some(PropertyValue::Duration(value)),
+                            Property::Volume => Some(PropertyValue::Volume(value)),
+                            _ => None,
+                        }
+                    }
+                    Format::Node => {
+                        let value = (*data).data as *const mpv_node;
+                        assert!(!value.is_null());
+                        let value = ptr_to_node(value);
+                        match property {
+                            Property::TrackList => Some(PropertyValue::TrackList(value)),
                             _ => None,
                         }
                     }
@@ -597,6 +731,19 @@ impl MpvHandle<Init> {
                 }
             }
             EventID::QueueOverflow => Event::QueueOverflow,
+            EventID::LogMessage => {
+                let data = (*event).data;
+                assert!(!data.is_null());
+                let data = data as *const mpv_event_log_message;
+                let prefix = ptr_to_string((*data).prefix);
+                let text = ptr_to_string((*data).text);
+                let level = LogLevel::from_int((*data).log_level);
+                Event::Log {
+                    prefix,
+                    level,
+                    text,
+                }
+            }
             unsupported => Event::UnsupportedEvent(unsupported),
         }
     }
@@ -651,7 +798,6 @@ enum_int_map! {EndReason (mpv_end_file_reason) {
     (Redirect, MPV_END_FILE_REASON_REDIRECT),
 }}
 
-// TODO: make private?
 enum_int_map! {LogLevel (mpv_log_level) {
     (None, MPV_LOG_LEVEL_NONE),
     (Fatal, MPV_LOG_LEVEL_FATAL),
@@ -675,3 +821,65 @@ enum_int_map! {Format (mpv_format) {
     (NodeMap, MPV_FORMAT_NODE_MAP),
     (ByteArray, MPV_FORMAT_BYTE_ARRAY),
 }}
+
+/// NOTE: The returned property should be UTF-8 except for a few things, see the header
+/// file. From the doc of MPV_FORMAT_STRING: although the encoding is usually UTF-8, this
+/// is not always the case. File tags often store strings in some legacy codepage, and
+/// even filenames don't necessarily have to be in UTF-8 (at least on Linux).
+unsafe fn ptr_to_string(ptr: *const libc::c_char) -> String {
+    assert!(!ptr.is_null());
+    CStr::from_ptr(ptr).to_string_lossy().into_owned()
+}
+
+#[derive(Clone, Debug)]
+pub enum Node {
+    String(String),
+    Flag(bool),
+    Int64(i64),
+    Double(f64),
+    Array(Vec<Node>),
+    Map(HashMap<String, Node>),
+    // NOTE: ignoring byte array
+    None,
+    Unknown(Format),
+}
+
+unsafe fn ptr_to_node(ptr: *const mpv_node) -> Node {
+    assert!(!ptr.is_null());
+    let u = (*ptr).u;
+    match Format::from((*ptr).format) {
+        Format::None => Node::None,
+        Format::String => Node::String(ptr_to_string(u.string)),
+        Format::Flag => Node::Flag(u.flag != 0),
+        Format::Int64 => Node::Int64(u.int64),
+        Format::Double => Node::Double(u.double),
+        Format::NodeArray => {
+            let num = (*u.list).num as isize;
+            let values = (*u.list).values;
+            assert!(num == 0 || !values.is_null());
+            let array = (0..num)
+                .into_iter()
+                .map(|i| ptr_to_node(values.offset(i)))
+                .collect();
+            Node::Array(array)
+        }
+        Format::NodeMap => {
+            let num = (*u.list).num as isize;
+            let values = (*u.list).values;
+            assert!(num == 0 || !values.is_null());
+            let keys = (*u.list).keys;
+            assert!(num == 0 || !keys.is_null());
+            let map = (0..num)
+                .into_iter()
+                .map(|i| {
+                    (
+                        ptr_to_string(*keys.offset(i)),
+                        ptr_to_node(values.offset(i)),
+                    )
+                })
+                .collect();
+            Node::Map(map)
+        }
+        format => Node::Unknown(format),
+    }
+}
