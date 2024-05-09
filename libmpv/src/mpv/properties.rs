@@ -1,4 +1,7 @@
-use std::{ffi::CStr, ptr};
+use std::{
+    ffi::{CStr, CString},
+    ptr,
+};
 
 use crate::{
     bindings::*,
@@ -13,10 +16,25 @@ use super::{
 };
 
 macro_rules! properties {
-    (@inner () -> ($(($name: ident, $type:ty))*)) => {
+    (@inner () -> ($(($name: ident, $type:ty))*) ($($pat:ident)*)) => {
         #[derive(Debug, Clone)]
         pub enum PropertyValue {
             $($name($type)),*
+        }
+
+        impl Property {
+            pub fn parse(
+                self,
+                value: &str,
+            ) -> std::result::Result<PropertyValue, PropValueParseError> {
+                match self {
+                    $(Property::$pat => value.parse()
+                      .map_err(|_| PropValueParseError::BadValue)
+                      .map(|b| PropertyValue::$pat(b))),*,
+                    Property::Unknown => Err(PropValueParseError::UnknownProp),
+                    _ => Err(PropValueParseError::UnsupportedType),
+                }
+            }
         }
     };
     (@inner ((Flag,
@@ -24,7 +42,7 @@ macro_rules! properties {
               $(Get $getter:ident $(,)*)*
               $(Set $setter:ident $(,)*)*
               $(Obs $obs:ident $(,)*)*
-    ) $($rest:tt)*) -> ($($arms:tt)*)) => {
+    ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
         impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<bool> {
@@ -42,14 +60,14 @@ macro_rules! properties {
                 }
             )*
         }
-        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, bool))}
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, bool)) ($($parse)* $prop)}
     };
     (@inner ((Int64,
               $prop:ident,
               $(Get $getter:ident $(,)*)*
               $(Set $setter:ident $(,)*)*
               $(Obs $obs:ident $(,)*)*
-    ) $($rest:tt)*) -> ($($arms:tt)*)) => {
+    ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
         impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<i64> {
@@ -67,14 +85,14 @@ macro_rules! properties {
                 }
             )*
         }
-        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, i64))}
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, i64)) ($($parse)* $prop)}
     };
     (@inner ((Double,
               $prop:ident,
               $(Get $getter:ident $(,)*)*
               $(Set $setter:ident $(,)*)*
               $(Obs $obs:ident $(,)*)*
-    ) $($rest:tt)*) -> ($($arms:tt)*)) => {
+    ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
         impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<f64> {
@@ -92,17 +110,23 @@ macro_rules! properties {
                 }
             )*
         }
-        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, f64))}
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, f64)) ($($parse)* $prop)}
     };
     (@inner ((String,
               $prop:ident,
               $(Get $getter:ident $(,)*)*
+              $(Set $setter:ident $(,)*)*
               $(Obs $obs:ident $(,)*)*
-    ) $($rest:tt)*) -> ($($arms:tt)*)) => {
+    ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
         impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<String> {
                     self.get_property_string(Property::$prop)
+                }
+            )*
+            $(
+                pub fn $setter(&mut self, value: String) -> Result<()> {
+                    self.set_property_string(Property::$prop, value)
                 }
             )*
             $(
@@ -111,13 +135,13 @@ macro_rules! properties {
                 }
             )*
         }
-        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, String))}
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, String)) ($($parse)* $prop)}
     };
     (@inner ((Node,
               $prop:ident,
               $(Get $getter:ident $(,)*)*
               $(Obs $obs:ident $(,)*)*
-    ) $($rest:tt)*) -> ($($arms:tt)*)) => {
+    ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
         impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<Node> {
@@ -130,22 +154,35 @@ macro_rules! properties {
                 }
             )*
         }
-        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, Node))}
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, Node)) ($($parse)*)}
     };
     ($($rest:tt),* $(,)*) => {
-        properties!{@inner ($($rest)*) -> ()}
+        properties!{@inner ($($rest)*) -> () ()}
     };
 }
+
 properties! {
     (Flag, Pause, Get is_paused, Set set_paused, Obs observe_paused),
     (String, MpvVersion, Get version),
     (String, MediaTitle, Get media_title, Obs observe_media_title),
     (Double, PlaybackTime, Get playback_time, Obs observe_playback_time),
     (Double, Duration, Get duration, Obs observe_duration),
-    (Double, Volume, Get volume, Obs observe_volume),
+    (Double, Volume, Get volume, Set set_volume, Obs observe_volume),
     (Int64, Chapters, Get chapters, Obs observe_chapters),
     (Int64, Chapter, Get chapter, Obs observe_chapter),
     (Node, TrackList, Get track_list, Obs observe_track_list),
+    (String, YtdlFormat, Set set_ytdl_format),
+    (Flag, Fullscreen, Set set_fullscreen),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum PropValueParseError {
+    #[error("Unknown property name")]
+    UnknownProp,
+    #[error("Bad value")]
+    BadValue,
+    #[error("Type not supported")]
+    UnsupportedType,
 }
 
 pub(crate) mod private {
@@ -164,11 +201,13 @@ pub(crate) mod private {
         (Chapters, c"chapters"),
         (Chapter, c"chapter"),
         (TrackList, c"track-list"),
+        (YtdlFormat, c"ytdl-format"),
+        (Fullscreen, c"fullscreen"),
     }}
 }
 
 impl<T: super::private::InitState> Handle<T> {
-    fn set_property_string(
+    fn set_property_cstr(
         &mut self,
         prop: Property,
         value: impl AsRef<CStr>,
@@ -177,6 +216,11 @@ impl<T: super::private::InitState> Handle<T> {
         let value = value.as_ref();
         mpv_try! {unsafe { mpv_set_property_string(self.ctx, prop.as_cstr().as_ptr(), value.as_ptr()) }}?;
         Ok(())
+    }
+
+    fn set_property_string(&mut self, prop: Property, value: String) -> Result<()> {
+        let value = CString::new(value).expect("this is always valid");
+        self.set_property_cstr(prop, value)
     }
 
     fn get_property_string(&mut self, prop: Property) -> Result<String> {
@@ -317,6 +361,6 @@ enum_cstr_map! {AudioDriver {
 impl Handle<Uninit> {
     pub fn set_audio_driver(&mut self, device: AudioDriver) -> Result<()> {
         mpv_try_unknown!(device)?;
-        self.set_property_string(Property::AudioDriver, device)
+        self.set_property_cstr(Property::AudioDriver, device)
     }
 }

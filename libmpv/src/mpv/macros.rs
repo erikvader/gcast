@@ -58,6 +58,13 @@ macro_rules! enum_cstr_map {
                 }
             }
 
+            pub fn from_str(cstr: &str) -> Self {
+                match () {
+                    $(_ if cstr == $c.to_str().unwrap() => Self::$r),*,
+                    _ => Self::Unknown,
+                }
+            }
+
             pub fn from_ptr(ptr: *const libc::c_char) -> Self {
                 assert!(!ptr.is_null());
                 Self::from_cstr(unsafe{std::ffi::CStr::from_ptr(ptr)})
@@ -68,6 +75,10 @@ macro_rules! enum_cstr_map {
                     $(Self::$r => $c),*,
                     Self::Unknown => c"<UNKNOWN>",
                 }
+            }
+
+            pub fn as_str(self) -> &'static str {
+                self.as_cstr().to_str().unwrap()
             }
 
             pub const fn as_ptr(self) -> *const libc::c_char {
