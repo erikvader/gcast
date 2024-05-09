@@ -38,140 +38,171 @@ macro_rules! properties {
     };
     (@inner ((Flag,
               $prop:ident,
-              $(Get $getter:ident $(,)*)*
-              $(Set $setter:ident $(,)*)*
-              $(Obs $obs:ident $(,)*)*
+              $(Get $getter:ident $(,)?)?
+              $(Set $setter:ident $(,)?)?
+              $(Obs $obs:ident $(,)?)?
+              $(Cyc $cyc:ident $(,)?)?
     ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
         impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<bool> {
                     self.get_property_flag(Property::$prop)
                 }
-            )*
+            )?
             $(
                 pub fn $setter(&mut self, value: bool) -> Result<()> {
                     self.set_property_flag(Property::$prop, value)
                 }
-            )*
+            )?
             $(
                 pub fn $obs(&mut self) -> Result<()> {
                     self.observe_property(Property::$prop, Format::Flag)
                 }
-            )*
+            )?
+            $(
+                pub fn $cyc(&mut self) -> Result<()> {
+                    self.cycle(Property::$prop)
+                }
+            )?
         }
         properties!{@inner ($($rest)*) -> ($($arms)* ($prop, bool)) ($($parse)* $prop)}
     };
     (@inner ((Int64,
               $prop:ident,
-              $(Get $getter:ident $(,)*)*
-              $(Set $setter:ident $(,)*)*
-              $(Obs $obs:ident $(,)*)*
+              $(Get $getter:ident $(,)?)?
+              $(Set $setter:ident $(,)?)?
+              $(Obs $obs:ident $(,)?)?
+              $(Add $add:ident $(,)?)?
     ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
         impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<i64> {
                     self.get_property_int(Property::$prop)
                 }
-            )*
+            )?
             $(
                 pub fn $setter(&mut self, value: i64) -> Result<()> {
                     self.set_property_int(Property::$prop, value)
                 }
-            )*
+            )?
             $(
                 pub fn $obs(&mut self) -> Result<()> {
                     self.observe_property(Property::$prop, Format::Int64)
                 }
-            )*
+            )?
+            $(
+                pub fn $add(&mut self, val: i64) -> Result<()> {
+                    self.add_int(Property::$prop, val)
+                }
+            )?
         }
         properties!{@inner ($($rest)*) -> ($($arms)* ($prop, i64)) ($($parse)* $prop)}
     };
     (@inner ((Double,
               $prop:ident,
-              $(Get $getter:ident $(,)*)*
-              $(Set $setter:ident $(,)*)*
-              $(Obs $obs:ident $(,)*)*
+              $(Get $getter:ident $(,)?)?
+              $(Set $setter:ident $(,)?)?
+              $(Obs $obs:ident $(,)?)?
+              $(Add $add:ident $(,)?)?
     ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
         impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<f64> {
                     self.get_property_double(Property::$prop)
                 }
-            )*
+            )?
             $(
                 pub fn $setter(&mut self, value: f64) -> Result<()> {
                     self.set_property_double(Property::$prop, value)
                 }
-            )*
+            )?
             $(
                 pub fn $obs(&mut self) -> Result<()> {
                     self.observe_property(Property::$prop, Format::Double)
                 }
-            )*
+            )?
+            $(
+                pub fn $add(&mut self, val: f64) -> Result<()> {
+                    self.add_double(Property::$prop, val)
+                }
+            )?
         }
         properties!{@inner ($($rest)*) -> ($($arms)* ($prop, f64)) ($($parse)* $prop)}
     };
     (@inner ((String,
               $prop:ident,
-              $(Get $getter:ident $(,)*)*
-              $(Set $setter:ident $(,)*)*
-              $(Obs $obs:ident $(,)*)*
+              $(Get $getter:ident $(,)?)?
+              $(Set $setter:ident $(,)?)?
+              $(Obs $obs:ident $(,)?)?
+              $(Cyc $cyc:ident $(,)?)?
     ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
         impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<String> {
                     self.get_property_string(Property::$prop)
                 }
-            )*
+            )?
             $(
                 pub fn $setter(&mut self, value: String) -> Result<()> {
                     self.set_property_string(Property::$prop, value)
                 }
-            )*
+            )?
             $(
                 pub fn $obs(&mut self) -> Result<()> {
                     self.observe_property(Property::$prop, Format::String)
                 }
-            )*
+            )?
+            $(
+                pub fn $cyc<S: Into<String>>(&mut self, values: Vec<S>) -> Result<()> {
+                    self.cycle_values(Property::$prop, values)
+                }
+            )?
         }
         properties!{@inner ($($rest)*) -> ($($arms)* ($prop, String)) ($($parse)* $prop)}
     };
     (@inner ((Node,
               $prop:ident,
-              $(Get $getter:ident $(,)*)*
-              $(Obs $obs:ident $(,)*)*
+              $(Get $getter:ident $(,)?)?
+              $(Obs $obs:ident $(,)?)?
     ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
         impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<Node> {
                     self.get_property_node(Property::$prop)
                 }
-            )*
+            )?
             $(
                 pub fn $obs(&mut self) -> Result<()> {
                     self.observe_property(Property::$prop, Format::Node)
                 }
-            )*
+            )?
         }
         properties!{@inner ($($rest)*) -> ($($arms)* ($prop, Node)) ($($parse)*)}
     };
-    ($($rest:tt),* $(,)*) => {
+    ($($rest:tt),* $(,)?) => {
         properties!{@inner ($($rest)*) -> () ()}
     };
 }
 
 properties! {
-    (Flag, Pause, Get is_paused, Set set_paused, Obs observe_paused),
+    (Flag, Pause, Get is_paused, Set set_paused, Obs observe_paused, Cyc toggle_pause),
     (String, MpvVersion, Get version),
     (String, MediaTitle, Get media_title, Obs observe_media_title),
     (Double, PlaybackTime, Get playback_time, Obs observe_playback_time),
     (Double, Duration, Get duration, Obs observe_duration),
-    (Double, Volume, Get volume, Set set_volume, Obs observe_volume),
+    (Double, Volume, Get volume, Set set_volume, Obs observe_volume, Add add_volume),
     (Int64, Chapters, Get chapters, Obs observe_chapters),
-    (Int64, Chapter, Get chapter, Obs observe_chapter),
+    (Int64, Chapter, Get chapter, Obs observe_chapter, Add add_chapter),
     (Node, TrackList, Get track_list, Obs observe_track_list),
     (String, YtdlFormat, Set set_ytdl_format),
     (Flag, Fullscreen, Set set_fullscreen),
+    (Flag, Mute, Cyc toggle_mute),
+    (Double, SubDelay, Add add_sub_delay),
+    (Double, SubScale, Add add_sub_scale),
+    (Double, SubPos, Add add_sub_pos),
+    (Int64, SubId, Set set_sub),
+    (Int64, AudioId, Set set_audio),
+    (String, AudioChannels, Obs observe_audio_channels, Cyc cycle_audio_channels),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -199,6 +230,14 @@ enum_cstr_map! {pub Property {
     (TrackList, c"track-list"),
     (YtdlFormat, c"ytdl-format"),
     (Fullscreen, c"fullscreen"),
+    (Mute, c"mute"),
+    (SubDelay, c"sub-delay"),
+    (SubScale, c"sub-scale"),
+    (SubPos, c"sub-pos"),
+    (SubId, c"sid"),
+    (AudioId, c"aid"),
+    (OsdLevel, c"osd-level"),
+    (AudioChannels, c"audio-channels"),
 }}
 
 impl<T: super::private::InitState> Handle<T> {
@@ -353,9 +392,28 @@ enum_cstr_map! {pub AudioDriver {
     (Pulse, c"pulse"),
 }}
 
+pub enum OsdLevel {
+    Disable,
+    Enabled,
+    EnabledTime,
+    EnabledTimeStatus,
+}
+
 impl Handle<Uninit> {
     pub fn set_audio_driver(&mut self, device: AudioDriver) -> Result<()> {
         mpv_try_unknown!(device)?;
         self.set_property_cstr(Property::AudioDriver, device)
+    }
+
+    pub fn set_osd_level(&mut self, level: OsdLevel) -> Result<()> {
+        self.set_property_int(
+            Property::OsdLevel,
+            match level {
+                OsdLevel::Disable => 0,
+                OsdLevel::Enabled => 1,
+                OsdLevel::EnabledTime => 2,
+                OsdLevel::EnabledTimeStatus => 3,
+            },
+        )
     }
 }
