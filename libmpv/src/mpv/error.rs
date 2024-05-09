@@ -15,7 +15,7 @@ pub enum Error {
     LibMpvTooOld(libc::c_ulong),
 }
 
-enum_int_map! {ErrorCode (mpv_error) {
+enum_int_map! {pub ErrorCode (mpv_error) {
     (EventQueueFull, MPV_ERROR_EVENT_QUEUE_FULL),
     (Nomem, MPV_ERROR_NOMEM),
     (Uninitialized, MPV_ERROR_UNINITIALIZED),

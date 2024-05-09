@@ -4,7 +4,7 @@ use super::{
 };
 use crate::bindings::*;
 
-enum_int_map! {LogLevel (mpv_log_level) {
+enum_int_map! {pub LogLevel (mpv_log_level) {
     (None, MPV_LOG_LEVEL_NONE),
     (Fatal, MPV_LOG_LEVEL_FATAL),
     (Error, MPV_LOG_LEVEL_ERROR),

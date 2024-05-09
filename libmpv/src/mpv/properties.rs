@@ -8,9 +8,8 @@ use crate::{
     mpv::{data::ptr_to_string, macros::mpv_try_null},
 };
 
-use self::private::*;
 use super::{
-    data::{private::Format, ptr_to_node, Node},
+    data::{ptr_to_node, Format, Node},
     macros::{enum_cstr_map, mpv_try, mpv_try_unknown},
     Handle, Init, Result, Uninit,
 };
@@ -185,26 +184,22 @@ pub enum PropValueParseError {
     UnsupportedType,
 }
 
-pub(crate) mod private {
-    use super::*;
-
-    enum_cstr_map! {Property {
-        (MpvVersion, c"mpv-version"),
-        (AudioDriver, c"ao"),
-        (Pause, c"pause"),
-        (InputDefaultBindings, c"input-default-bindings"),
-        (InputVoKeyboard, c"input-vo-keyboard"),
-        (MediaTitle, c"media-title"),
-        (PlaybackTime, c"playback-time"),
-        (Duration, c"duration"),
-        (Volume, c"volume"),
-        (Chapters, c"chapters"),
-        (Chapter, c"chapter"),
-        (TrackList, c"track-list"),
-        (YtdlFormat, c"ytdl-format"),
-        (Fullscreen, c"fullscreen"),
-    }}
-}
+enum_cstr_map! {pub Property {
+    (MpvVersion, c"mpv-version"),
+    (AudioDriver, c"ao"),
+    (Pause, c"pause"),
+    (InputDefaultBindings, c"input-default-bindings"),
+    (InputVoKeyboard, c"input-vo-keyboard"),
+    (MediaTitle, c"media-title"),
+    (PlaybackTime, c"playback-time"),
+    (Duration, c"duration"),
+    (Volume, c"volume"),
+    (Chapters, c"chapters"),
+    (Chapter, c"chapter"),
+    (TrackList, c"track-list"),
+    (YtdlFormat, c"ytdl-format"),
+    (Fullscreen, c"fullscreen"),
+}}
 
 impl<T: super::private::InitState> Handle<T> {
     fn set_property_cstr(
@@ -354,7 +349,7 @@ impl Handle<Init> {
     }
 }
 
-enum_cstr_map! {AudioDriver {
+enum_cstr_map! {pub AudioDriver {
     (Pulse, c"pulse"),
 }}
 

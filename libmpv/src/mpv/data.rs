@@ -1,25 +1,19 @@
-use self::private::*;
 use crate::bindings::*;
 use crate::mpv::macros::enum_int_map;
 use std::{collections::HashMap, ffi::CStr};
 
-pub(crate) mod private {
-
-    use super::*;
-
-    enum_int_map! {Format (mpv_format) {
-        (None, MPV_FORMAT_NONE),
-        (String, MPV_FORMAT_STRING),
-        (OsdString, MPV_FORMAT_OSD_STRING),
-        (Flag, MPV_FORMAT_FLAG),
-        (Int64, MPV_FORMAT_INT64),
-        (Double, MPV_FORMAT_DOUBLE),
-        (Node, MPV_FORMAT_NODE),
-        (NodeArray, MPV_FORMAT_NODE_ARRAY),
-        (NodeMap, MPV_FORMAT_NODE_MAP),
-        (ByteArray, MPV_FORMAT_BYTE_ARRAY),
-    }}
-}
+enum_int_map! {pub Format (mpv_format) {
+    (None, MPV_FORMAT_NONE),
+    (String, MPV_FORMAT_STRING),
+    (OsdString, MPV_FORMAT_OSD_STRING),
+    (Flag, MPV_FORMAT_FLAG),
+    (Int64, MPV_FORMAT_INT64),
+    (Double, MPV_FORMAT_DOUBLE),
+    (Node, MPV_FORMAT_NODE),
+    (NodeArray, MPV_FORMAT_NODE_ARRAY),
+    (NodeMap, MPV_FORMAT_NODE_MAP),
+    (ByteArray, MPV_FORMAT_BYTE_ARRAY),
+}}
 
 /// NOTE: The returned property should be UTF-8 except for a few things, see the header
 /// file. From the doc of MPV_FORMAT_STRING: although the encoding is usually UTF-8, this

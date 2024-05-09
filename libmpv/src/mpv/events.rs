@@ -1,43 +1,38 @@
 use std::time::Duration;
 
 use super::{
-    data::private::Format,
+    data::Format,
     error::ErrorCode,
     logs::LogLevel,
     macros::enum_int_map,
-    properties::{private::Property, PropertyValue},
+    properties::{Property, PropertyValue},
     Handle, Init,
 };
 
-use self::private::*;
 use crate::{
     bindings::*,
     mpv::data::{ptr_to_node, ptr_to_string},
 };
 
-mod private {
-    use super::*;
-
-    enum_int_map! {EventID (mpv_event_id) {
-        (None, MPV_EVENT_NONE),
-        (Shutdown, MPV_EVENT_SHUTDOWN),
-        (LogMessage, MPV_EVENT_LOG_MESSAGE),
-        (GetPropertyReply, MPV_EVENT_GET_PROPERTY_REPLY),
-        (SetPropertyReply, MPV_EVENT_SET_PROPERTY_REPLY),
-        (CommandReply, MPV_EVENT_COMMAND_REPLY),
-        (StartFile, MPV_EVENT_START_FILE),
-        (EndFile, MPV_EVENT_END_FILE),
-        (FileLoaded, MPV_EVENT_FILE_LOADED),
-        (ClientMessage, MPV_EVENT_CLIENT_MESSAGE),
-        (VideoReconfig, MPV_EVENT_VIDEO_RECONFIG),
-        (AudioReconfig, MPV_EVENT_AUDIO_RECONFIG),
-        (Seek, MPV_EVENT_SEEK),
-        (PlaybackRestart, MPV_EVENT_PLAYBACK_RESTART),
-        (PropertyChange, MPV_EVENT_PROPERTY_CHANGE),
-        (QueueOverflow, MPV_EVENT_QUEUE_OVERFLOW),
-        (Hook, MPV_EVENT_HOOK),
-    }}
-}
+enum_int_map! {pub EventID (mpv_event_id) {
+    (None, MPV_EVENT_NONE),
+    (Shutdown, MPV_EVENT_SHUTDOWN),
+    (LogMessage, MPV_EVENT_LOG_MESSAGE),
+    (GetPropertyReply, MPV_EVENT_GET_PROPERTY_REPLY),
+    (SetPropertyReply, MPV_EVENT_SET_PROPERTY_REPLY),
+    (CommandReply, MPV_EVENT_COMMAND_REPLY),
+    (StartFile, MPV_EVENT_START_FILE),
+    (EndFile, MPV_EVENT_END_FILE),
+    (FileLoaded, MPV_EVENT_FILE_LOADED),
+    (ClientMessage, MPV_EVENT_CLIENT_MESSAGE),
+    (VideoReconfig, MPV_EVENT_VIDEO_RECONFIG),
+    (AudioReconfig, MPV_EVENT_AUDIO_RECONFIG),
+    (Seek, MPV_EVENT_SEEK),
+    (PlaybackRestart, MPV_EVENT_PLAYBACK_RESTART),
+    (PropertyChange, MPV_EVENT_PROPERTY_CHANGE),
+    (QueueOverflow, MPV_EVENT_QUEUE_OVERFLOW),
+    (Hook, MPV_EVENT_HOOK),
+}}
 
 #[derive(Debug)]
 pub enum Event {
@@ -60,7 +55,7 @@ pub enum Event {
     UnsupportedEvent(EventID),
 }
 
-enum_int_map! {EndReason (mpv_end_file_reason) {
+enum_int_map! {pub EndReason (mpv_end_file_reason) {
     (EOF, MPV_END_FILE_REASON_EOF),
     (Stop, MPV_END_FILE_REASON_STOP),
     (Quit, MPV_END_FILE_REASON_QUIT),

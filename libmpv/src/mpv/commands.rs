@@ -4,21 +4,15 @@ use std::{
     ptr,
 };
 
-use self::private::Command;
-
 use super::{
     macros::{enum_cstr_map, mpv_try, mpv_try_unknown},
     Handle, Init, Result,
 };
 use crate::bindings::*;
 
-mod private {
-    use super::*;
-
-    enum_cstr_map! {Command {
-        (LoadFile, c"loadfile"),
-    }}
-}
+enum_cstr_map! {Command {
+    (LoadFile, c"loadfile"),
+}}
 
 impl<T: super::private::InitState> Handle<T> {
     fn command<const N: usize>(
