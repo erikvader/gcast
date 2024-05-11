@@ -27,7 +27,7 @@ impl<T: super::private::InitState> Handle<T> {
         command: Command,
         args: [*const libc::c_char; N],
     ) -> Result<()> {
-        mpv_try_unknown!(command)?;
+        mpv_try_unknown!(&command)?;
         // TODO: can't use full_args = [ptr::null; {N+2}] yet
         let mut full_args = Vec::new();
         full_args.push(command.as_cstr().as_ptr());
@@ -48,18 +48,18 @@ impl Handle<Init> {
     }
 
     pub(super) fn cycle(&mut self, prop: Property) -> Result<()> {
-        mpv_try_unknown!(prop)?;
+        mpv_try_unknown!(&prop)?;
         self.command(Command::Cycle, [prop.into()])
     }
 
     pub(super) fn add_int(&mut self, prop: Property, val: i64) -> Result<()> {
-        mpv_try_unknown!(prop)?;
+        mpv_try_unknown!(&prop)?;
         let val = SeeString::from(val);
         self.command(Command::Add, [prop.into(), &val])
     }
 
     pub(super) fn add_double(&mut self, prop: Property, val: f64) -> Result<()> {
-        mpv_try_unknown!(prop)?;
+        mpv_try_unknown!(&prop)?;
         let val = SeeString::from(val);
         self.command(Command::Add, [prop.into(), &val])
     }

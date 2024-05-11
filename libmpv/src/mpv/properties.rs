@@ -28,7 +28,7 @@ macro_rules! properties {
                     $(Property::$pat => value.parse()
                       .map_err(|_| PropValueParseError::BadValue)
                       .map(|b| PropertyValue::$pat(b))),*,
-                    Property::Unknown => Err(PropValueParseError::UnknownProp),
+                    Property::Unknown(_) => Err(PropValueParseError::UnknownProp),
                     _ => Err(PropValueParseError::UnsupportedType),
                 }
             }
@@ -238,14 +238,14 @@ impl<T: super::private::InitState> Handle<T> {
         prop: Property,
         value: impl Into<SeeString<'a>>,
     ) -> Result<()> {
-        mpv_try_unknown!(prop)?;
+        mpv_try_unknown!(&prop)?;
         let value = value.into();
         mpv_try! {unsafe { mpv_set_property_string(self.ctx, prop.as_cstr().as_ptr(), value.as_ptr()) }}?;
         Ok(())
     }
 
     fn get_property_string(&mut self, prop: Property) -> Result<String> {
-        mpv_try_unknown!(prop)?;
+        mpv_try_unknown!(&prop)?;
         let retval =
             mpv_try_null! {unsafe { mpv_get_property_string(self.ctx, prop.as_ptr()) }}?;
         let rust_str = unsafe { ptr_to_string(retval) };
@@ -255,7 +255,7 @@ impl<T: super::private::InitState> Handle<T> {
     }
 
     fn get_property_node(&mut self, prop: Property) -> Result<Node> {
-        mpv_try_unknown!(prop)?;
+        mpv_try_unknown!(&prop)?;
         let mut node = mpv_node {
             u: mpv_node_u { int64: 0 },
             format: Format::None.to_int(),
@@ -272,7 +272,7 @@ impl<T: super::private::InitState> Handle<T> {
     }
 
     fn get_property_flag(&mut self, prop: Property) -> Result<bool> {
-        mpv_try_unknown!(prop)?;
+        mpv_try_unknown!(&prop)?;
         let mut flag: libc::c_int = 0;
         mpv_try!(unsafe {
             mpv_get_property(
@@ -286,7 +286,7 @@ impl<T: super::private::InitState> Handle<T> {
     }
 
     fn set_property_flag(&mut self, prop: Property, flag: bool) -> Result<()> {
-        mpv_try_unknown!(prop)?;
+        mpv_try_unknown!(&prop)?;
         let mut flag: libc::c_int = if flag { 1 } else { 0 };
         mpv_try!(unsafe {
             mpv_set_property(
@@ -300,7 +300,7 @@ impl<T: super::private::InitState> Handle<T> {
     }
 
     fn get_property_double(&mut self, prop: Property) -> Result<f64> {
-        mpv_try_unknown!(prop)?;
+        mpv_try_unknown!(&prop)?;
         let mut double: libc::c_double = 0.0;
         mpv_try!(unsafe {
             mpv_get_property(
@@ -315,7 +315,7 @@ impl<T: super::private::InitState> Handle<T> {
 
     #[allow(dead_code)]
     fn set_property_double(&mut self, prop: Property, double: f64) -> Result<()> {
-        mpv_try_unknown!(prop)?;
+        mpv_try_unknown!(&prop)?;
         let mut double: libc::c_double = double;
         mpv_try!(unsafe {
             mpv_set_property(
@@ -329,7 +329,7 @@ impl<T: super::private::InitState> Handle<T> {
     }
 
     fn get_property_int(&mut self, prop: Property) -> Result<i64> {
-        mpv_try_unknown!(prop)?;
+        mpv_try_unknown!(&prop)?;
         let mut int: int64_t = 0;
         mpv_try!(unsafe {
             mpv_get_property(
@@ -344,7 +344,7 @@ impl<T: super::private::InitState> Handle<T> {
 
     #[allow(dead_code)]
     fn set_property_int(&mut self, prop: Property, int: i64) -> Result<()> {
-        mpv_try_unknown!(prop)?;
+        mpv_try_unknown!(&prop)?;
         let mut int: int64_t = int;
         mpv_try!(unsafe {
             mpv_set_property(
@@ -358,7 +358,7 @@ impl<T: super::private::InitState> Handle<T> {
     }
 
     fn observe_property(&mut self, prop: Property, format: Format) -> Result<()> {
-        mpv_try_unknown!(prop)?;
+        mpv_try_unknown!(&prop)?;
         mpv_try_unknown!(format)?;
         mpv_try!(unsafe {
             mpv_observe_property(self.ctx, 0, prop.as_ptr(), format.to_int())

@@ -44,10 +44,10 @@ pub(crate) use enum_int_map;
 
 macro_rules! enum_cstr_map {
     ($vis:vis $name:ident {$(($r:ident, $c:literal)),* $(,)*}) => {
-        #[derive(Debug, Copy, Clone)]
+        #[derive(Debug, Clone)]
         $vis enum $name {
             $($r),*,
-            Unknown,
+            Unknown(#[allow(dead_code)] std::ffi::CString),
         }
 
         #[allow(dead_code)]
@@ -55,14 +55,14 @@ macro_rules! enum_cstr_map {
             $vis fn from_cstr(cstr: &std::ffi::CStr) -> Self {
                 match () {
                     $(_ if cstr == $c => Self::$r),*,
-                    _ => Self::Unknown,
+                    _ => Self::Unknown(cstr.to_owned()),
                 }
             }
 
             $vis fn from_str(cstr: &str) -> Self {
                 match () {
                     $(_ if cstr == $c.to_str().unwrap() => Self::$r),*,
-                    _ => Self::Unknown,
+                    _ => Self::Unknown(SeeString::from(cstr).into_cstring()),
                 }
             }
 
@@ -71,23 +71,23 @@ macro_rules! enum_cstr_map {
                 Self::from_cstr(unsafe{std::ffi::CStr::from_ptr(ptr)})
             }
 
-            $vis const fn as_cstr(self) -> &'static std::ffi::CStr {
+            $vis const fn as_cstr(&self) -> &'static std::ffi::CStr {
                 match self {
                     $(Self::$r => $c),*,
-                    Self::Unknown => c"<UNKNOWN>",
+                    Self::Unknown(_) => c"<UNKNOWN>",
                 }
             }
 
-            $vis fn as_str(self) -> &'static str {
+            $vis fn as_str(&self) -> &'static str {
                 self.as_cstr().to_str().unwrap()
             }
 
-            $vis const fn as_ptr(self) -> *const libc::c_char {
+            $vis const fn as_ptr(&self) -> *const libc::c_char {
                 self.as_cstr().as_ptr()
             }
 
-            $vis const fn is_unknown(self) -> bool {
-                matches!(self, Self::Unknown)
+            $vis const fn is_unknown(&self) -> bool {
+                matches!(self, Self::Unknown(_))
             }
         }
 
