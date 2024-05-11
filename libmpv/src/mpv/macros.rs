@@ -52,30 +52,17 @@ macro_rules! enum_cstr_map {
 
         #[allow(dead_code)]
         impl $name {
-            $vis fn from_cstr(cstr: &std::ffi::CStr) -> Self {
+            $vis fn from_str<'a>(cstr: impl Into<SeeString<'a>>) -> Self {
+                let cstr = cstr.into();
                 match () {
-                    $(_ if cstr == $c => Self::$r),*,
-                    _ => Self::Unknown(cstr.to_owned()),
-                }
-            }
-
-            $vis fn from_cstring(cstr: std::ffi::CString) -> Self {
-                match () {
-                    $(_ if cstr.as_c_str() == $c => Self::$r),*,
-                    _ => Self::Unknown(cstr),
-                }
-            }
-
-            $vis fn from_str(cstr: &str) -> Self {
-                match () {
-                    $(_ if cstr == $c.to_str().unwrap() => Self::$r),*,
-                    _ => Self::Unknown(SeeString::from(cstr).into_cstring()),
+                    $(_ if cstr.as_ref() == $c => Self::$r),*,
+                    _ => Self::Unknown(cstr.into_cstring()),
                 }
             }
 
             $vis fn from_ptr(ptr: *const libc::c_char) -> Self {
                 assert!(!ptr.is_null());
-                Self::from_cstr(unsafe{std::ffi::CStr::from_ptr(ptr)})
+                Self::from_str(unsafe{std::ffi::CStr::from_ptr(ptr)})
             }
 
             $vis const fn as_cstr(&self) -> &'static std::ffi::CStr {
@@ -100,7 +87,7 @@ macro_rules! enum_cstr_map {
 
         impl From<&std::ffi::CStr> for $name {
             fn from(int: &std::ffi::CStr) -> Self {
-                Self::from_cstr(int)
+                Self::from_str(int)
             }
         }
 

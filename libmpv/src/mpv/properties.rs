@@ -17,7 +17,6 @@ use super::{
 };
 
 macro_rules! properties {
-    // TODO: remove pat, it is unused
     (@inner () -> ($(($name: ident, $type:ty))*) ($($pat:ident)*)) => {
         #[derive(Debug, Clone)]
         pub enum PropertyValue {
@@ -152,7 +151,7 @@ macro_rules! properties {
             $(
                 pub fn $getter(&mut self) -> Result<$enum> {
                     let cstr = self.get_property_cstr(Property::$prop)?;
-                    Ok($enum::from_cstring(cstr))
+                    Ok($enum::from_str(cstr))
                 }
             )?
             $(
@@ -210,7 +209,7 @@ properties! {
     (Double, SubPos, Add add_sub_pos),
     (Int64, SubId, Set set_sub),
     (Int64, AudioId, Set set_audio),
-    (EnumCstr Idle, Idle, Set set_idle),
+    (EnumCstr Idle, Idle, Get get_idle, Set set_idle),
 }
 
 enum_cstr_map! {pub Property {
@@ -405,5 +404,35 @@ impl<T: super::private::InitState> Handle<T> {
             mpv_observe_property(self.ctx, 0, prop.as_ptr(), format.to_int())
         })?;
         Ok(())
+    }
+}
+
+impl Property {
+    pub(crate) fn value_i64(self, data: i64) -> Option<Self> {
+        match self {
+            Property::MpvVersion => None,
+            Property::Pause => None,
+            Property::InputDefaultBindings => None,
+            Property::InputVoKeyboard => None,
+            Property::MediaTitle => None,
+            Property::PlaybackTime => None,
+            Property::Duration => None,
+            Property::Volume => None,
+            Property::Chapters => None,
+            Property::Chapter => None,
+            Property::TrackList => None,
+            Property::YtdlFormat => None,
+            Property::Fullscreen => None,
+            Property::Mute => None,
+            Property::SubDelay => None,
+            Property::SubScale => None,
+            Property::SubPos => None,
+            Property::SubId => None,
+            Property::AudioId => None,
+            Property::Config => None,
+            Property::ConfigDir => None,
+            Property::Idle => None,
+            Property::Unknown(_) => None,
+        }
     }
 }
