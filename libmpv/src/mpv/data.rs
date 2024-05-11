@@ -19,9 +19,13 @@ enum_int_map! {pub Format (mpv_format) {
 /// file. From the doc of MPV_FORMAT_STRING: although the encoding is usually UTF-8, this
 /// is not always the case. File tags often store strings in some legacy codepage, and
 /// even filenames don't necessarily have to be in UTF-8 (at least on Linux).
+pub(crate) fn cstr_to_string(ptr: &CStr) -> String {
+    ptr.to_string_lossy().into_owned()
+}
+
 pub(crate) unsafe fn ptr_to_string(ptr: *const libc::c_char) -> String {
     assert!(!ptr.is_null());
-    CStr::from_ptr(ptr).to_string_lossy().into_owned()
+    cstr_to_string(CStr::from_ptr(ptr))
 }
 
 #[derive(Clone, Debug)]

@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{ffi::CStr, time::Duration};
 
 use super::{
     data::Format,
@@ -104,55 +104,33 @@ impl Handle<Init> {
                         let value = (*data).data as *const *const libc::c_char;
                         assert!(!value.is_null());
                         let value = *value;
-                        let value = ptr_to_string(value);
-                        match property {
-                            Property::MediaTitle => {
-                                Some(PropertyValue::MediaTitle(value))
-                            }
-                            _ => None,
-                        }
+                        let value = CStr::from_ptr(value);
+                        property.value_string(value)
                     }
                     Format::Flag => {
                         let value = (*data).data as *const libc::c_int;
                         assert!(!value.is_null());
                         let value = *value;
                         let value = value != 0;
-                        match property {
-                            Property::Pause => Some(PropertyValue::Pause(value)),
-                            _ => None,
-                        }
+                        property.value_flag(value)
                     }
                     Format::Int64 => {
                         let value = (*data).data as *const int64_t;
                         assert!(!value.is_null());
                         let value = *value;
-                        match property {
-                            Property::Chapter => Some(PropertyValue::Chapter(value)),
-                            Property::Chapters => Some(PropertyValue::Chapters(value)),
-                            _ => None,
-                        }
+                        property.value_i64(value)
                     }
                     Format::Double => {
                         let value = (*data).data as *const libc::c_double;
                         assert!(!value.is_null());
                         let value = *value;
-                        match property {
-                            Property::PlaybackTime => {
-                                Some(PropertyValue::PlaybackTime(value))
-                            }
-                            Property::Duration => Some(PropertyValue::Duration(value)),
-                            Property::Volume => Some(PropertyValue::Volume(value)),
-                            _ => None,
-                        }
+                        property.value_double(value)
                     }
                     Format::Node => {
                         let value = (*data).data as *const mpv_node;
                         assert!(!value.is_null());
                         let value = ptr_to_node(value);
-                        match property {
-                            Property::TrackList => Some(PropertyValue::TrackList(value)),
-                            _ => None,
-                        }
+                        property.value_node(value)
                     }
                     _ => None,
                 };

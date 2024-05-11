@@ -5,6 +5,7 @@ use std::{
 
 use crate::{
     bindings::*,
+    cstr_to_string,
     mpv::{data::ptr_to_string, macros::mpv_try_null},
     see_string::SeeString,
     Uninit,
@@ -16,11 +17,52 @@ use super::{
     Handle, Init, Result,
 };
 
+fn none<T>(_val: T) -> Option<PropertyValue> {
+    None
+}
+
 macro_rules! properties {
-    (@inner () -> ($(($name: ident, $type:ty))*) ($($pat:ident)*)) => {
+    (@inner () -> ($(($name: ident, $type:ty, $int:expr, $cstr:expr, $bool:expr, $double:expr, $node:expr))*)) => {
         #[derive(Debug, Clone)]
         pub enum PropertyValue {
             $($name($type)),*
+        }
+
+        impl Property {
+            pub(crate) fn value_i64(&self, value: i64) -> Option<PropertyValue> {
+                match self {
+                    $(Property::$name => $int(value)),*,
+                    _ => None,
+                }
+            }
+
+            pub(crate) fn value_string(&self, value: &CStr) -> Option<PropertyValue> {
+                match self {
+                    $(Property::$name => $cstr(value)),*,
+                    _ => None,
+                }
+            }
+
+            pub(crate) fn value_flag(&self, value: bool) -> Option<PropertyValue> {
+                match self {
+                    $(Property::$name => $bool(value)),*,
+                    _ => None,
+                }
+            }
+
+            pub(crate) fn value_double(&self, value: f64) -> Option<PropertyValue> {
+                match self {
+                    $(Property::$name => $double(value)),*,
+                    _ => None,
+                }
+            }
+
+            pub(crate) fn value_node(&self, value: Node) -> Option<PropertyValue> {
+                match self {
+                    $(Property::$name => $node(value)),*,
+                    _ => None,
+                }
+            }
         }
     };
     (@inner ((Flag,
@@ -29,7 +71,7 @@ macro_rules! properties {
               $(Set $setter:ident $(,)?)?
               $(Obs $obs:ident $(,)?)?
               $(Cyc $cyc:ident $(,)?)?
-    ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
+    ) $($rest:tt)*) -> ($($arms:tt)*)) => {
         impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<bool> {
@@ -52,7 +94,7 @@ macro_rules! properties {
                 }
             )?
         }
-        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, bool)) ($($parse)* $prop)}
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, bool, none, none, |b| Some(PropertyValue::$prop(b)), none, none))}
     };
     (@inner ((Int64,
               $prop:ident,
@@ -60,7 +102,7 @@ macro_rules! properties {
               $(Set $setter:ident $(,)?)?
               $(Obs $obs:ident $(,)?)?
               $(Add $add:ident $(,)?)?
-    ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
+    ) $($rest:tt)*) -> ($($arms:tt)*)) => {
         impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<i64> {
@@ -83,7 +125,7 @@ macro_rules! properties {
                 }
             )?
         }
-        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, i64)) ($($parse)* $prop)}
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, i64, |i| Some(PropertyValue::$prop(i)), none, none, none, none))}
     };
     (@inner ((Double,
               $prop:ident,
@@ -91,7 +133,7 @@ macro_rules! properties {
               $(Set $setter:ident $(,)?)?
               $(Obs $obs:ident $(,)?)?
               $(Add $add:ident $(,)?)?
-    ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
+    ) $($rest:tt)*) -> ($($arms:tt)*)) => {
         impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<f64> {
@@ -114,14 +156,14 @@ macro_rules! properties {
                 }
             )?
         }
-        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, f64)) ($($parse)* $prop)}
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, f64, none, none, none, |d| Some(PropertyValue::$prop(d)), none))}
     };
     (@inner ((String,
               $prop:ident,
               $(Get $getter:ident $(,)?)?
               $(Set $setter:ident $(,)?)?
               $(Obs $obs:ident $(,)?)?
-    ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
+    ) $($rest:tt)*) -> ($($arms:tt)*)) => {
         impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<String> {
@@ -139,14 +181,14 @@ macro_rules! properties {
                 }
             )?
         }
-        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, String)) ($($parse)* $prop)}
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, String, none, |s| Some(PropertyValue::$prop(cstr_to_string(s))), none, none, none))}
     };
     (@inner ((EnumCstr $enum:ident,
               $prop:ident,
               $(Get $getter:ident $(,)?)?
               $(Set $setter:ident $(,)?)?
               $(Obs $obs:ident $(,)?)?
-    ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
+    ) $($rest:tt)*) -> ($($arms:tt)*)) => {
         impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<$enum> {
@@ -165,13 +207,13 @@ macro_rules! properties {
                 }
             )?
         }
-        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, $enum)) ($($parse)* $prop)}
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, $enum, none, |s| Some(PropertyValue::$prop($enum::from_str(s))), none, none, none))}
     };
     (@inner ((Node,
               $prop:ident,
               $(Get $getter:ident $(,)?)?
               $(Obs $obs:ident $(,)?)?
-    ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
+    ) $($rest:tt)*) -> ($($arms:tt)*)) => {
         impl Handle<Init> {
             $(
                 pub fn $getter(&mut self) -> Result<Node> {
@@ -184,10 +226,10 @@ macro_rules! properties {
                 }
             )?
         }
-        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, Node)) ($($parse)*)}
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, Node, none, none, none, none, |n| Some(PropertyValue::$prop(n))))}
     };
     ($($rest:tt),* $(,)?) => {
-        properties!{@inner ($($rest)*) -> () ()}
+        properties!{@inner ($($rest)*) -> ()}
     };
 }
 
@@ -404,35 +446,5 @@ impl<T: super::private::InitState> Handle<T> {
             mpv_observe_property(self.ctx, 0, prop.as_ptr(), format.to_int())
         })?;
         Ok(())
-    }
-}
-
-impl Property {
-    pub(crate) fn value_i64(self, data: i64) -> Option<Self> {
-        match self {
-            Property::MpvVersion => None,
-            Property::Pause => None,
-            Property::InputDefaultBindings => None,
-            Property::InputVoKeyboard => None,
-            Property::MediaTitle => None,
-            Property::PlaybackTime => None,
-            Property::Duration => None,
-            Property::Volume => None,
-            Property::Chapters => None,
-            Property::Chapter => None,
-            Property::TrackList => None,
-            Property::YtdlFormat => None,
-            Property::Fullscreen => None,
-            Property::Mute => None,
-            Property::SubDelay => None,
-            Property::SubScale => None,
-            Property::SubPos => None,
-            Property::SubId => None,
-            Property::AudioId => None,
-            Property::Config => None,
-            Property::ConfigDir => None,
-            Property::Idle => None,
-            Property::Unknown(_) => None,
-        }
     }
 }
