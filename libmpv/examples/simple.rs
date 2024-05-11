@@ -34,6 +34,7 @@ fn inner_main(file: &Path) -> libmpv::Result<()> {
     handle.observe_media_title()?;
     handle.observe_track_list()?;
     handle.loadfile(file)?;
+    handle.set_idle(libmpv::Idle::No)?;
 
     loop {
         let event = handle.wait_event_infinite();

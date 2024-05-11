@@ -59,6 +59,13 @@ macro_rules! enum_cstr_map {
                 }
             }
 
+            $vis fn from_cstring(cstr: std::ffi::CString) -> Self {
+                match () {
+                    $(_ if cstr.as_c_str() == $c => Self::$r),*,
+                    _ => Self::Unknown(cstr),
+                }
+            }
+
             $vis fn from_str(cstr: &str) -> Self {
                 match () {
                     $(_ if cstr == $c.to_str().unwrap() => Self::$r),*,

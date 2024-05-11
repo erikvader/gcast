@@ -1,4 +1,7 @@
-use std::ptr;
+use std::{
+    ffi::{CStr, CString},
+    ptr,
+};
 
 use crate::{
     bindings::*,
@@ -139,6 +142,32 @@ macro_rules! properties {
         }
         properties!{@inner ($($rest)*) -> ($($arms)* ($prop, String)) ($($parse)* $prop)}
     };
+    (@inner ((EnumCstr $enum:ident,
+              $prop:ident,
+              $(Get $getter:ident $(,)?)?
+              $(Set $setter:ident $(,)?)?
+              $(Obs $obs:ident $(,)?)?
+    ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
+        impl Handle<Init> {
+            $(
+                pub fn $getter(&mut self) -> Result<$enum> {
+                    let cstr = self.get_property_cstr(Property::$prop)?;
+                    Ok($enum::from_cstring(cstr))
+                }
+            )?
+            $(
+                pub fn $setter(&mut self, value: $enum) -> Result<()> {
+                    self.set_property_string(Property::$prop, value.as_cstr())
+                }
+            )?
+            $(
+                pub fn $obs(&mut self) -> Result<()> {
+                    self.observe_property(Property::$prop, Format::String)
+                }
+            )?
+        }
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, $enum)) ($($parse)* $prop)}
+    };
     (@inner ((Node,
               $prop:ident,
               $(Get $getter:ident $(,)?)?
@@ -181,6 +210,7 @@ properties! {
     (Double, SubPos, Add add_sub_pos),
     (Int64, SubId, Set set_sub),
     (Int64, AudioId, Set set_audio),
+    (EnumCstr Idle, Idle, Set set_idle),
 }
 
 enum_cstr_map! {pub Property {
@@ -205,6 +235,13 @@ enum_cstr_map! {pub Property {
     (AudioId, c"aid"),
     (Config, c"config"),
     (ConfigDir, c"config-dir"),
+    (Idle, c"idle"),
+}}
+
+enum_cstr_map! {pub Idle {
+    (No, c"no"),
+    (Yes, c"yes"),
+    (Once, c"once"),
 }}
 
 impl Handle<Init> {
@@ -246,6 +283,16 @@ impl<T: super::private::InitState> Handle<T> {
         assert_ne!(retval as *const u8, rust_str.as_ptr());
         unsafe { mpv_free(retval as *mut libc::c_void) };
         Ok(rust_str)
+    }
+
+    fn get_property_cstr(&mut self, prop: Property) -> Result<CString> {
+        mpv_try_unknown!(&prop)?;
+        let retval =
+            mpv_try_null! {unsafe { mpv_get_property_string(self.ctx, prop.as_ptr()) }}?;
+        let cstr = unsafe { CStr::from_ptr(retval) }.to_owned();
+        assert_ne!(retval as *const libc::c_char, cstr.as_ptr());
+        unsafe { mpv_free(retval as *mut libc::c_void) };
+        Ok(cstr)
     }
 
     fn get_property_node(&mut self, prop: Property) -> Result<Node> {
