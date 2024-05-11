@@ -75,4 +75,14 @@ impl Handle<Init> {
         let amount = SeeString::from(-(amount.as_secs() as i64));
         self.command(Command::Seek, [&amount])
     }
+
+    pub fn seek_abs_percent(&mut self, percent: f64) -> Result<()> {
+        let percent = percent
+            .is_nan()
+            .then_some(0.0)
+            .unwrap_or(percent)
+            .clamp(0.0, 100.0);
+        let percent = SeeString::from(percent);
+        self.command(Command::Seek, [&percent, c"absolute-percent"])
+    }
 }
