@@ -123,7 +123,7 @@ impl Handle<Init> {
                         }
                     }
                     Format::Int64 => {
-                        let value = (*data).data as *const i64; // int64_t
+                        let value = (*data).data as *const int64_t;
                         assert!(!value.is_null());
                         let value = *value;
                         match property {

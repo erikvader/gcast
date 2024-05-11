@@ -1,6 +1,10 @@
-use std::{error::Error, ffi::OsString, path::PathBuf};
+use std::{
+    error::Error,
+    ffi::OsString,
+    path::{Path, PathBuf},
+};
 
-use libmpv::{AudioDriver, Event, Handle, LogLevel};
+use libmpv::{Event, Handle, LogLevel};
 
 pub fn main() -> Result<(), Box<dyn Error>> {
     let mut args: Vec<OsString> = std::env::args_os().collect();
@@ -10,14 +14,14 @@ pub fn main() -> Result<(), Box<dyn Error>> {
 
     let filepath: PathBuf = args.remove(1).into();
 
-    inner_main(filepath)?;
+    inner_main(&filepath)?;
     Ok(())
 }
 
-fn inner_main(file: PathBuf) -> libmpv::Result<()> {
+fn inner_main(file: &Path) -> libmpv::Result<()> {
     let mut handle = Handle::new()?;
-    handle.set_audio_driver(AudioDriver::Pulse)?;
     handle.request_log_messages(LogLevel::Info)?;
+    handle.read_config_file()?;
 
     let mut handle = handle.init()?;
     let version = handle.version()?;

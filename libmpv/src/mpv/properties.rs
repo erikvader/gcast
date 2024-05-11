@@ -4,34 +4,21 @@ use crate::{
     bindings::*,
     mpv::{data::ptr_to_string, macros::mpv_try_null},
     see_string::SeeString,
+    Uninit,
 };
 
 use super::{
     data::{ptr_to_node, Format, Node},
     macros::{enum_cstr_map, mpv_try, mpv_try_unknown},
-    Handle, Init, Result, Uninit,
+    Handle, Init, Result,
 };
 
 macro_rules! properties {
+    // TODO: remove pat, it is unused
     (@inner () -> ($(($name: ident, $type:ty))*) ($($pat:ident)*)) => {
         #[derive(Debug, Clone)]
         pub enum PropertyValue {
             $($name($type)),*
-        }
-
-        impl Property {
-            pub fn parse(
-                self,
-                value: &str,
-            ) -> std::result::Result<PropertyValue, PropValueParseError> {
-                match self {
-                    $(Property::$pat => value.parse()
-                      .map_err(|_| PropValueParseError::BadValue)
-                      .map(|b| PropertyValue::$pat(b))),*,
-                    Property::Unknown(_) => Err(PropValueParseError::UnknownProp),
-                    _ => Err(PropValueParseError::UnsupportedType),
-                }
-            }
         }
     };
     (@inner ((Flag,
@@ -194,22 +181,10 @@ properties! {
     (Double, SubPos, Add add_sub_pos),
     (Int64, SubId, Set set_sub),
     (Int64, AudioId, Set set_audio),
-    (String, AudioChannels, Obs observe_audio_channels),
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum PropValueParseError {
-    #[error("Unknown property name")]
-    UnknownProp,
-    #[error("Bad value")]
-    BadValue,
-    #[error("Type not supported")]
-    UnsupportedType,
 }
 
 enum_cstr_map! {pub Property {
     (MpvVersion, c"mpv-version"),
-    (AudioDriver, c"ao"),
     (Pause, c"pause"),
     (InputDefaultBindings, c"input-default-bindings"),
     (InputVoKeyboard, c"input-vo-keyboard"),
@@ -228,9 +203,28 @@ enum_cstr_map! {pub Property {
     (SubPos, c"sub-pos"),
     (SubId, c"sid"),
     (AudioId, c"aid"),
-    (OsdLevel, c"osd-level"),
-    (AudioChannels, c"audio-channels"),
+    (Config, c"config"),
+    (ConfigDir, c"config-dir"),
 }}
+
+impl Handle<Init> {
+    pub fn enable_default_bindings(&mut self) -> Result<()> {
+        self.set_property_flag(Property::InputDefaultBindings, true)?;
+        self.set_property_flag(Property::InputVoKeyboard, true)?;
+        Ok(())
+    }
+}
+
+impl Handle<Uninit> {
+    pub fn read_config_file(&mut self) -> Result<()> {
+        self.set_property_flag(Property::Config, true)
+    }
+
+    pub fn set_config_dir<'a>(&mut self, path: impl Into<SeeString<'a>>) -> Result<()> {
+        // NOTE: hopefully mpv won't mangle the string if it is a file path
+        self.set_property_string(Property::ConfigDir, path)
+    }
+}
 
 impl<T: super::private::InitState> Handle<T> {
     fn set_property_string<'a>(
@@ -364,55 +358,5 @@ impl<T: super::private::InitState> Handle<T> {
             mpv_observe_property(self.ctx, 0, prop.as_ptr(), format.to_int())
         })?;
         Ok(())
-    }
-}
-
-impl Handle<Init> {
-    pub fn enable_default_bindings(&mut self) -> Result<()> {
-        self.set_property_flag(Property::InputDefaultBindings, true)?;
-        self.set_property_flag(Property::InputVoKeyboard, true)?;
-        Ok(())
-    }
-}
-
-enum_cstr_map! {pub AudioDriver {
-    (Pulse, c"pulse"),
-}}
-
-enum_cstr_map! {pub AudioChannel {
-    (AutoSafe, c"auto-safe"),
-    (TwoPointOne, c"2.1"),
-    (Stereo, c"stereo"),
-}}
-
-pub enum OsdLevel {
-    Disable,
-    Enabled,
-    EnabledTime,
-    EnabledTimeStatus,
-}
-
-impl Handle<Uninit> {
-    // TODO: support this pattern in the macro?
-    pub fn set_audio_driver(&mut self, device: AudioDriver) -> Result<()> {
-        mpv_try_unknown!(device)?;
-        self.set_property_string(Property::AudioDriver, device.as_cstr())
-    }
-
-    pub fn set_osd_level(&mut self, level: OsdLevel) -> Result<()> {
-        self.set_property_int(
-            Property::OsdLevel,
-            match level {
-                OsdLevel::Disable => 0,
-                OsdLevel::Enabled => 1,
-                OsdLevel::EnabledTime => 2,
-                OsdLevel::EnabledTimeStatus => 3,
-            },
-        )
-    }
-
-    pub fn set_audio_channels(&mut self, channel: AudioChannel) -> Result<()> {
-        mpv_try_unknown!(channel)?;
-        self.set_property_string(Property::AudioChannels, channel.as_cstr())
     }
 }

@@ -43,7 +43,7 @@ impl Handle<Init> {
     /// returns immediately
     pub fn loadfile<'a>(&mut self, file: impl Into<SeeString<'a>>) -> Result<()> {
         let file = file.into();
-        // filenames are passed as-is to fdopen and the like, mpv does not touch it.
+        // NOTE: filenames are passed as-is to fdopen and the like, mpv does not touch it.
         unsafe { self.command_ptr(Command::LoadFile, [file.as_ptr()]) }
     }
 
