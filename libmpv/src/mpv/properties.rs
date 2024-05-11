@@ -1,11 +1,9 @@
-use std::{
-    ffi::{CStr, CString},
-    ptr,
-};
+use std::ptr;
 
 use crate::{
     bindings::*,
     mpv::{data::ptr_to_string, macros::mpv_try_null},
+    see_string::SeeString,
 };
 
 use super::{
@@ -134,7 +132,6 @@ macro_rules! properties {
               $(Get $getter:ident $(,)?)?
               $(Set $setter:ident $(,)?)?
               $(Obs $obs:ident $(,)?)?
-              $(Cyc $cyc:ident $(,)?)?
     ) $($rest:tt)*) -> ($($arms:tt)*) ($($parse:tt)*)) => {
         impl Handle<Init> {
             $(
@@ -143,18 +140,13 @@ macro_rules! properties {
                 }
             )?
             $(
-                pub fn $setter(&mut self, value: String) -> Result<()> {
-                    self.set_property_string(Property::$prop, value)
+                pub fn $setter(&mut self, value: impl AsRef<str>) -> Result<()> {
+                    self.set_property_string(Property::$prop, value.as_ref())
                 }
             )?
             $(
                 pub fn $obs(&mut self) -> Result<()> {
                     self.observe_property(Property::$prop, Format::String)
-                }
-            )?
-            $(
-                pub fn $cyc<S: Into<String>>(&mut self, values: Vec<S>) -> Result<()> {
-                    self.cycle_values(Property::$prop, values)
                 }
             )?
         }
@@ -202,7 +194,7 @@ properties! {
     (Double, SubPos, Add add_sub_pos),
     (Int64, SubId, Set set_sub),
     (Int64, AudioId, Set set_audio),
-    (String, AudioChannels, Obs observe_audio_channels, Cyc cycle_audio_channels),
+    (String, AudioChannels, Obs observe_audio_channels),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -241,20 +233,15 @@ enum_cstr_map! {pub Property {
 }}
 
 impl<T: super::private::InitState> Handle<T> {
-    fn set_property_cstr(
+    fn set_property_string<'a>(
         &mut self,
         prop: Property,
-        value: impl AsRef<CStr>,
+        value: impl Into<SeeString<'a>>,
     ) -> Result<()> {
         mpv_try_unknown!(prop)?;
-        let value = value.as_ref();
+        let value = value.into();
         mpv_try! {unsafe { mpv_set_property_string(self.ctx, prop.as_cstr().as_ptr(), value.as_ptr()) }}?;
         Ok(())
-    }
-
-    fn set_property_string(&mut self, prop: Property, value: String) -> Result<()> {
-        let value = CString::new(value).expect("this is always valid");
-        self.set_property_cstr(prop, value)
     }
 
     fn get_property_string(&mut self, prop: Property) -> Result<String> {
@@ -392,6 +379,12 @@ enum_cstr_map! {pub AudioDriver {
     (Pulse, c"pulse"),
 }}
 
+enum_cstr_map! {pub AudioChannel {
+    (AutoSafe, c"auto-safe"),
+    (TwoPointOne, c"2.1"),
+    (Stereo, c"stereo"),
+}}
+
 pub enum OsdLevel {
     Disable,
     Enabled,
@@ -400,9 +393,10 @@ pub enum OsdLevel {
 }
 
 impl Handle<Uninit> {
+    // TODO: support this pattern in the macro?
     pub fn set_audio_driver(&mut self, device: AudioDriver) -> Result<()> {
         mpv_try_unknown!(device)?;
-        self.set_property_cstr(Property::AudioDriver, device)
+        self.set_property_string(Property::AudioDriver, device.as_cstr())
     }
 
     pub fn set_osd_level(&mut self, level: OsdLevel) -> Result<()> {
@@ -415,5 +409,10 @@ impl Handle<Uninit> {
                 OsdLevel::EnabledTimeStatus => 3,
             },
         )
+    }
+
+    pub fn set_audio_channels(&mut self, channel: AudioChannel) -> Result<()> {
+        mpv_try_unknown!(channel)?;
+        self.set_property_string(Property::AudioChannels, channel.as_cstr())
     }
 }

@@ -1,5 +1,6 @@
 mod bindings;
 pub mod mpv;
+pub mod see_string;
 
 pub use mpv::data::*;
 pub use mpv::error::*;
