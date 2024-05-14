@@ -72,6 +72,10 @@ impl Handle<Init> {
         unsafe { self.wait_event_raw(-1.0) }
     }
 
+    pub fn wait_event_poll(&mut self) -> Event {
+        unsafe { self.wait_event_raw(0.0) }
+    }
+
     unsafe fn wait_event_raw(&mut self, timeout: f64) -> Event {
         let event = unsafe { mpv_wait_event(self.ctx, timeout) };
         assert!(!event.is_null(), "is never null");

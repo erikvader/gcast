@@ -5,16 +5,17 @@ use std::{
 
 use crate::{
     bindings::*,
-    cstr_to_string,
-    mpv::{data::ptr_to_string, macros::mpv_try_null},
+    mpv::{
+        data::{cstr_to_string, ptr_to_string},
+        macros::mpv_try_null,
+    },
     see_string::SeeString,
-    Uninit,
 };
 
 use super::{
     data::{ptr_to_node, Format, Node},
     macros::{enum_cstr_map, mpv_try, mpv_try_unknown},
-    Handle, Init, Result,
+    Handle, Init, Result, Uninit,
 };
 
 fn none<T>(_val: T) -> Option<PropertyValue> {

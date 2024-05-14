@@ -223,6 +223,12 @@ extern "C" {
         ctx: *mut mpv_handle,
         min_level: *const libc::c_char,
     ) -> libc::c_int;
+
+    pub fn mpv_set_wakeup_callback(
+        ctx: *mut mpv_handle,
+        cb: Option<unsafe extern "C" fn(d: *mut libc::c_void)>,
+        d: *mut libc::c_void,
+    );
 }
 
 /// Port of the macro MPV_MAKE_VERSION

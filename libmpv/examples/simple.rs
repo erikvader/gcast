@@ -1,12 +1,11 @@
 use std::{
-    error::Error,
     ffi::OsString,
     path::{Path, PathBuf},
 };
 
 use libmpv::{Event, Handle, LogLevel};
 
-pub fn main() -> Result<(), Box<dyn Error>> {
+pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args: Vec<OsString> = std::env::args_os().collect();
     if args.len() != 2 {
         return Err("invalid usage".into());

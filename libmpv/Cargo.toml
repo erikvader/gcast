@@ -7,3 +7,6 @@ links = "mpv"
 [dependencies]
 libc.workspace = true
 thiserror.workspace = true
+
+# TODO: put behind feature gate
+tokio.workspace = true

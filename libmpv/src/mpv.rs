@@ -7,6 +7,7 @@ use self::{
     macros::{mpv_try, mpv_try_null},
 };
 
+pub mod asynchronous;
 pub mod commands;
 pub mod data;
 pub mod error;

@@ -2,9 +2,10 @@ use std::{ffi::CStr, ptr, time::Duration};
 
 use super::{
     macros::{enum_cstr_map, mpv_try, mpv_try_unknown},
+    properties::Property,
     Handle, Init, Result,
 };
-use crate::{bindings::*, see_string::SeeString, Property};
+use crate::{bindings::*, see_string::SeeString};
 
 enum_cstr_map! {Command {
     (LoadFile, c"loadfile"),
