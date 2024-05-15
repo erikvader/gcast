@@ -39,17 +39,21 @@ mod private {
     }
 
     /// A state that is initialized
-    pub trait Init: HandleState {}
+    pub trait InitState: HandleState {}
 }
 
 /// Is initialized and supports everything except for rust async functions
-pub struct Sync;
+pub struct Sync {
+    _priv: (),
+}
 
 /// Is not initialized and only supports things that can be done in this early stage
-pub struct Uninit;
+pub struct Uninit {
+    _priv: (),
+}
 
 impl private::HandleState for Sync {}
-impl private::Init for Sync {}
+impl private::InitState for Sync {}
 impl private::HandleState for Uninit {}
 
 unsafe impl Send for Handle<Sync> {}
@@ -65,14 +69,17 @@ impl Handle<Uninit> {
             return Err(Error::LibMpvTooOld(oldversion));
         }
         let ctx = mpv_try_null! {unsafe { mpv_create() }}?;
-        Ok(Handle { ctx, state: Uninit })
+        Ok(Handle {
+            ctx,
+            state: Uninit { _priv: () },
+        })
     }
 
     pub fn init(mut self) -> Result<Handle<Sync>> {
         mpv_try! {unsafe { mpv_initialize(self.ctx) }}?;
         let handle = Handle {
             ctx: self.disarm(),
-            state: Sync,
+            state: Sync { _priv: () },
         };
         // TODO: add a check to make sure the version is at least 0.37.0
         // TODO: the mpv-version property can return git hashes and stuff, so it is not so easy...
@@ -90,10 +97,13 @@ impl<T: private::HandleState> Drop for Handle<T> {
     }
 }
 
-impl<T: private::Init> Handle<T> {
+impl<T: private::InitState> Handle<T> {
     pub fn create_client(&mut self) -> Result<Handle<Sync>> {
         let ctx = mpv_try_null! {unsafe{mpv_create_client(self.ctx, ptr::null())}}?;
-        Ok(Handle { ctx, state: Sync })
+        Ok(Handle {
+            ctx,
+            state: Sync { _priv: () },
+        })
     }
 
     /// The same as dropping the handle, but also quits the player for all other handles

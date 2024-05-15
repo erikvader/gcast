@@ -63,7 +63,7 @@ enum_int_map! {pub EndReason (mpv_end_file_reason) {
     (Redirect, MPV_END_FILE_REASON_REDIRECT),
 }}
 
-impl<T: super::private::Init> Handle<T> {
+impl<T: super::private::InitState> Handle<T> {
     pub fn wait_event(&mut self, timeout: Duration) -> Event {
         unsafe { self.wait_event_raw(timeout.as_secs_f64()) }
     }

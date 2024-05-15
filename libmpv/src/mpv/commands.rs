@@ -40,7 +40,7 @@ impl<T: super::private::HandleState> Handle<T> {
     }
 }
 
-impl<T: super::private::Init> Handle<T> {
+impl<T: super::private::InitState> Handle<T> {
     /// returns immediately
     pub fn loadfile<'a>(&mut self, file: impl Into<SeeString<'a>>) -> Result<()> {
         let file = file.into();

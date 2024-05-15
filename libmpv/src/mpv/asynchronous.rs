@@ -19,7 +19,7 @@ impl super::private::HandleState for Async {
         // in use.
     }
 }
-impl super::private::Init for Async {}
+impl super::private::InitState for Async {}
 
 // NOTE: doesn't need to be repr(C) since this is never used by C code
 struct WakeupData {
