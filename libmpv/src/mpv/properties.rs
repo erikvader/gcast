@@ -15,7 +15,7 @@ use crate::{
 use super::{
     data::{ptr_to_node, Format, Node},
     macros::{enum_cstr_map, mpv_try, mpv_try_unknown},
-    Handle, Init, Result, Uninit,
+    Handle, Result, Uninit,
 };
 
 fn none<T>(_val: T) -> Option<PropertyValue> {
@@ -73,7 +73,7 @@ macro_rules! properties {
               $(Obs $obs:ident $(,)?)?
               $(Cyc $cyc:ident $(,)?)?
     ) $($rest:tt)*) -> ($($arms:tt)*)) => {
-        impl Handle<Init> {
+        impl<T: super::private::Init> Handle<T> {
             $(
                 pub fn $getter(&mut self) -> Result<bool> {
                     self.get_property_flag(Property::$prop)
@@ -104,7 +104,7 @@ macro_rules! properties {
               $(Obs $obs:ident $(,)?)?
               $(Add $add:ident $(,)?)?
     ) $($rest:tt)*) -> ($($arms:tt)*)) => {
-        impl Handle<Init> {
+        impl<T: super::private::Init> Handle<T> {
             $(
                 pub fn $getter(&mut self) -> Result<i64> {
                     self.get_property_int(Property::$prop)
@@ -135,7 +135,7 @@ macro_rules! properties {
               $(Obs $obs:ident $(,)?)?
               $(Add $add:ident $(,)?)?
     ) $($rest:tt)*) -> ($($arms:tt)*)) => {
-        impl Handle<Init> {
+        impl<T: super::private::Init> Handle<T> {
             $(
                 pub fn $getter(&mut self) -> Result<f64> {
                     self.get_property_double(Property::$prop)
@@ -165,7 +165,7 @@ macro_rules! properties {
               $(Set $setter:ident $(,)?)?
               $(Obs $obs:ident $(,)?)?
     ) $($rest:tt)*) -> ($($arms:tt)*)) => {
-        impl Handle<Init> {
+        impl<T: super::private::Init> Handle<T> {
             $(
                 pub fn $getter(&mut self) -> Result<String> {
                     self.get_property_string(Property::$prop)
@@ -190,7 +190,7 @@ macro_rules! properties {
               $(Set $setter:ident $(,)?)?
               $(Obs $obs:ident $(,)?)?
     ) $($rest:tt)*) -> ($($arms:tt)*)) => {
-        impl Handle<Init> {
+        impl<T: super::private::Init> Handle<T> {
             $(
                 pub fn $getter(&mut self) -> Result<$enum> {
                     let cstr = self.get_property_cstr(Property::$prop)?;
@@ -215,7 +215,7 @@ macro_rules! properties {
               $(Get $getter:ident $(,)?)?
               $(Obs $obs:ident $(,)?)?
     ) $($rest:tt)*) -> ($($arms:tt)*)) => {
-        impl Handle<Init> {
+        impl<T: super::private::Init> Handle<T> {
             $(
                 pub fn $getter(&mut self) -> Result<Node> {
                     self.get_property_node(Property::$prop)
@@ -286,7 +286,7 @@ enum_cstr_map! {pub Idle {
     (Once, c"once"),
 }}
 
-impl Handle<Init> {
+impl<T: super::private::Init> Handle<T> {
     pub fn enable_default_bindings(&mut self) -> Result<()> {
         self.set_property_flag(Property::InputDefaultBindings, true)?;
         self.set_property_flag(Property::InputVoKeyboard, true)?;
@@ -305,7 +305,7 @@ impl Handle<Uninit> {
     }
 }
 
-impl<T: super::private::InitState> Handle<T> {
+impl<T: super::private::HandleState> Handle<T> {
     fn set_property_string<'a>(
         &mut self,
         prop: Property,

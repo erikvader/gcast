@@ -3,7 +3,7 @@ use std::{ffi::CStr, ptr, time::Duration};
 use super::{
     macros::{enum_cstr_map, mpv_try, mpv_try_unknown},
     properties::Property,
-    Handle, Init, Result,
+    Handle, Result,
 };
 use crate::{bindings::*, see_string::SeeString};
 
@@ -14,7 +14,7 @@ enum_cstr_map! {Command {
     (Seek, c"seek"),
 }}
 
-impl<T: super::private::InitState> Handle<T> {
+impl<T: super::private::HandleState> Handle<T> {
     fn command<const N: usize>(
         &mut self,
         command: Command,
@@ -40,7 +40,7 @@ impl<T: super::private::InitState> Handle<T> {
     }
 }
 
-impl Handle<Init> {
+impl<T: super::private::Init> Handle<T> {
     /// returns immediately
     pub fn loadfile<'a>(&mut self, file: impl Into<SeeString<'a>>) -> Result<()> {
         let file = file.into();

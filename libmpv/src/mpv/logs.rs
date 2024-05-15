@@ -15,7 +15,7 @@ enum_int_map! {pub LogLevel (mpv_log_level) {
     (Trace, MPV_LOG_LEVEL_TRACE),
 }}
 
-impl<T: super::private::InitState> Handle<T> {
+impl<T: super::private::HandleState> Handle<T> {
     pub fn request_log_messages(&mut self, level: LogLevel) -> Result<()> {
         mpv_try_unknown!(level)?;
         let level_string = match level {

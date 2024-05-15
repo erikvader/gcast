@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use libmpv::{AsyncHandle, Event, Handle, LogLevel};
+use libmpv::{Event, Handle, LogLevel};
 use tokio::io::AsyncBufReadExt;
 
 #[tokio::main]
@@ -25,7 +25,7 @@ async fn inner_main(file: &Path) -> libmpv::Result<()> {
     handle.read_config_file()?;
 
     let handle = handle.init()?;
-    let mut handle = AsyncHandle::new(handle);
+    let mut handle = handle.into_async();
 
     handle.enable_default_bindings()?;
 
@@ -45,7 +45,7 @@ async fn inner_main(file: &Path) -> libmpv::Result<()> {
                     break;
                 }
             }
-            Ok(_) = stdin.next_line() => {
+            Ok(Some(_)) = stdin.next_line() => {
                 handle.toggle_pause()?;
             }
         }

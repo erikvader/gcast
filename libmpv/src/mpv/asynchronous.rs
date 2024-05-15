@@ -1,12 +1,25 @@
-use super::{Handle, Init};
+use super::{Handle, Sync};
 use crate::{bindings::*, Event};
-use std::ptr;
+use std::{pin::Pin, ptr};
 use tokio::sync::Notify;
 
-pub struct AsyncHandle {
-    handle: Handle<Init>,
-    data: Box<WakeupData>,
+/// Supports everything that sync does, but also some rust async functions
+pub struct Async {
+    data: Pin<Box<WakeupData>>,
 }
+
+impl super::private::HandleState for Async {
+    fn destroy(&mut self, handle: *mut mpv_handle) {
+        unsafe {
+            mpv_set_wakeup_callback(handle, None, ptr::null_mut());
+        }
+        // SAFETY: The box will be dropped after here somewhere. Invoking the callback and
+        // setting it is done behind a mutex in mpv, so it is not possible that the
+        // callback is executing at this point. So it is safe to free the data, it's not
+        // in use.
+    }
+}
+impl super::private::Init for Async {}
 
 // NOTE: doesn't need to be repr(C) since this is never used by C code
 struct WakeupData {
@@ -22,55 +35,39 @@ unsafe extern "C" fn wakeup(data: *mut libc::c_void) {
     data.notify.notify_one();
 }
 
-impl AsyncHandle {
-    pub fn new(handle: Handle<Init>) -> Self {
-        let data = Box::new(WakeupData {
+impl Handle<Sync> {
+    pub fn into_async(mut self) -> Handle<Async> {
+        let data = Box::pin(WakeupData {
             notify: Notify::new(),
         });
+        let asy = Async { data };
+        asy.register(self.ctx);
 
+        Handle {
+            ctx: self.disarm(),
+            state: asy,
+        }
+    }
+}
+
+impl Async {
+    fn register(&self, ctx: *mut mpv_handle) {
         unsafe {
             mpv_set_wakeup_callback(
-                handle.ctx,
+                ctx,
                 Some(wakeup),
-                &*data as *const WakeupData as *mut libc::c_void,
+                &*self.data as *const WakeupData as *mut libc::c_void,
             );
         }
-        Self { handle, data }
     }
 }
 
-impl std::ops::Deref for AsyncHandle {
-    type Target = Handle<Init>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.handle
-    }
-}
-
-impl std::ops::DerefMut for AsyncHandle {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.handle
-    }
-}
-
-impl Drop for AsyncHandle {
-    fn drop(&mut self) {
-        unsafe {
-            mpv_set_wakeup_callback(self.handle.ctx, None, ptr::null_mut());
-        }
-        // SAFETY: The box will be dropped after here somewhere. Invoking the callback and
-        // setting it is done behind a mutex in mpv, so it is not possible that the
-        // callback is executing at this point. So it is safe to free the data, it's not
-        // in use.
-    }
-}
-
-impl AsyncHandle {
+impl Handle<Async> {
     /// Cancel safe since `notified()` is.
     pub async fn wait_event_async(&mut self) -> Event {
         loop {
-            match self.handle.wait_event_poll() {
-                Event::None => self.data.notify.notified().await,
+            match self.wait_event_poll() {
+                Event::None => self.state.data.notify.notified().await,
                 event => break event,
             }
         }
