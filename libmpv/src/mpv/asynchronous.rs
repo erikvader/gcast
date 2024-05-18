@@ -1,6 +1,6 @@
 use super::{Handle, Sync};
 use crate::{bindings::*, Event};
-use std::{pin::Pin, ptr};
+use std::{marker::PhantomPinned, pin::Pin, ptr};
 use tokio::sync::Notify;
 
 /// Supports everything that sync does, but also some rust async functions
@@ -24,6 +24,7 @@ impl super::private::InitState for Async {}
 // NOTE: doesn't need to be repr(C) since this is never used by C code
 struct WakeupData {
     notify: Notify,
+    _pin: PhantomPinned,
 }
 
 // TODO: something about panics and ffi is UB. Understand the solution and fix?
@@ -39,6 +40,7 @@ impl Handle<Sync> {
     pub fn into_async(mut self) -> Handle<Async> {
         let data = Box::pin(WakeupData {
             notify: Notify::new(),
+            _pin: PhantomPinned,
         });
         let asy = Async { data };
         asy.register(self.ctx);
