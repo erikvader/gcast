@@ -1,5 +1,5 @@
-use super::{Handle, Sync};
-use crate::{bindings::*, Event};
+use super::{events::Event, Handle, Sync};
+use crate::bindings::*;
 use std::{marker::PhantomPinned, pin::Pin, ptr};
 use tokio::sync::Notify;
 

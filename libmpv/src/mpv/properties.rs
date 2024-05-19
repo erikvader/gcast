@@ -1,22 +1,12 @@
-use std::{
-    ffi::{CStr, CString},
-    ptr,
-};
-
-use crate::{
-    bindings::*,
-    mpv::{
-        data::{cstr_to_string, ptr_to_string},
-        macros::mpv_try_null,
-    },
-    see_string::SeeString,
-};
-
 use super::{
-    data::{ptr_to_node, Format, Node},
+    commands::Cmd,
+    data::{AllocMpvData, Format, FromMpvData, Node, ToMpvData},
     macros::{enum_cstr_map, mpv_try, mpv_try_unknown},
     Handle, Result, Uninit,
 };
+use crate::bindings::*;
+use crate::see_string::SeeString;
+use std::{marker::PhantomData, ptr::addr_of};
 
 fn none<T>(_val: T) -> Option<PropertyValue> {
     None
@@ -37,7 +27,7 @@ macro_rules! properties {
                 }
             }
 
-            pub(crate) fn value_string(&self, value: &CStr) -> Option<PropertyValue> {
+            pub(crate) fn value_string(&self, value: *const libc::c_char) -> Option<PropertyValue> {
                 match self {
                     $(Property::$name => $cstr(value)),*,
                     _ => None,
@@ -75,12 +65,12 @@ macro_rules! properties {
     ) $($rest:tt)*) -> ($($arms:tt)*)) => {
         impl<T: super::private::InitState> Handle<T> {
             $(
-                pub fn $getter(&mut self) -> Result<bool> {
+                pub fn $getter(&mut self) -> Get<'_, bool> {
                     self.get_property_flag(Property::$prop)
                 }
             )?
             $(
-                pub fn $setter(&mut self, value: bool) -> Result<()> {
+                pub fn $setter(&mut self, value: bool) -> Set<'_, bool> {
                     self.set_property_flag(Property::$prop, value)
                 }
             )?
@@ -90,7 +80,7 @@ macro_rules! properties {
                 }
             )?
             $(
-                pub fn $cyc(&mut self) -> Result<()> {
+                pub fn $cyc(&mut self) -> Cmd<'_, 'static> {
                     self.cycle(Property::$prop)
                 }
             )?
@@ -106,12 +96,12 @@ macro_rules! properties {
     ) $($rest:tt)*) -> ($($arms:tt)*)) => {
         impl<T: super::private::InitState> Handle<T> {
             $(
-                pub fn $getter(&mut self) -> Result<i64> {
+                pub fn $getter(&mut self) -> Get<'_, i64> {
                     self.get_property_int(Property::$prop)
                 }
             )?
             $(
-                pub fn $setter(&mut self, value: i64) -> Result<()> {
+                pub fn $setter(&mut self, value: i64) -> Set<'_, i64> {
                     self.set_property_int(Property::$prop, value)
                 }
             )?
@@ -121,7 +111,7 @@ macro_rules! properties {
                 }
             )?
             $(
-                pub fn $add(&mut self, val: i64) -> Result<()> {
+                pub fn $add(&mut self, val: i64) -> Cmd<'_, 'static> {
                     self.add_int(Property::$prop, val)
                 }
             )?
@@ -137,12 +127,12 @@ macro_rules! properties {
     ) $($rest:tt)*) -> ($($arms:tt)*)) => {
         impl<T: super::private::InitState> Handle<T> {
             $(
-                pub fn $getter(&mut self) -> Result<f64> {
+                pub fn $getter(&mut self) -> Get<'_, f64> {
                     self.get_property_double(Property::$prop)
                 }
             )?
             $(
-                pub fn $setter(&mut self, value: f64) -> Result<()> {
+                pub fn $setter(&mut self, value: f64) -> Set<'_, f64> {
                     self.set_property_double(Property::$prop, value)
                 }
             )?
@@ -152,7 +142,7 @@ macro_rules! properties {
                 }
             )?
             $(
-                pub fn $add(&mut self, val: f64) -> Result<()> {
+                pub fn $add(&mut self, val: f64) -> Cmd<'_, 'static> {
                     self.add_double(Property::$prop, val)
                 }
             )?
@@ -167,13 +157,13 @@ macro_rules! properties {
     ) $($rest:tt)*) -> ($($arms:tt)*)) => {
         impl<T: super::private::InitState> Handle<T> {
             $(
-                pub fn $getter(&mut self) -> Result<String> {
+                pub fn $getter(&mut self) -> Get<'_, String> {
                     self.get_property_string(Property::$prop)
                 }
             )?
             $(
-                pub fn $setter(&mut self, value: impl AsRef<str>) -> Result<()> {
-                    self.set_property_string(Property::$prop, value.as_ref())
+                pub fn $setter<'a>(&mut self, value: impl Into<SeeString<'a>>) -> Set<'_, SeeString<'a>> {
+                    self.set_property_string(Property::$prop, value)
                 }
             )?
             $(
@@ -182,7 +172,7 @@ macro_rules! properties {
                 }
             )?
         }
-        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, String, none, |s| Some(PropertyValue::$prop(cstr_to_string(s))), none, none, none))}
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, String, none, |s| Some(PropertyValue::$prop(String::from_mpv_data(&s))), none, none, none))}
     };
     (@inner ((EnumCstr $enum:ident,
               $prop:ident,
@@ -190,16 +180,43 @@ macro_rules! properties {
               $(Set $setter:ident $(,)?)?
               $(Obs $obs:ident $(,)?)?
     ) $($rest:tt)*) -> ($($arms:tt)*)) => {
+        impl FromMpvData for $enum {
+            type Input = *const libc::c_char;
+
+            fn from_mpv_data(mpv: &Self::Input) -> Self {
+                Self::from_ptr(*mpv)
+            }
+        }
+
+        impl ToMpvData for $enum {
+            type Output = *const libc::c_char;
+
+            fn to_mpv_data(&self) -> Self::Output {
+                self.as_ptr()
+            }
+        }
+
         impl<T: super::private::InitState> Handle<T> {
             $(
-                pub fn $getter(&mut self) -> Result<$enum> {
-                    let cstr = self.get_property_cstr(Property::$prop)?;
-                    Ok($enum::from_str(cstr))
+                pub fn $getter(&mut self) -> Get<'_, $enum> {
+                    Get{
+                        ctx: self.ctx,
+                        _phant: PhantomData,
+                        _phant2: PhantomData,
+                        format: Format::String,
+                        property: Property::$prop,
+                    }
                 }
             )?
             $(
-                pub fn $setter(&mut self, value: $enum) -> Result<()> {
-                    self.set_property_string(Property::$prop, value.as_cstr())
+                pub fn $setter(&mut self, value: $enum) -> Set<'_, $enum> {
+                    Set {
+                        data: value,
+                        ctx: self.ctx,
+                        _phant: PhantomData,
+                        format: Format::String,
+                        property: Property::$prop,
+                    }
                 }
             )?
             $(
@@ -208,7 +225,7 @@ macro_rules! properties {
                 }
             )?
         }
-        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, $enum, none, |s| Some(PropertyValue::$prop($enum::from_str(s))), none, none, none))}
+        properties!{@inner ($($rest)*) -> ($($arms)* ($prop, $enum, none, |s| Some(PropertyValue::$prop($enum::from_ptr(s))), none, none, none))}
     };
     (@inner ((Node,
               $prop:ident,
@@ -217,7 +234,7 @@ macro_rules! properties {
     ) $($rest:tt)*) -> ($($arms:tt)*)) => {
         impl<T: super::private::InitState> Handle<T> {
             $(
-                pub fn $getter(&mut self) -> Result<Node> {
+                pub fn $getter(&mut self) -> Get<'_, Node> {
                     self.get_property_node(Property::$prop)
                 }
             )?
@@ -288,20 +305,125 @@ enum_cstr_map! {pub Idle {
 
 impl<T: super::private::InitState> Handle<T> {
     pub fn enable_default_bindings(&mut self) -> Result<()> {
-        self.set_property_flag(Property::InputDefaultBindings, true)?;
-        self.set_property_flag(Property::InputVoKeyboard, true)?;
+        self.set_property_flag(Property::InputDefaultBindings, true)
+            .synch()?;
+        self.set_property_flag(Property::InputVoKeyboard, true)
+            .synch()?;
         Ok(())
     }
 }
 
 impl Handle<Uninit> {
     pub fn read_config_file(&mut self) -> Result<()> {
-        self.set_property_flag(Property::Config, true)
+        self.set_property_flag(Property::Config, true).synch()
     }
 
     pub fn set_config_dir<'a>(&mut self, path: impl Into<SeeString<'a>>) -> Result<()> {
         // NOTE: hopefully mpv won't mangle the string if it is a file path
-        self.set_property_string(Property::ConfigDir, path)
+        self.set_property_string(Property::ConfigDir, path).synch()
+    }
+}
+
+#[must_use = "must call it for something to happen"]
+#[allow(private_bounds)]
+pub struct Set<'handle, T>
+where
+    T: ToMpvData,
+{
+    data: T,
+    ctx: *mut mpv_handle,
+    _phant: PhantomData<&'handle mut mpv_handle>,
+    format: Format,
+    property: Property,
+}
+
+#[allow(private_bounds)]
+impl<'handle, T> Set<'handle, T>
+where
+    T: ToMpvData,
+{
+    pub fn synch(self) -> Result<()> {
+        mpv_try_unknown!(self.format)?;
+        mpv_try_unknown!(&self.property)?;
+
+        let data = self.data.to_mpv_data();
+        mpv_try! {unsafe{mpv_set_property(
+            self.ctx,
+            self.property.as_ptr(),
+            self.format.to_int(),
+            addr_of!(data).cast_mut().cast(),
+        )}}?;
+
+        Ok(())
+    }
+
+    pub fn asynch(self, userdata: u64) -> Result<()> {
+        mpv_try_unknown!(self.format)?;
+        mpv_try_unknown!(&self.property)?;
+
+        let data = self.data.to_mpv_data();
+        mpv_try! {unsafe{mpv_set_property_async(
+            self.ctx,
+            userdata,
+            self.property.as_ptr(),
+            self.format.to_int(),
+            addr_of!(data).cast_mut().cast(),
+        )}}?;
+
+        Ok(())
+    }
+}
+
+#[must_use = "must call it for something to happen"]
+#[allow(private_bounds)]
+pub struct Get<'handle, T>
+where
+    T: FromMpvData,
+    T::Input: AllocMpvData,
+{
+    ctx: *mut mpv_handle,
+    _phant: PhantomData<&'handle mut mpv_handle>,
+    _phant2: PhantomData<T>,
+    format: Format,
+    property: Property,
+}
+
+#[allow(private_bounds)]
+impl<'handle, T> Get<'handle, T>
+where
+    T: FromMpvData,
+    T::Input: AllocMpvData,
+{
+    pub fn synch(self) -> Result<T> {
+        mpv_try_unknown!(self.format)?;
+        mpv_try_unknown!(&self.property)?;
+
+        let data = T::Input::empty();
+        mpv_try! {unsafe{mpv_get_property(
+            self.ctx,
+            self.property.as_ptr(),
+            self.format.to_int(),
+            addr_of!(data).cast_mut().cast(),
+        )}}?;
+
+        let retval = T::from_mpv_data(&data);
+        data.free();
+
+        Ok(retval)
+    }
+
+    pub fn asynch(self, userdata: u64) -> Result<()> {
+        mpv_try_unknown!(self.format)?;
+        mpv_try_unknown!(&self.property)?;
+
+        mpv_try! {unsafe{mpv_get_property_async(
+            self.ctx,
+            userdata,
+            self.property.as_ptr(),
+            self.format.to_int(),
+        )}}?;
+
+        Ok(())
     }
 }
 
@@ -310,139 +432,100 @@ impl<T: super::private::HandleState> Handle<T> {
         &mut self,
         prop: Property,
         value: impl Into<SeeString<'a>>,
-    ) -> Result<()> {
-        mpv_try_unknown!(&prop)?;
-        let value = value.into();
-        mpv_try! {unsafe { mpv_set_property_string(self.ctx, prop.as_cstr().as_ptr(), value.as_ptr()) }}?;
-        Ok(())
+    ) -> Set<'_, SeeString<'a>> {
+        Set {
+            data: value.into(),
+            ctx: self.ctx,
+            _phant: PhantomData,
+            format: Format::String,
+            property: prop,
+        }
     }
 
-    fn get_property_string(&mut self, prop: Property) -> Result<String> {
-        mpv_try_unknown!(&prop)?;
-        let retval =
-            mpv_try_null! {unsafe { mpv_get_property_string(self.ctx, prop.as_ptr()) }}?;
-        let rust_str = unsafe { ptr_to_string(retval) };
-        assert_ne!(retval as *const u8, rust_str.as_ptr());
-        unsafe { mpv_free(retval as *mut libc::c_void) };
-        Ok(rust_str)
+    fn get_property_string(&mut self, prop: Property) -> Get<'_, String> {
+        Get {
+            ctx: self.ctx,
+            _phant: PhantomData,
+            _phant2: PhantomData,
+            format: Format::String,
+            property: prop,
+        }
     }
 
-    fn get_property_cstr(&mut self, prop: Property) -> Result<CString> {
-        mpv_try_unknown!(&prop)?;
-        let retval =
-            mpv_try_null! {unsafe { mpv_get_property_string(self.ctx, prop.as_ptr()) }}?;
-        let cstr = unsafe { CStr::from_ptr(retval) }.to_owned();
-        assert_ne!(retval as *const libc::c_char, cstr.as_ptr());
-        unsafe { mpv_free(retval as *mut libc::c_void) };
-        Ok(cstr)
+    fn get_property_node(&mut self, prop: Property) -> Get<'_, Node> {
+        Get {
+            ctx: self.ctx,
+            _phant: PhantomData,
+            _phant2: PhantomData,
+            format: Format::Node,
+            property: prop,
+        }
     }
 
-    fn get_property_node(&mut self, prop: Property) -> Result<Node> {
-        mpv_try_unknown!(&prop)?;
-        let mut node = mpv_node {
-            u: mpv_node_u { int64: 0 },
-            format: Format::None.to_int(),
-        };
-        mpv_try! {unsafe { mpv_get_property(
-            self.ctx,
-            prop.as_ptr(),
-            Format::Node.to_int(),
-            ptr::from_mut(&mut node) as *mut libc::c_void
-        ) }}?;
-        let rust_node = unsafe { ptr_to_node(ptr::from_ref(&node)) };
-        unsafe { mpv_free_node_contents(ptr::from_mut(&mut node)) };
-        Ok(rust_node)
+    fn get_property_flag(&mut self, prop: Property) -> Get<'_, bool> {
+        Get {
+            ctx: self.ctx,
+            _phant: PhantomData,
+            _phant2: PhantomData,
+            format: Format::Flag,
+            property: prop,
+        }
     }
 
-    fn get_property_flag(&mut self, prop: Property) -> Result<bool> {
-        mpv_try_unknown!(&prop)?;
-        let mut flag: libc::c_int = 0;
-        mpv_try!(unsafe {
-            mpv_get_property(
-                self.ctx,
-                prop.as_ptr(),
-                Format::Flag.to_int(),
-                ptr::from_mut(&mut flag) as *mut libc::c_void,
-            )
-        })?;
-        Ok(flag != 0)
+    fn set_property_flag(&mut self, prop: Property, flag: bool) -> Set<'_, bool> {
+        Set {
+            data: flag,
+            ctx: self.ctx,
+            _phant: PhantomData,
+            format: Format::Flag,
+            property: prop,
+        }
     }
 
-    fn set_property_flag(&mut self, prop: Property, flag: bool) -> Result<()> {
-        mpv_try_unknown!(&prop)?;
-        let mut flag: libc::c_int = if flag { 1 } else { 0 };
-        mpv_try!(unsafe {
-            mpv_set_property(
-                self.ctx,
-                prop.as_ptr(),
-                Format::Flag.to_int(),
-                ptr::from_mut(&mut flag) as *mut libc::c_void,
-            )
-        })?;
-        Ok(())
+    fn get_property_double(&mut self, prop: Property) -> Get<'_, f64> {
+        Get {
+            ctx: self.ctx,
+            _phant: PhantomData,
+            _phant2: PhantomData,
+            format: Format::Double,
+            property: prop,
+        }
     }
 
-    fn get_property_double(&mut self, prop: Property) -> Result<f64> {
-        mpv_try_unknown!(&prop)?;
-        let mut double: libc::c_double = 0.0;
-        mpv_try!(unsafe {
-            mpv_get_property(
-                self.ctx,
-                prop.as_ptr(),
-                Format::Double.to_int(),
-                ptr::from_mut(&mut double) as *mut libc::c_void,
-            )
-        })?;
-        Ok(double)
+    fn set_property_double(&mut self, prop: Property, double: f64) -> Set<'_, f64> {
+        Set {
+            data: double,
+            ctx: self.ctx,
+            _phant: PhantomData,
+            format: Format::Double,
+            property: prop,
+        }
     }
 
-    #[allow(dead_code)]
-    fn set_property_double(&mut self, prop: Property, double: f64) -> Result<()> {
-        mpv_try_unknown!(&prop)?;
-        let mut double: libc::c_double = double;
-        mpv_try!(unsafe {
-            mpv_set_property(
-                self.ctx,
-                prop.as_ptr(),
-                Format::Double.to_int(),
-                ptr::from_mut(&mut double) as *mut libc::c_void,
-            )
-        })?;
-        Ok(())
+    fn get_property_int(&mut self, prop: Property) -> Get<'_, i64> {
+        Get {
+            ctx: self.ctx,
+            _phant: PhantomData,
+            _phant2: PhantomData,
+            format: Format::Int64,
+            property: prop,
+        }
     }
 
-    fn get_property_int(&mut self, prop: Property) -> Result<i64> {
-        mpv_try_unknown!(&prop)?;
-        let mut int: int64_t = 0;
-        mpv_try!(unsafe {
-            mpv_get_property(
-                self.ctx,
-                prop.as_ptr(),
-                Format::Int64.to_int(),
-                ptr::from_mut(&mut int) as *mut libc::c_void,
-            )
-        })?;
-        Ok(int)
-    }
-
-    #[allow(dead_code)]
-    fn set_property_int(&mut self, prop: Property, int: i64) -> Result<()> {
-        mpv_try_unknown!(&prop)?;
-        let mut int: int64_t = int;
-        mpv_try!(unsafe {
-            mpv_set_property(
-                self.ctx,
-                prop.as_ptr(),
-                Format::Int64.to_int(),
-                ptr::from_mut(&mut int) as *mut libc::c_void,
-            )
-        })?;
-        Ok(())
+    fn set_property_int(&mut self, prop: Property, int: i64) -> Set<'_, i64> {
+        Set {
+            data: int,
+            ctx: self.ctx,
+            _phant: PhantomData,
+            format: Format::Int64,
+            property: prop,
+        }
     }
 
     fn observe_property(&mut self, prop: Property, format: Format) -> Result<()> {
         mpv_try_unknown!(&prop)?;
         mpv_try_unknown!(format)?;
+        // TODO: use the userdata
         mpv_try!(unsafe {
             mpv_observe_property(self.ctx, 0, prop.as_ptr(), format.to_int())
         })?;

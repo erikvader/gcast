@@ -1,5 +1,7 @@
-use crate::bindings::*;
 use crate::mpv::macros::enum_int_map;
+use crate::{bindings::*, see_string::SeeString};
+use std::ffi::CString;
+use std::ptr::{self, addr_of_mut};
 use std::{collections::HashMap, ffi::CStr};
 
 enum_int_map! {pub Format (mpv_format) {
@@ -15,19 +17,6 @@ enum_int_map! {pub Format (mpv_format) {
     (ByteArray, MPV_FORMAT_BYTE_ARRAY),
 }}
 
-/// NOTE: The returned property should be UTF-8 except for a few things, see the header
-/// file. From the doc of MPV_FORMAT_STRING: although the encoding is usually UTF-8, this
-/// is not always the case. File tags often store strings in some legacy codepage, and
-/// even filenames don't necessarily have to be in UTF-8 (at least on Linux).
-pub(crate) fn cstr_to_string(ptr: &CStr) -> String {
-    ptr.to_string_lossy().into_owned()
-}
-
-pub(crate) unsafe fn ptr_to_string(ptr: *const libc::c_char) -> String {
-    assert!(!ptr.is_null());
-    cstr_to_string(CStr::from_ptr(ptr))
-}
-
 #[derive(Clone, Debug)]
 pub enum Node {
     String(String),
@@ -41,12 +30,11 @@ pub enum Node {
     Unknown(Format),
 }
 
-pub(crate) unsafe fn ptr_to_node(ptr: *const mpv_node) -> Node {
-    assert!(!ptr.is_null());
-    let u = (*ptr).u;
-    match Format::from((*ptr).format) {
+unsafe fn ref_to_node(ptr: &mpv_node) -> Node {
+    let u = ptr.u;
+    match Format::from(ptr.format) {
         Format::None => Node::None,
-        Format::String => Node::String(ptr_to_string(u.string)),
+        Format::String => Node::String(String::from_mpv_data(&u.string.cast_const())),
         Format::Flag => Node::Flag(u.flag != 0),
         Format::Int64 => Node::Int64(u.int64),
         Format::Double => Node::Double(u.double),
@@ -56,7 +44,7 @@ pub(crate) unsafe fn ptr_to_node(ptr: *const mpv_node) -> Node {
             assert!(num == 0 || !values.is_null());
             let array = (0..num)
                 .into_iter()
-                .map(|i| ptr_to_node(values.offset(i)))
+                .map(|i| ref_to_node(&*values.offset(i)))
                 .collect();
             Node::Array(array)
         }
@@ -70,13 +58,164 @@ pub(crate) unsafe fn ptr_to_node(ptr: *const mpv_node) -> Node {
                 .into_iter()
                 .map(|i| {
                     (
-                        ptr_to_string(*keys.offset(i)),
-                        ptr_to_node(values.offset(i)),
+                        String::from_mpv_data(&(*keys.offset(i)).cast_const()),
+                        ref_to_node(&*values.offset(i)),
                     )
                 })
                 .collect();
             Node::Map(map)
         }
         format => Node::Unknown(format),
+    }
+}
+
+pub(crate) trait ToMpvData {
+    type Output;
+
+    fn to_mpv_data(&self) -> Self::Output;
+}
+
+impl<'a> ToMpvData for SeeString<'a> {
+    type Output = *const libc::c_char;
+
+    fn to_mpv_data(&self) -> Self::Output {
+        self.as_cstr().as_ptr()
+    }
+}
+
+impl ToMpvData for i64 {
+    type Output = int64_t;
+
+    fn to_mpv_data(&self) -> Self::Output {
+        *self
+    }
+}
+
+impl ToMpvData for f64 {
+    type Output = libc::c_double;
+
+    fn to_mpv_data(&self) -> Self::Output {
+        *self
+    }
+}
+
+impl ToMpvData for bool {
+    type Output = libc::c_int;
+
+    fn to_mpv_data(&self) -> Self::Output {
+        (*self).then_some(1).unwrap_or(0)
+    }
+}
+
+pub(crate) trait FromMpvData {
+    type Input;
+
+    fn from_mpv_data(mpv: &Self::Input) -> Self;
+}
+
+impl FromMpvData for CString {
+    type Input = *const libc::c_char;
+
+    fn from_mpv_data(mpv: &Self::Input) -> Self {
+        assert!(!mpv.is_null());
+        unsafe { CStr::from_ptr(*mpv) }.into()
+    }
+}
+
+/// NOTE: The returned property should be UTF-8 except for a few things, see the header
+/// file. From the doc of MPV_FORMAT_STRING: although the encoding is usually UTF-8, this
+/// is not always the case. File tags often store strings in some legacy codepage, and
+/// even filenames don't necessarily have to be in UTF-8 (at least on Linux).
+impl FromMpvData for String {
+    type Input = *const libc::c_char;
+
+    fn from_mpv_data(mpv: &Self::Input) -> Self {
+        let cstr = CString::from_mpv_data(mpv);
+        cstr.to_string_lossy().into_owned()
+    }
+}
+
+impl FromMpvData for Node {
+    type Input = mpv_node;
+
+    fn from_mpv_data(mpv: &Self::Input) -> Self {
+        unsafe { ref_to_node(mpv) }
+    }
+}
+
+impl FromMpvData for bool {
+    type Input = libc::c_int;
+
+    fn from_mpv_data(mpv: &Self::Input) -> Self {
+        *mpv != 0
+    }
+}
+
+impl FromMpvData for f64 {
+    type Input = libc::c_double;
+
+    fn from_mpv_data(mpv: &Self::Input) -> Self {
+        *mpv
+    }
+}
+
+impl FromMpvData for i64 {
+    type Input = int64_t;
+
+    fn from_mpv_data(mpv: &Self::Input) -> Self {
+        *mpv
+    }
+}
+
+pub(crate) trait AllocMpvData {
+    fn free(self);
+    fn empty() -> Self;
+}
+
+impl AllocMpvData for *const libc::c_char {
+    fn free(self) {
+        assert!(!self.is_null());
+        unsafe { mpv_free(self.cast_mut().cast()) };
+    }
+
+    fn empty() -> Self {
+        ptr::null()
+    }
+}
+
+impl AllocMpvData for mpv_node {
+    fn free(mut self) {
+        unsafe { mpv_free_node_contents(addr_of_mut!(self)) };
+    }
+
+    fn empty() -> Self {
+        mpv_node {
+            u: mpv_node_u { int64: 0 },
+            format: Format::None.to_int(),
+        }
+    }
+}
+
+impl AllocMpvData for libc::c_int {
+    fn free(self) {}
+
+    fn empty() -> Self {
+        0
+    }
+}
+
+impl AllocMpvData for libc::c_double {
+    fn free(self) {}
+
+    fn empty() -> Self {
+        0.0
+    }
+}
+
+impl AllocMpvData for int64_t {
+    fn free(self) {}
+
+    fn empty() -> Self {
+        0
     }
 }

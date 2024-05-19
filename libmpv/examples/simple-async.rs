@@ -33,8 +33,8 @@ async fn inner_main(file: &Path) -> libmpv::Result<()> {
     handle.observe_playback_time()?;
     handle.observe_media_title()?;
     handle.observe_track_list()?;
-    handle.loadfile(file)?;
-    handle.set_idle(libmpv::Idle::No)?;
+    handle.loadfile(file).asynch(1)?;
+    handle.set_idle(libmpv::Idle::No).asynch(0)?;
 
     let mut stdin = tokio::io::BufReader::new(tokio::io::stdin()).lines();
     loop {
@@ -46,7 +46,7 @@ async fn inner_main(file: &Path) -> libmpv::Result<()> {
                 }
             }
             Ok(Some(_)) = stdin.next_line() => {
-                handle.toggle_pause()?;
+                handle.toggle_pause().asynch(8)?;
             }
         }
     }

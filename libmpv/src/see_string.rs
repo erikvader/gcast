@@ -13,14 +13,11 @@ impl SeeString<'_> {
     pub fn into_cstring(self) -> CString {
         self.inner.into()
     }
-}
 
-// TODO: have this?
-// impl From<SeeString<'_>> for CString {
-//     fn from(value: SeeString<'_>) -> Self {
-//         value.into_cstring()
-//     }
-// }
+    pub fn as_cstr(&self) -> &CStr {
+        self.as_ref()
+    }
+}
 
 impl AsRef<CStr> for SeeString<'_> {
     fn as_ref(&self) -> &CStr {
@@ -94,24 +91,6 @@ impl From<PathBuf> for SeeString<'_> {
 impl From<&Path> for SeeString<'_> {
     fn from(value: &Path) -> Self {
         value.to_owned().into()
-    }
-}
-
-impl From<i64> for SeeString<'_> {
-    fn from(value: i64) -> Self {
-        value.to_string().into()
-    }
-}
-
-impl From<f64> for SeeString<'_> {
-    fn from(value: f64) -> Self {
-        value.to_string().into()
-    }
-}
-
-impl From<u64> for SeeString<'_> {
-    fn from(value: u64) -> Self {
-        value.to_string().into()
     }
 }
 

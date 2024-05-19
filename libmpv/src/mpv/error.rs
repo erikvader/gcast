@@ -52,3 +52,11 @@ impl std::fmt::Display for ErrorCode {
         write!(f, "{}", self.as_str())
     }
 }
+
+pub fn error_code(code: libc::c_int) -> std::result::Result<libc::c_int, ErrorCode> {
+    if code < 0 {
+        Err(ErrorCode::from_int(code))
+    } else {
+        Ok(code)
+    }
+}

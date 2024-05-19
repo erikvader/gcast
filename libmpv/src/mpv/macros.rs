@@ -109,12 +109,8 @@ pub(crate) use enum_cstr_map;
 macro_rules! mpv_try {
     ($expr:expr) => {{
         let int = ($expr);
-        match int {
-            0.. => Ok(int),
-            _ => Err($crate::mpv::error::Error::ErrorCode(
-                $crate::mpv::error::ErrorCode::from_int(int),
-            )),
-        }
+        $crate::mpv::error::error_code(int)
+            .map_err(|err| $crate::mpv::error::Error::ErrorCode(err))
     }};
 }
 pub(crate) use mpv_try;
@@ -123,9 +119,10 @@ macro_rules! mpv_try_null {
     ($expr:expr) => {{
         let ptr = ($expr);
         if ptr.is_null() {
-            return Err($crate::mpv::error::Error::NullPtr);
+            Err($crate::mpv::error::Error::NullPtr)
+        } else {
+            Ok(ptr)
         }
-        Ok(ptr)
     }};
 }
 pub(crate) use mpv_try_null;
@@ -134,9 +131,10 @@ macro_rules! mpv_try_unknown {
     ($expr:expr) => {{
         let val = ($expr);
         if val.is_unknown() {
-            return Err($crate::mpv::error::Error::Unknown);
+            Err($crate::mpv::error::Error::Unknown)
+        } else {
+            Ok(val)
         }
-        Ok(val)
     }};
 }
 pub(crate) use mpv_try_unknown;

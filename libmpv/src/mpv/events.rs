@@ -1,4 +1,4 @@
-use std::{ffi::CStr, time::Duration};
+use std::time::Duration;
 
 use super::{
     data::Format,
@@ -11,7 +11,10 @@ use super::{
 
 use crate::{
     bindings::*,
-    mpv::data::{ptr_to_node, ptr_to_string},
+    mpv::{
+        data::{FromMpvData, Node},
+        error::error_code,
+    },
 };
 
 enum_int_map! {pub EventID (mpv_event_id) {
@@ -47,11 +50,28 @@ pub enum Event {
     PropertyChange(PropertyValue),
     PropertyChangeError(Format, Property),
     StartFile,
+    FileLoaded,
     EndFile {
         reason: EndReason,
         error: Option<ErrorCode>,
     },
-    FileLoaded,
+    GetProperty {
+        value: PropertyValue,
+        userdata: u64,
+    },
+    GetPropertyError {
+        error: ErrorCode,
+        format: Format,
+        property: Property,
+    },
+    SetProperty {
+        error: Option<ErrorCode>,
+        userdata: u64,
+    },
+    Command {
+        error: Option<ErrorCode>,
+        userdata: u64,
+    },
     UnsupportedEvent(EventID),
 }
 
@@ -102,42 +122,7 @@ impl<T: super::private::InitState> Handle<T> {
                 let data = data as *const mpv_event_property;
                 let property = Property::from_ptr((*data).name);
                 let format = Format::from_int((*data).format);
-
-                let property_value = match format {
-                    Format::String => {
-                        let value = (*data).data as *const *const libc::c_char;
-                        assert!(!value.is_null());
-                        let value = *value;
-                        let value = CStr::from_ptr(value);
-                        property.value_string(value)
-                    }
-                    Format::Flag => {
-                        let value = (*data).data as *const libc::c_int;
-                        assert!(!value.is_null());
-                        let value = *value;
-                        let value = value != 0;
-                        property.value_flag(value)
-                    }
-                    Format::Int64 => {
-                        let value = (*data).data as *const int64_t;
-                        assert!(!value.is_null());
-                        let value = *value;
-                        property.value_i64(value)
-                    }
-                    Format::Double => {
-                        let value = (*data).data as *const libc::c_double;
-                        assert!(!value.is_null());
-                        let value = *value;
-                        property.value_double(value)
-                    }
-                    Format::Node => {
-                        let value = (*data).data as *const mpv_node;
-                        assert!(!value.is_null());
-                        let value = ptr_to_node(value);
-                        property.value_node(value)
-                    }
-                    _ => None,
-                };
+                let property_value = read_property_value(format, data, &property);
 
                 if let Some(value) = property_value {
                     Event::PropertyChange(value)
@@ -145,13 +130,43 @@ impl<T: super::private::InitState> Handle<T> {
                     Event::PropertyChangeError(format, property)
                 }
             }
+            EventID::GetPropertyReply => {
+                let data = (*event).data;
+                assert!(!data.is_null());
+                let data = data as *const mpv_event_property;
+                let property = Property::from_ptr((*data).name);
+                let format = Format::from_int((*data).format);
+                let property_value = read_property_value(format, data, &property);
+                let error = ErrorCode::from_int((*event).error);
+                let userdata = (*event).reply_userdata;
+
+                if let Some(value) = property_value {
+                    Event::GetProperty { value, userdata }
+                } else {
+                    Event::GetPropertyError {
+                        error,
+                        format,
+                        property,
+                    }
+                }
+            }
+            EventID::SetPropertyReply => {
+                let error = error_code((*event).error).err();
+                let userdata = (*event).reply_userdata;
+                Event::SetProperty { error, userdata }
+            }
+            EventID::CommandReply => {
+                let error = error_code((*event).error).err();
+                let userdata = (*event).reply_userdata;
+                Event::Command { error, userdata }
+            }
             EventID::QueueOverflow => Event::QueueOverflow,
             EventID::LogMessage => {
                 let data = (*event).data;
                 assert!(!data.is_null());
                 let data = data as *const mpv_event_log_message;
-                let prefix = ptr_to_string((*data).prefix);
-                let text = ptr_to_string((*data).text);
+                let prefix = String::from_mpv_data(&(*data).prefix);
+                let text = String::from_mpv_data(&(*data).text);
                 let level = LogLevel::from_int((*data).log_level);
                 Event::Log {
                     prefix,
@@ -161,5 +176,46 @@ impl<T: super::private::InitState> Handle<T> {
             }
             unsupported => Event::UnsupportedEvent(unsupported),
         }
+    }
+}
+
+unsafe fn read_property_value(
+    format: Format,
+    data: *const mpv_event_property,
+    property: &Property,
+) -> Option<PropertyValue> {
+    match format {
+        Format::String => {
+            let value = (*data).data as *const *const libc::c_char;
+            assert!(!value.is_null());
+            let value = *value;
+            property.value_string(value)
+        }
+        Format::Flag => {
+            let value = (*data).data as *const libc::c_int;
+            assert!(!value.is_null());
+            let value = *value;
+            let value = value != 0;
+            property.value_flag(value)
+        }
+        Format::Int64 => {
+            let value = (*data).data as *const int64_t;
+            assert!(!value.is_null());
+            let value = *value;
+            property.value_i64(value)
+        }
+        Format::Double => {
+            let value = (*data).data as *const libc::c_double;
+            assert!(!value.is_null());
+            let value = *value;
+            property.value_double(value)
+        }
+        Format::Node => {
+            let value = (*data).data as *const mpv_node;
+            assert!(!value.is_null());
+            let value = Node::from_mpv_data(&*value);
+            property.value_node(value)
+        }
+        _ => None,
     }
 }

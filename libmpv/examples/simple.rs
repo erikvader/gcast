@@ -23,7 +23,7 @@ fn inner_main(file: &Path) -> libmpv::Result<()> {
     handle.read_config_file()?;
 
     let mut handle = handle.init()?;
-    let version = handle.version()?;
+    let version = handle.version().synch()?;
     println!("{version}");
 
     handle.enable_default_bindings()?;
@@ -32,8 +32,8 @@ fn inner_main(file: &Path) -> libmpv::Result<()> {
     handle.observe_playback_time()?;
     handle.observe_media_title()?;
     handle.observe_track_list()?;
-    handle.loadfile(file)?;
-    handle.set_idle(libmpv::Idle::No)?;
+    handle.loadfile(file).synch()?;
+    handle.set_idle(libmpv::Idle::No).synch()?;
 
     loop {
         let event = handle.wait_event_infinite();
