@@ -169,6 +169,12 @@ impl MpvHandle {
             }
             MpvControl::SubMoveUp => self.handle.add_sub_pos(-pos).asynch(DEF_USR)?,
             MpvControl::SubMoveDown => self.handle.add_sub_pos(pos).asynch(DEF_USR)?,
+            // TODO: probably add a safeguard to ignore new seek commands while another
+            // seek is in progress
+            MpvControl::SeekAbs(perc) => self
+                .handle
+                .seek_abs_percent(perc.as_f64())
+                .asynch(DEF_USR)?,
         };
 
         Ok(())

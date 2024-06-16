@@ -1,3 +1,5 @@
+use crate::util::Percent;
+
 #[protocol_macros::message_aggregator]
 #[no_intos]
 enum MpvControl {
@@ -10,6 +12,7 @@ enum MpvControl {
     SubDelayLater,
     NextChapter,
     PrevChapter,
+    SeekAbs(Percent),
     SeekBack,
     SeekForward,
     SeekBackLong,

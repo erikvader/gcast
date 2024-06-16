@@ -44,7 +44,10 @@ pub fn mpv(props: &MpvProps) -> Html {
                 <span class={classes!("float-right")}>{chapter}{"/"}{chapter_total}</span>
             </div>
             <div class={classes!("pad")}>
-                <Progressbar progress={progress(&props.front)}
+                <ProgressbarInteractive
+                             disabled={!clickable}
+                             on_slide={click_send!(server, perc -> mpvcontrol::SeekAbs(perc))}
+                             progress={progress(&props.front)}
                              outer_class={classes!("mpv-progress-outer")}
                              inner_class={classes!("mpv-progress-inner")}/>
             </div>
