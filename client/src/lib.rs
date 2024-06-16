@@ -93,9 +93,9 @@ pub fn main() {
     //         m::PlayState(m::playstate::PlayState {
     //             title: "hejsan hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej hej".to_string(),
     //             pause: true,
-    //             progress: protocol::util::not_nan_or_zero(0.0),
-    //             length: protocol::util::not_nan_or_zero(0.0),
-    //             volume: protocol::util::not_nan_or_zero(0.0),
+    //             progress: protocol::util::not_nan(0.0),
+    //             length: protocol::util::not_nan(0.0),
+    //             volume: protocol::util::not_nan(0.0),
     //             chapter: None,
     //             subtitles: vec![
     //                 m::playstate::Track {id: 0, selected: false, title: "None".to_string()},

@@ -20,7 +20,7 @@ pub fn errormessage(props: &ErrorProps) -> Html {
             <header class={classes!("pad")}>
                 <h2>{&props.front.header}</h2>
             </header>
-            <p class={classes!("pad")}>{&props.front.body}</p>
+            <p class={classes!("pad", "pre-wrap")}>{&props.front.body}</p>
             <button onclick={click_send!(server, Close)}
                     class={classes!()}
                     disabled={server.is_disconnected()}>

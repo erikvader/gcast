@@ -22,9 +22,7 @@ protocol = {path="../protocol"}
 thiserror.workspace = true
 anyhow.workspace = true
 
-libmpv.workspace = true
-derive_builder.workspace = true
-
+libmpv = {path="../libmpv"}
 searcher = {path="../searcher", features=["search-fun"]}
 walkdir.workspace = true
 serde.workspace = true

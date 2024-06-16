@@ -188,15 +188,11 @@ fn progress(front: &prot::Mpv) -> f64 {
     let p = match *front {
         prot::PlayState(prot::playstate::PlayState {
             progress, length, ..
-        }) if length != 0.0 => ((progress / length) * 100.0).into_inner(),
+        }) if !length.is_zero() => 100.0 * progress.as_secs_f64() / length.as_secs_f64(),
         _ => 0.0,
     };
 
-    if p > 100.0 {
-        100.0
-    } else {
-        p
-    }
+    p.clamp(0.0, 100.0)
 }
 
 fn progress_timestamps(front: &prot::Mpv) -> (String, String) {
@@ -205,8 +201,8 @@ fn progress_timestamps(front: &prot::Mpv) -> (String, String) {
         prot::PlayState(prot::playstate::PlayState {
             progress, length, ..
         }) => (
-            timestamp(progress.into_inner()),
-            timestamp(length.into_inner()),
+            timestamp(progress.as_secs_f64()),
+            timestamp(length.as_secs_f64()),
         ),
     }
 }

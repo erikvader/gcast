@@ -8,6 +8,8 @@ pub struct Async {
     data: Pin<Box<WakeupData>>,
 }
 
+unsafe impl Send for Handle<Async> {}
+
 impl super::private::HandleState for Async {
     fn destroy(&mut self, handle: *mut mpv_handle) {
         unsafe {

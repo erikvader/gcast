@@ -174,7 +174,7 @@ impl Jump {
         E: std::fmt::Debug,
     {
         let header = header.to_string();
-        log::debug!("Jump to user error: header={}", header);
+        log::debug!("Jump to user error: header='{}'", header);
         Err(Self::UserError {
             header,
             body: format!("{:?}", error),

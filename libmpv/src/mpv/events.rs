@@ -48,7 +48,10 @@ pub enum Event {
     },
     QueueOverflow,
     PropertyChange(PropertyValue),
-    PropertyChangeError(Format, Property),
+    PropertyChangeError {
+        format: Format,
+        property: Property,
+    },
     StartFile,
     FileLoaded,
     EndFile {
@@ -63,6 +66,7 @@ pub enum Event {
         error: ErrorCode,
         format: Format,
         property: Property,
+        userdata: u64,
     },
     SetProperty {
         error: Option<ErrorCode>,
@@ -127,7 +131,7 @@ impl<T: super::private::InitState> Handle<T> {
                 if let Some(value) = property_value {
                     Event::PropertyChange(value)
                 } else {
-                    Event::PropertyChangeError(format, property)
+                    Event::PropertyChangeError { format, property }
                 }
             }
             EventID::GetPropertyReply => {
@@ -147,6 +151,7 @@ impl<T: super::private::InitState> Handle<T> {
                         error,
                         format,
                         property,
+                        userdata,
                     }
                 }
             }

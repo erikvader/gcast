@@ -1,13 +1,16 @@
-use ordered_float::NotNan;
+use std::time::Duration;
+
 use protocol_macros::message_part;
+
+use crate::util::Percent;
 
 #[message_part]
 struct PlayState {
     title: String,
     pause: bool,
-    progress: NotNan<f64>,
-    length: NotNan<f64>,
-    volume: NotNan<f64>,
+    progress: Duration,
+    length: Duration,
+    volume: Percent,
     chapter: Option<(i64, i64)>,
     subtitles: Vec<Track>,
     audios: Vec<Track>,

@@ -14,6 +14,9 @@ fn none<T>(_val: T) -> Option<PropertyValue> {
 
 macro_rules! properties {
     (@inner () -> ($(($name: ident, $type:ty, $int:expr, $cstr:expr, $bool:expr, $double:expr, $node:expr))*)) => {
+        // TODO: if this enum is only used in `wait_event`, then maybe consider only
+        // adding variants to this enum if an observe function is generated. Figure out
+        // how to do that.
         #[derive(Debug, Clone)]
         pub enum PropertyValue {
             $($name($type)),*

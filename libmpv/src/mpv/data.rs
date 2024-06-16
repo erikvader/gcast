@@ -30,6 +30,40 @@ pub enum Node {
     Unknown(Format),
 }
 
+impl Node {
+    pub fn try_to_string(&self) -> Option<&str> {
+        if let Node::String(s) = self {
+            Some(s)
+        } else {
+            None
+        }
+    }
+
+    pub fn try_to_flag(&self) -> Option<bool> {
+        if let Node::Flag(s) = self {
+            Some(*s)
+        } else {
+            None
+        }
+    }
+
+    pub fn try_to_i64(&self) -> Option<i64> {
+        if let Node::Int64(s) = self {
+            Some(*s)
+        } else {
+            None
+        }
+    }
+
+    pub fn try_to_double(&self) -> Option<f64> {
+        if let Node::Double(s) = self {
+            Some(*s)
+        } else {
+            None
+        }
+    }
+}
+
 unsafe fn ref_to_node(ptr: &mpv_node) -> Node {
     let u = ptr.u;
     match Format::from(ptr.format) {

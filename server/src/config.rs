@@ -15,7 +15,6 @@ struct Config {
     port: u16,
     poweroff_exe: String,
     refresh_cache_boot: bool,
-    mpv: Mpv,
     spotify: Spotify,
 }
 
@@ -25,21 +24,12 @@ struct Spotify {
     fullscreen_exe: String,
 }
 
-#[derive(Debug, serde::Deserialize)]
-struct Mpv {
-    properties: toml::value::Table,
-}
-
 pub fn init_config() -> anyhow::Result<()> {
     let conf_file = conf_dir().join(CONFIG_NAME);
     let conts = fs::read_to_string(&conf_file)
         .with_context(|| format!("reading config file at {:?}", conf_file))?;
 
     let conf: Config = toml::from_str(&conts).context("parsing config file as TOML")?;
-
-    if conf.mpv.properties.iter().any(|(_, v)| !v.is_str()) {
-        anyhow::bail!("Mpv values must be strings");
-    }
 
     CONF.set(conf).context("setting the global conf variable")?;
     Ok(())
@@ -57,22 +47,6 @@ pub fn port() -> u16 {
     get_instance().port
 }
 
-pub fn mpv_options() -> Vec<(String, String)> {
-    get_instance()
-        .mpv
-        .properties
-        .iter()
-        .map(|(k, v)| {
-            (
-                k.clone(),
-                v.as_str()
-                    .expect("has been checked while reading the config")
-                    .to_string(),
-            )
-        })
-        .collect()
-}
-
 pub fn spotify_exe() -> &'static str {
     &get_instance().spotify.executable
 }
@@ -87,6 +61,11 @@ pub fn poweroff_exe() -> &'static str {
 
 pub fn refresh_cache_boot() -> bool {
     get_instance().refresh_cache_boot
+}
+
+// TODO: make configurable
+pub fn mpv_conf_dir() -> PathBuf {
+    conf_dir().join("mpv")
 }
 
 pub fn conf_dir() -> PathBuf {

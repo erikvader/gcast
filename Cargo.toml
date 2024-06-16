@@ -31,8 +31,6 @@ systemd-journal-logger = "2.1" # server: log to systemd
 thiserror="1.0" # server, protocol, searcher: create custom error types
 anyhow = "1.0" # server: nice error handling
 
-libmpv = { git = "https://github.com/ParadoxSpiral/libmpv-rs.git", rev = "3e6c389" } # server: mpv support
-derive_builder = "0.20" # server: create builder used for mpv
 delegate = "0.12" # server: CacheDirEntry
 
 walkdir = "2.3" # server: visit all files in directories

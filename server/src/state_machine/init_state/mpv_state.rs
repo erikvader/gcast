@@ -7,7 +7,7 @@ use tokio::select;
 
 use crate::{
     filer::{cache_file, read_cache},
-    mpv::{self, MpvError},
+    mpv::{self},
 };
 
 use super::{Control, Jump, MachineResult, StateLogger};
@@ -60,25 +60,31 @@ async fn mpv_state(ctrl: &mut Control, path: String, paused: bool) -> MachineRes
             msg = ctrl.recv() => {
                 match msg {
                     Some(ToServer::MpvStart(mpvstart::Stop)) | None => {
-                        logger.attempt_exit();
-                        break handle.quit().await.map_err(|e| e.into())
+                        break Ok(())
                     },
-                    Some(ToServer::MpvControl(mpvctrl)) => break_err!(handle.command(&mpvctrl).await),
-                    Some(m) => logger.invalid_message(&m),
+                    Some(ToServer::MpvControl(mpvctrl)) => break_err!{
+                        handle.command(mpvctrl.clone())
+                            .with_context(|| format!("calling command {:?}", mpvctrl))
+                    },
+                    Some(m) => {
+                        logger.invalid_message(&m);
+                    },
                 }
             }
             state = handle.next() => {
-                match state.map(|s| s.to_client_state()) {
-                    Ok(Some(newstate)) => ctrl.send(newstate).await,
-                    Ok(None) => (),
-                    Err(MpvError::Exited) => break Ok(()),
-                    Err(e) => break Jump::user_error("Mpv play", e),
+                match state {
+                    Some(Ok(newstate)) => {
+                        ctrl.send(newstate).await;
+                    },
+                    None => break Ok(()),
+                    Some(Err(e)) => break Jump::user_error("Mpv play", e),
                 }
             }
         }
     };
 
     logger.waiting("mpv handle to exit");
-    handle.wait_until_closed().await;
+    let reason = handle.wait_until_closed().await;
+    logger.debug(format!("exit reason: {reason:?}"));
     retval
 }
