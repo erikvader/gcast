@@ -1,10 +1,11 @@
 use protocol::{
     to_client::front::mpv as prot,
     to_server::{mpvcontrol, mpvstart},
+    util::Percent,
 };
 use yew::prelude::*;
 
-use crate::progressbar::Progressbar;
+use crate::progressbar::ProgressbarInteractive;
 use crate::{
     back_button::{BackButton, Type},
     hooks::server::UseServer,
@@ -184,15 +185,14 @@ fn has_chapters(front: &prot::Mpv) -> bool {
     )
 }
 
-fn progress(front: &prot::Mpv) -> f64 {
-    let p = match *front {
+fn progress(front: &prot::Mpv) -> Percent {
+    match *front {
         prot::PlayState(prot::playstate::PlayState {
             progress, length, ..
-        }) if !length.is_zero() => 100.0 * progress.as_secs_f64() / length.as_secs_f64(),
-        _ => 0.0,
-    };
-
-    p.clamp(0.0, 100.0)
+        }) => Percent::of(progress.as_secs_f64(), length.as_secs_f64())
+            .unwrap_or(Percent::ZERO),
+        _ => Percent::ZERO,
+    }
 }
 
 fn progress_timestamps(front: &prot::Mpv) -> (String, String) {
@@ -208,7 +208,7 @@ fn progress_timestamps(front: &prot::Mpv) -> (String, String) {
 }
 
 fn timestamp(seconds: f64) -> String {
-    if seconds.is_nan() || seconds.is_infinite() || seconds < 0.0 {
+    if !seconds.is_finite() || seconds < 0.0 {
         "??:??:??".to_string()
     } else {
         let int = seconds as u64;
