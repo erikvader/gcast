@@ -1,11 +1,6 @@
 use anyhow::Context;
 use libmpv::{EndReason, Event, LogLevel, PropertyValue};
-use std::{
-    mem,
-    sync::atomic::{AtomicBool, Ordering},
-    thread,
-    time::Duration,
-};
+use std::{mem, time::Duration};
 
 use protocol::{
     to_client::front::mpv::{
@@ -13,14 +8,15 @@ use protocol::{
         Mpv as ClientMpv,
     },
     to_server::mpvcontrol::MpvControl,
-    util::{not_nan, Percent},
+    util::Percent,
 };
-use tokio::{
-    sync::{mpsc, oneshot},
-    task::JoinHandle,
-};
+use tokio::task::spawn_blocking;
 
-use crate::{config, util::join_handle_wait_take};
+use crate::{config, mpv::lang::HumanLang, util::join_handle_wait_take};
+
+use self::lang::{AutoLang, Lang};
+
+mod lang;
 
 pub type MpvResult<T> = anyhow::Result<T>;
 
@@ -29,6 +25,7 @@ const DEF_USR: u64 = 0;
 pub struct MpvHandle {
     handle: libmpv::Handle<libmpv::Async>,
     state: MpvState,
+    auto_lang: AutoLang,
 }
 
 #[derive(Debug, Clone)]
@@ -47,8 +44,7 @@ struct State {
 struct Track {
     id: i64,
     ttype: TrackType,
-    title: Option<String>,
-    lang: Option<String>,
+    lang: Lang,
     selected: bool,
 }
 
@@ -64,6 +60,12 @@ enum MpvState {
     Load,
     Play(State),
     End(EndReason),
+}
+
+impl AsRef<Lang> for Track {
+    fn as_ref(&self) -> &Lang {
+        &self.lang
+    }
 }
 
 impl Default for State {
@@ -112,12 +114,7 @@ fn to_client_tracks(tracks: &[Track], ttype: TrackType) -> Vec<ClientTrack> {
         .filter(|t| t.ttype == ttype)
         .map(|t| ClientTrack {
             id: t.id,
-            title: t
-                .title
-                .as_deref()
-                .or(t.lang.as_deref())
-                .unwrap_or("Unknown")
-                .to_string(),
+            title: t.lang.to_string(),
             selected: t.selected,
         })
         .collect();
@@ -204,7 +201,21 @@ impl MpvHandle {
                 Event::QueueOverflow => log::error!("Mpv queue overflow"),
                 Event::PropertyChange(propvalue) => {
                     if let MpvState::Play(play) = &mut self.state {
-                        if play.update_state(propvalue) {
+                        let updated = play.update_state(&propvalue);
+
+                        if self.auto_lang.has_not_chosen()
+                            && matches!(propvalue, PropertyValue::TrackList(_))
+                        {
+                            if let Err(e) = self
+                                .auto_lang
+                                .auto_choose(&mut self.handle, &play.tracks)
+                                .context("auto choosing tracks")
+                            {
+                                break Some(Err(e));
+                            }
+                        }
+
+                        if updated {
                             break Some(Ok(self
                                 .state
                                 .to_client_state()
@@ -315,6 +326,8 @@ pub fn mpv(path: &str, paused: bool) -> MpvResult<MpvHandle> {
     Ok(MpvHandle {
         handle: mpv.into_async(),
         state: MpvState::Load,
+        // TODO: make the languages configurable
+        auto_lang: AutoLang::new(HumanLang::English, HumanLang::Japanese),
     })
 }
 
