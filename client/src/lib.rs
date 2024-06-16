@@ -81,7 +81,12 @@ fn live_app() -> Html {
 
 #[wasm_bindgen(start)]
 pub fn main() {
-    wasm_logger::init(wasm_logger::Config::default());
+    let logger_level = if cfg!(debug_assertions) {
+        log::Level::Trace
+    } else {
+        log::Level::Debug
+    };
+    wasm_logger::init(wasm_logger::Config::new(logger_level));
     yew::Renderer::<LiveApp>::new().render();
 
     // use protocol::to_client::front::filesearch as fs;
