@@ -41,12 +41,13 @@ pub struct ProgressInteractiveProps {
 #[function_component(ProgressbarInteractive)]
 pub fn progressbar_interactive(props: &ProgressInteractiveProps) -> Html {
     let down = use_state_eq(|| false);
-    let seek = use_state_eq(|| props.progress);
+    let seek = use_state_eq(|| Percent::ZERO);
 
     {
         let on_slide = props.on_slide.clone();
         use_effect_with((down.clone(), seek.clone()), move |(down, seek)| {
             if **down {
+                // TODO: add a debouncer
                 on_slide.emit(**seek);
             }
         });
@@ -86,15 +87,57 @@ pub fn progressbar_interactive(props: &ProgressInteractiveProps) -> Html {
         })
     };
 
-    let onmousedown = {
+    let ontouchstart = {
+        let down = down.setter();
+        let seek = seek.setter();
+        let disabled = props.disabled;
+        let propsprog = props.progress;
+        Callback::from(move |_| {
+            if disabled {
+                return;
+            }
+            log::trace!("Touch start");
+            down.set(true);
+            seek.set(propsprog);
+        })
+    };
+
+    let ontouchend = {
         let down = down.setter();
         let disabled = props.disabled;
         Callback::from(move |_| {
             if disabled {
                 return;
             }
-            log::trace!("Down");
+            log::trace!("Touch end");
+            down.set(false);
+        })
+    };
+
+    let ontouchcancel = {
+        let down = down.setter();
+        let disabled = props.disabled;
+        Callback::from(move |_| {
+            if disabled {
+                return;
+            }
+            log::trace!("Touch cancel");
+            down.set(false);
+        })
+    };
+
+    let onmousedown = {
+        let down = down.setter();
+        let seek = seek.setter();
+        let disabled = props.disabled;
+        let propsprog = props.progress;
+        Callback::from(move |_| {
+            if disabled {
+                return;
+            }
+            log::trace!("Mouse down");
             down.set(true);
+            seek.set(propsprog);
         })
     };
 
@@ -105,7 +148,7 @@ pub fn progressbar_interactive(props: &ProgressInteractiveProps) -> Html {
             if disabled {
                 return;
             }
-            log::trace!("Up");
+            log::trace!("Mouse up");
             down.set(false);
         })
     };
@@ -115,16 +158,20 @@ pub fn progressbar_interactive(props: &ProgressInteractiveProps) -> Html {
     html! {
         <div class={props.outer_class.clone()}>
             <input type="range"
+                   disabled={props.disabled}
                    min="0.0"
                    max="100.0"
                    step="any"
                    value={progress.as_f64().to_string()}
                    class={props.inner_class.clone()}
                    oninput={oninput}
-                   onpointerdown={onmousedown}
-                   onpointerup={onmouseup.clone()}
-                   onpointercancel={onmouseup}
-                   disabled={props.disabled}
+                   // NOTE: the pointer events, which are an abstraction over input
+                   // devices, didn't work well on my phone
+                   ontouchstart={ontouchstart}
+                   ontouchend={ontouchend}
+                   ontouchcancel={ontouchcancel}
+                   onmousedown={onmousedown}
+                   onmouseup={onmouseup}
             />
         </div>
     }
