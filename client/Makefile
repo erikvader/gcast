@@ -57,6 +57,7 @@ $(SERVICE): $(SERVICE).in
 
 .PHONY: deploy-build
 deploy-build: all
+deploy-build: RELEASE := t
 
 .PHONY: deploy-stop
 deploy-stop:

@@ -5,7 +5,6 @@ AUXSOURCES := config.def.toml
 
 RELEASE :=
 CARGO_BUILDFLAGS += $(if $(RELEASE),--release,)
-TARGET_SUBDIR := $(if $(RELEASE),release,debug)
 
 .PHONY: build
 build:
@@ -22,12 +21,15 @@ clean:
 ifneq ($(filter deploy%,$(MAKECMDGOALS)),)
 include ../deploy-config.mk
 
+TARGET_SUBDIR = $(if $(RELEASE),release,debug)
+
 $(SERVICE): $(SERVICE).in
 	env IN_DEPLOY_PATH='$(DEPLOY_PATH)' envsubst '$$IN_DEPLOY_PATH' < $< > $@
 
 .PHONY: deploy-build
 deploy-build: build
 deploy-build: CARGO_BUILDFLAGS += --target $(DEPLOY_TARGET)
+deploy-build: RELEASE := t
 
 .PHONY: deploy-stop
 deploy-stop:
