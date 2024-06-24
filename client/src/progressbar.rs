@@ -47,7 +47,6 @@ pub fn progressbar_interactive(props: &ProgressInteractiveProps) -> Html {
         let on_slide = props.on_slide.clone();
         use_effect_with((down.clone(), seek.clone()), move |(down, seek)| {
             if **down {
-                // TODO: add a debouncer
                 on_slide.emit(**seek);
             }
         });

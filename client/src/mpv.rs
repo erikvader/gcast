@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use protocol::{
     to_client::front::mpv as prot,
     to_server::{mpvcontrol, mpvstart},
@@ -5,11 +7,11 @@ use protocol::{
 };
 use yew::prelude::*;
 
-use crate::progressbar::ProgressbarInteractive;
 use crate::{
     back_button::{BackButton, Type},
     hooks::server::UseServer,
 };
+use crate::{debounce::use_debounce, progressbar::ProgressbarInteractive};
 
 #[derive(Properties, PartialEq, Eq)]
 pub struct MpvProps {
@@ -30,6 +32,13 @@ pub fn mpv(props: &MpvProps) -> Html {
     let subtitles = subtitles(&props.front);
     let audios = audios(&props.front);
 
+    let on_slide = {
+        let sender = server.sender();
+        use_debounce(Duration::from_millis(250), move |seek| {
+            sender.send(mpvcontrol::SeekAbs(seek))
+        })
+    };
+
     // TODO: show a volume indicator
     html! {
         <article class={classes!("stacker")}>
@@ -46,7 +55,7 @@ pub fn mpv(props: &MpvProps) -> Html {
             <div class={classes!("pad")}>
                 <ProgressbarInteractive
                              disabled={!clickable}
-                             on_slide={click_send!(server, perc -> mpvcontrol::SeekAbs(perc))}
+                             on_slide={on_slide}
                              progress={progress(&props.front)}
                              outer_class={classes!("mpv-progress-outer")}
                              inner_class={classes!("mpv-progress-inner")}/>

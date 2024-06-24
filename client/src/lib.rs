@@ -16,6 +16,7 @@ macro_rules! click_send {
 
 mod back_button;
 mod confirm_button;
+mod debounce;
 mod errormessage;
 mod hooks;
 mod mpv;
