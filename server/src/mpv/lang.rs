@@ -171,6 +171,10 @@ where
 }
 
 fn choose_eng(lang: &Lang) -> Prio {
+    // TODO: en-US
+    // TODO: en
+    // TODO: english
+    // TODO: minus på SDH
     if lang.lang_imatches("eng") {
         if lang.title_imatches("signs") {
             1
@@ -183,6 +187,7 @@ fn choose_eng(lang: &Lang) -> Prio {
 }
 
 fn choose_jap(lang: &Lang) -> Prio {
+    // TODO: ja
     lang.lang_imatches("jpn").then_some(1).unwrap_or(0)
 }
 

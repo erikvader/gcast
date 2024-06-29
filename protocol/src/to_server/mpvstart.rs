@@ -22,6 +22,7 @@ pub mod file {
 pub mod url {
     #[protocol_macros::message_part]
     struct Url {
+        // TODO: use an URL type
         url: String,
         paused: bool,
     }

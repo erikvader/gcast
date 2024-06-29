@@ -12,8 +12,8 @@ pub use scan::{read_cache, refresh_cache, write_cache};
 ///
 /// All paths are required to be valid rust strings, i.e., be valid UTF-8. This makes it
 /// easier to use on the client, and the libmpv crate (v2.0.1) needs them to be `String`s
-/// anyway. But this is a limitation that should be fixed in the future, i.e., use
-/// `PathBuf` instead.
+/// anyway (not anymore when i created my own libmpv). But this is a limitation that
+/// should be fixed in the future, i.e., use `PathBuf` instead.
 // TODO: make this partially updateable, i.e., update the files of a subfolder
 #[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
 pub struct Cache {

@@ -14,7 +14,7 @@ use super::{Control, Jump, MachineResult, StateLogger};
 
 pub(super) async fn mpv_url_state(
     ctrl: &mut Control,
-    url: String,
+    url: String, // TODO: use an URL type
     paused: bool,
 ) -> MachineResult<()> {
     let _logger = StateLogger::new("MpvUrl");
