@@ -45,6 +45,7 @@ yew = {version="0.21", features=["csr"]} # client: react
 wasm-bindgen = "0.2" # client: wasm stuff
 wasm-logger = "0.2" # client: log to web browser console
 web-sys = "0.3" # client: access HtmlInputElement
+url = "2.5" # client, protocol: debug view
 
 gloo-net = {version="0.2", default-features=false} # client: wasm websockets
 gloo-events = "0.2" # client: check for visibility

@@ -285,6 +285,7 @@ dependencies = [
  "protocol",
  "searcher",
  "serde",
+ "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-logger",

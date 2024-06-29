@@ -1,6 +1,7 @@
 use super::visibility::use_page_visibility;
 use super::websocket;
 use super::websocket::use_websocket;
+use crate::debug;
 use derivative::Derivative;
 use protocol::to_client;
 use protocol::to_client::front::Front;
@@ -56,7 +57,10 @@ impl Sender {
     where
         T: protocol::ToServerable,
     {
-        let bytes = protocol::Message::from(msg.to_server()).serialize();
+        let msg = msg.to_server();
+        log::debug!("Sending message: {msg:?}");
+
+        let bytes = protocol::Message::from(msg).serialize();
         let Ok(bytes) = bytes else {
             log::error!("Failed to serialize: {}", bytes.unwrap_err());
             return;
@@ -128,5 +132,15 @@ pub fn use_server() -> UseServer {
         connected: ws.is_connected(),
         accepted: *accepted,
         sender: ws.sender(),
+    }
+}
+
+#[hook]
+pub fn use_server_debug(debug: &debug::Debug) -> UseServer {
+    UseServer {
+        front: debug.front(),
+        connected: debug.is_connected(),
+        accepted: debug.is_accepted(),
+        sender: websocket::Sender::empty(),
     }
 }

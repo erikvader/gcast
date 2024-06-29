@@ -11,7 +11,7 @@ yew.workspace = true
 wasm-bindgen.workspace = true
 
 serde.workspace = true
-
+url.workspace = true
 web-sys = {workspace = true, features = ["VisibilityState", "HtmlDocument"]}
 
 wasm-logger.workspace = true

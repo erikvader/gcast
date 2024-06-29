@@ -38,7 +38,7 @@ impl Sender {
         }
     }
 
-    fn empty() -> Self {
+    pub fn empty() -> Self {
         Self { sender: None }
     }
 }
