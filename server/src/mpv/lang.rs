@@ -23,27 +23,29 @@ impl Lang {
         Self { title, lang }
     }
 
-    pub fn title(&self) -> &str {
-        self.title.as_deref().unwrap_or("??")
+    fn lang(&self) -> Matcher<'_> {
+        Matcher {
+            inner: self.lang.as_deref(),
+        }
     }
 
-    pub fn lang(&self) -> &str {
-        self.lang.as_deref().unwrap_or("??")
-    }
-
-    fn lang_imatches(&self, s: &str) -> bool {
-        imatches(self.lang.as_deref(), s)
-    }
-
-    fn title_imatches(&self, s: &str) -> bool {
-        imatches(self.title.as_deref(), s)
+    fn title(&self) -> Matcher<'_> {
+        Matcher {
+            inner: self.title.as_deref(),
+        }
     }
 }
 
-fn imatches(a: Option<&str>, b: &str) -> bool {
-    match a {
-        None => false,
-        Some(a) => a.eq_ignore_ascii_case(b),
+struct Matcher<'a> {
+    inner: Option<&'a str>,
+}
+
+impl<'a> Matcher<'a> {
+    fn iequals(&self, b: &str) -> bool {
+        match self.inner {
+            None => false,
+            Some(a) => a.eq_ignore_ascii_case(b),
+        }
     }
 }
 
@@ -171,24 +173,21 @@ where
 }
 
 fn choose_eng(lang: &Lang) -> Prio {
-    // TODO: en-US
-    // TODO: en
-    // TODO: english
-    // TODO: minus på SDH
-    if lang.lang_imatches("eng") {
-        if lang.title_imatches("signs") {
-            1
-        } else {
-            2
-        }
-    } else {
-        0
-    }
+    let is_english = ["eng", "en-US", "en", "english"]
+        .into_iter()
+        .any(|s| lang.lang().iequals(s));
+
+    let is_special = ["SDH", "signs"]
+        .into_iter()
+        .any(|s| lang.title().iequals(s));
+
+    is_english.then_some(1).unwrap_or(0) + is_special.then_some(0).unwrap_or(1)
 }
 
 fn choose_jap(lang: &Lang) -> Prio {
-    // TODO: ja
-    lang.lang_imatches("jpn").then_some(1).unwrap_or(0)
+    (lang.lang().iequals("ja") || lang.lang().iequals("jpn"))
+        .then_some(1)
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -229,7 +228,19 @@ mod test {
     }
 
     #[test]
-    fn signs() {
+    fn english_prio() {
+        let preferred = vec![
+            Lang::new_lang("eng"),
+            Lang::new_both("SDH", "en"),
+            Lang::new_both("Signs", "eng"),
+            Lang::new_lang("swe"),
+        ];
+        let prios: Vec<_> = preferred.iter().map(choose_eng).collect();
+        assert!(prios.windows(2).all(|pair| pair[0] >= pair[1]));
+    }
+
+    #[test]
+    fn skips_signs() {
         let chosen = auto_choose(
             vec![
                 Lang::new_both("Signs", "eng"),

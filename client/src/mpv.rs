@@ -3,7 +3,7 @@ use std::time::Duration;
 use protocol::{
     to_client::front::mpv as prot,
     to_server::{mpvcontrol, mpvstart},
-    util::{Percent, PositivePercent},
+    util::Percent,
 };
 use yew::prelude::*;
 

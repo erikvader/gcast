@@ -1,10 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use protocol::{
-    to_client::front::Front,
-    util::{Percent, PositivePercent},
-    ToClientable,
-};
+use protocol::{to_client::front::Front, util::PositivePercent, ToClientable};
 use web_sys::window;
 
 use crate::hooks::server::Accepted;
