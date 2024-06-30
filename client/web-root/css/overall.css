@@ -118,6 +118,8 @@ input[disabled] {
 
 .stacker {
     position: relative;
+    overflow: auto;
+    max-height: 100%;
 }
 
 .stacker > * {

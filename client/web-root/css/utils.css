@@ -183,6 +183,7 @@
     border: thin solid;
 }
 
-.pre-wrap {
-    white-space: pre-wrap;
+.pre {
+    white-space: pre;
+    overflow: auto;
 }
