@@ -108,6 +108,11 @@ pub fn main() {
         Ok(debug) => {
             log::info!("Entering the debug app");
             log::info!("URL input: {debug:#?}");
+            log::info!(
+                "Connected={}, Accepted={:?}",
+                debug.is_connected(),
+                debug.accepted()
+            );
             log::info!("Front: {:#?}", debug.front());
             yew::Renderer::<DebugApp>::with_props(DebugAppProps { debug }).render();
         }

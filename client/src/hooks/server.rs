@@ -140,7 +140,7 @@ pub fn use_server_debug(debug: &debug::Debug) -> UseServer {
     UseServer {
         front: debug.front(),
         connected: debug.is_connected(),
-        accepted: debug.is_accepted(),
+        accepted: debug.accepted(),
         sender: websocket::Sender::empty(),
     }
 }

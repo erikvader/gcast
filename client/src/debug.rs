@@ -12,6 +12,10 @@ pub struct Debug {
 }
 
 pub fn debug() -> Result<Debug, String> {
+    if !cfg!(debug_assertions) {
+        return Err("not compiled in debug mode".to_string());
+    }
+
     let location = window()
         .ok_or_else(|| "failed to get window".to_string())?
         .location();
@@ -43,7 +47,7 @@ impl Debug {
         self.bool_kv("connected", true)
     }
 
-    pub fn is_accepted(&self) -> Accepted {
+    pub fn accepted(&self) -> Accepted {
         match self.kv.get("accepted").map(String::as_str) {
             Some("pending") => Accepted::Pending,
             Some("rejected") => Accepted::Rejected,
@@ -53,7 +57,7 @@ impl Debug {
 
     fn bool_kv(&self, key: &str, default: bool) -> bool {
         match self.kv.get(key).map(String::as_str) {
-            Some("yes") | Some("true") => true,
+            Some("yes") | Some("true") | Some("") => true,
             Some("no") | Some("false") => false,
             _ => default,
         }

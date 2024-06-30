@@ -11,8 +11,7 @@
 }
 
 .mpv-progress-outer input[type="range"]:disabled {
-    background: var(--disabled-bg);
-    cursor: default;
+  cursor: default;
 }
 
 /* Removes default focus */
@@ -26,7 +25,7 @@
 .mpv-progress-outer input[type="range"]::-webkit-slider-runnable-track {
   background-color: #000000;
   border-radius: 0.5rem;
-  height: 0.5rem;
+  height: 0.4rem;
 }
 
 /* slider thumb */
@@ -40,9 +39,14 @@
   width: 1.5rem;
 }
 
-.mpv-progress-outer input[type="range"]:focus::-webkit-slider-thumb {
-  outline: 3px solid #000000;
-  outline-offset: 0.125rem;
+.mpv-progress-outer input[type="range"]:disabled::-webkit-slider-runnable-track {
+    background-color: var(--disabled-bg);
+    cursor: default;
+}
+
+.mpv-progress-outer input[type="range"]:disabled::-webkit-slider-thumb {
+    background-color: var(--disabled-bg);
+    cursor: default;
 }
 
 /*********** Firefox styles ***********/
@@ -50,7 +54,7 @@
 .mpv-progress-outer input[type="range"]::-moz-range-track {
   background-color: #000000;
   border-radius: 0.5rem;
-  height: 0.5rem;
+  height: 0.4rem;
 }
 
 /* slider thumb */
@@ -62,9 +66,14 @@
   width: 1.5rem;
 }
 
-.mpv-progress-outer input[type="range"]:focus::-moz-range-thumb {
-  outline: 3px solid #000000;
-  outline-offset: 0.125rem;
+.mpv-progress-outer input[type="range"]:disabled::-moz-range-track {
+    background-color: var(--disabled-bg);
+    cursor: default;
+}
+
+.mpv-progress-outer input[type="range"]:disabled::-moz-range-thumb {
+    background-color: var(--disabled-bg);
+    cursor: default;
 }
 
 .mpv-progress-outer {
