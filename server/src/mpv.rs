@@ -8,7 +8,7 @@ use protocol::{
         Mpv as ClientMpv,
     },
     to_server::mpvcontrol::MpvControl,
-    util::Percent,
+    util::PositivePercent,
 };
 use tokio::task::spawn_blocking;
 
@@ -35,6 +35,7 @@ struct State {
     playback_time: f64,
     duration: f64,
     volume: f64,
+    muted: bool,
     chapters: i64,
     chapter: i64,
     tracks: Vec<Track>,
@@ -76,6 +77,7 @@ impl Default for State {
             playback_time: 0.0,
             duration: 0.0,
             volume: 0.0,
+            muted: false,
             chapters: 0,
             chapter: 0,
             tracks: Vec::new(),
@@ -95,7 +97,8 @@ impl MpvState {
                     .unwrap_or(Duration::ZERO),
                 length: Duration::try_from_secs_f64(state.duration)
                     .unwrap_or(Duration::ZERO),
-                volume: Percent::try_new(state.volume).unwrap_or(Percent::ZERO),
+                volume: (!state.muted)
+                    .then(|| PositivePercent::try_new(state.volume).unwrap_or_default()),
                 chapter: if state.chapters > 0 {
                     Some((state.chapter + 1, state.chapters))
                 } else {
@@ -344,6 +347,7 @@ fn observe_properties(mpv: &mut libmpv::Handle<libmpv::Async>) -> MpvResult<()> 
         .context("observe playback time")?;
     mpv.observe_duration().context("observe duration")?;
     mpv.observe_volume().context("observe volume")?;
+    mpv.observe_muted().context("observe muted")?;
     mpv.observe_chapter().context("observe chapter")?;
     mpv.observe_chapters().context("observe chapters")?;
     mpv.observe_track_list().context("observe track list")?;
@@ -374,6 +378,7 @@ impl State {
             }
             PropertyValue::Duration(new) => replace_secs(&mut self.duration, *new),
             PropertyValue::Volume(new) => replace(&mut self.volume, *new),
+            PropertyValue::Mute(new) => replace(&mut self.muted, *new),
             PropertyValue::Chapters(new) => replace(&mut self.chapters, *new),
             PropertyValue::Chapter(new) => replace(&mut self.chapter, *new),
             PropertyValue::TrackList(new) => {

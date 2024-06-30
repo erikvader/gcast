@@ -117,7 +117,7 @@ pub fn main() {
             yew::Renderer::<DebugApp>::with_props(DebugAppProps { debug }).render();
         }
         Err(reason) => {
-            log::info!("Entering the live app and not debug because: '{reason}'");
+            log::info!("Entering the live app and not debug because: {reason}");
             yew::Renderer::<LiveApp>::new().render();
         }
     }

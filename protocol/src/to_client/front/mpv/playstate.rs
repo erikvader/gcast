@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use protocol_macros::message_part;
 
-use crate::util::Percent;
+use crate::util::PositivePercent;
 
 #[message_part]
 struct PlayState {
@@ -10,7 +10,7 @@ struct PlayState {
     pause: bool,
     progress: Duration,
     length: Duration,
-    volume: Percent,
+    volume: Option<PositivePercent>,
     chapter: Option<(i64, i64)>,
     subtitles: Vec<Track>,
     audios: Vec<Track>,

@@ -266,7 +266,7 @@ properties! {
     (Node, TrackList, Get track_list, Obs observe_track_list),
     (String, YtdlFormat, Set set_ytdl_format),
     (Flag, Fullscreen, Set set_fullscreen),
-    (Flag, Mute, Cyc toggle_mute),
+    (Flag, Mute, Get is_muted, Obs observe_muted, Cyc toggle_mute),
     (Double, SubDelay, Add add_sub_delay),
     (Double, SubScale, Add add_sub_scale),
     (Double, SubPos, Add add_sub_pos),

@@ -3,7 +3,7 @@ use std::time::Duration;
 use protocol::{
     to_client::front::mpv as prot,
     to_server::{mpvcontrol, mpvstart},
-    util::Percent,
+    util::{Percent, PositivePercent},
 };
 use yew::prelude::*;
 
@@ -31,6 +31,7 @@ pub fn mpv(props: &MpvProps) -> Html {
     let title = title(&props.front);
     let subtitles = subtitles(&props.front);
     let audios = audios(&props.front);
+    let volume = volume(&props.front);
 
     let on_slide = {
         let sender = server.sender();
@@ -122,6 +123,7 @@ pub fn mpv(props: &MpvProps) -> Html {
                            onclick={click_send!(server, id -> mpvcontrol::SetSub(id))} />
             <div class={classes!("section", "pad", "small")}>
                 <span>{"Audio controls"}</span>
+                <span class={classes!("float-right")}>{format!("Volume: {volume}")}</span>
             </div>
             <div class={classes!("space-evenly", "pad")}>
                 <button onclick={click_send!(server, mpvcontrol::ToggleMute)}
@@ -204,6 +206,16 @@ fn progress(front: &prot::Mpv) -> Percent {
         }) => Percent::of(progress.as_secs_f64(), length.as_secs_f64())
             .unwrap_or(Percent::ZERO),
         _ => Percent::ZERO,
+    }
+}
+
+fn volume(front: &prot::Mpv) -> String {
+    match front {
+        prot::PlayState(prot::playstate::PlayState {
+            volume: Some(volume),
+            ..
+        }) => volume.to_string(),
+        _ => "muted".to_string(),
     }
 }
 
