@@ -57,7 +57,6 @@ $(SERVICE): $(SERVICE).in
 
 .PHONY: deploy-build
 deploy-build: all
-deploy-build: RELEASE := t
 
 .PHONY: deploy-stop
 deploy-stop:
@@ -82,4 +81,6 @@ deploy-sync: $(SERVICE)
 
 .PHONY: deploy
 deploy: deploy-build deploy-stop deploy-sync deploy-start
+deploy: RELEASE := t
+
 endif
