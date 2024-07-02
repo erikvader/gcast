@@ -7,7 +7,7 @@ use protocol::{
         fscontrol::{search_ctrl, tree_ctrl},
         fsstart, mpvstart,
     },
-    util::Percent,
+    util::{Normal, Percent},
 };
 
 use wasm_bindgen::JsCast;
@@ -268,7 +268,7 @@ fn refreshing(props: &RefreshingProps) -> Html {
     let done_dirs = props.front.done_dirs;
     let total_dirs = props.front.total_dirs;
     let dirs_progress =
-        Percent::of(done_dirs as f64, total_dirs as f64).unwrap_or(Percent::ZERO);
+        Percent::<Normal>::of(done_dirs as f64, total_dirs as f64).unwrap_or_default();
 
     let roots = props.front.roots.iter().map(|rootinfo| {
         use prot::refreshing::RootStatus::*;

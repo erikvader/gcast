@@ -1,11 +1,11 @@
-use protocol::util::Percent;
+use protocol::util::{Normal, Percent};
 use wasm_bindgen::JsCast;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
 #[derive(Properties, PartialEq)]
 pub struct ProgressProps {
-    pub progress: Percent,
+    pub progress: Percent<Normal>,
     #[prop_or_default]
     pub text: Option<String>,
     #[prop_or_default]
@@ -30,10 +30,10 @@ pub fn progressbar(props: &ProgressProps) -> Html {
 
 #[derive(Properties, PartialEq)]
 pub struct ProgressInteractiveProps {
-    pub progress: Percent,
+    pub progress: Percent<Normal>,
     pub outer_class: Classes,
     pub inner_class: Classes,
-    pub on_slide: Callback<Percent>,
+    pub on_slide: Callback<Percent<Normal>>,
     pub disabled: bool,
 }
 
@@ -41,7 +41,7 @@ pub struct ProgressInteractiveProps {
 #[function_component(ProgressbarInteractive)]
 pub fn progressbar_interactive(props: &ProgressInteractiveProps) -> Html {
     let down = use_state_eq(|| false);
-    let seek = use_state_eq(|| Percent::ZERO);
+    let seek = use_state_eq(|| Percent::<Normal>::default());
 
     {
         let on_slide = props.on_slide.clone();
@@ -80,7 +80,7 @@ pub fn progressbar_interactive(props: &ProgressInteractiveProps) -> Html {
                 }
             };
 
-            if let Some(p) = Percent::try_new(input) {
+            if let Some(p) = Percent::<Normal>::try_new(input) {
                 seek.set(p);
             }
         })

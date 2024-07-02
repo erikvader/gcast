@@ -8,7 +8,7 @@ use protocol::{
         Mpv as ClientMpv,
     },
     to_server::mpvcontrol::MpvControl,
-    util::PositivePercent,
+    util::{Percent, Positive},
 };
 use tokio::task::spawn_blocking;
 
@@ -98,7 +98,7 @@ impl MpvState {
                 length: Duration::try_from_secs_f64(state.duration)
                     .unwrap_or(Duration::ZERO),
                 volume: (!state.muted)
-                    .then(|| PositivePercent::try_new(state.volume).unwrap_or_default()),
+                    .then(|| Percent::<Positive>::new(state.volume).unwrap_or_default()),
                 chapter: if state.chapters > 0 {
                     Some((state.chapter + 1, state.chapters))
                 } else {

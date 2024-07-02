@@ -3,7 +3,7 @@ use std::time::Duration;
 use protocol::{
     to_client::front::mpv as prot,
     to_server::{mpvcontrol, mpvstart},
-    util::Percent,
+    util::{Normal, Percent},
 };
 use yew::prelude::*;
 
@@ -199,13 +199,13 @@ fn has_chapters(front: &prot::Mpv) -> bool {
     )
 }
 
-fn progress(front: &prot::Mpv) -> Percent {
+fn progress(front: &prot::Mpv) -> Percent<Normal> {
     match *front {
         prot::PlayState(prot::playstate::PlayState {
             progress, length, ..
-        }) => Percent::of(progress.as_secs_f64(), length.as_secs_f64())
-            .unwrap_or(Percent::ZERO),
-        _ => Percent::ZERO,
+        }) => Percent::<Normal>::of(progress.as_secs_f64(), length.as_secs_f64())
+            .unwrap_or_default(),
+        _ => Percent::<Normal>::default(),
     }
 }
 

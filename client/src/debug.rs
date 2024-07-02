@@ -1,6 +1,10 @@
 use std::{collections::HashMap, time::Duration};
 
-use protocol::{to_client::front::Front, util::PositivePercent, ToClientable};
+use protocol::{
+    to_client::front::Front,
+    util::{Percent, Positive},
+    ToClientable,
+};
 use web_sys::window;
 
 use crate::hooks::server::Accepted;
@@ -108,7 +112,7 @@ impl Debug {
                 progress: Duration::from_secs(1111),
                 length: Duration::from_secs(3651),
                 volume: (!self.bool_kv("muted", false)).then(|| {
-                    PositivePercent::try_new(self.f64_kv("volume", 80.0))
+                    Percent::<Positive>::new(self.f64_kv("volume", 80.0))
                         .unwrap_or_default()
                 }),
                 chapter: None,
