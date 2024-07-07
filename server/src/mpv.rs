@@ -112,7 +112,7 @@ impl MpvState {
 }
 
 fn to_client_tracks(tracks: &[Track], ttype: TrackType) -> Vec<ClientTrack> {
-    let mut client_tracks: Vec<_> = tracks
+    tracks
         .iter()
         .filter(|t| t.ttype == ttype)
         .map(|t| ClientTrack {
@@ -120,18 +120,7 @@ fn to_client_tracks(tracks: &[Track], ttype: TrackType) -> Vec<ClientTrack> {
             title: t.lang.to_string(),
             selected: t.selected,
         })
-        .collect();
-
-    client_tracks.insert(
-        0,
-        ClientTrack {
-            id: 0,
-            title: "None".to_string(),
-            selected: client_tracks.iter().all(|t| !t.selected),
-        },
-    );
-
-    client_tracks
+        .collect()
 }
 
 impl MpvHandle {
@@ -456,5 +445,29 @@ fn node_to_tracks(node: &libmpv::Node) -> Vec<Track> {
             }
         }
     }
+
+    let none_audio = Track {
+        id: 0,
+        ttype: TrackType::Audio,
+        lang: lang::Lang::empty(),
+        selected: tracks
+            .iter()
+            .filter(|t| t.ttype == TrackType::Audio)
+            .all(|t| !t.selected),
+    };
+
+    let none_video = Track {
+        id: 0,
+        ttype: TrackType::Sub,
+        lang: lang::Lang::empty(),
+        selected: tracks
+            .iter()
+            .filter(|t| t.ttype == TrackType::Sub)
+            .all(|t| !t.selected),
+    };
+
+    tracks.insert(0, none_audio);
+    tracks.insert(0, none_video);
+
     tracks
 }

@@ -23,6 +23,13 @@ impl Lang {
         Self { title, lang }
     }
 
+    pub const fn empty() -> Self {
+        Self {
+            title: None,
+            lang: None,
+        }
+    }
+
     fn lang(&self) -> Matcher<'_> {
         Matcher {
             inner: self.lang.as_deref(),
@@ -51,15 +58,23 @@ impl<'a> Matcher<'a> {
 
 impl fmt::Display for Lang {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut written = false;
+
         if let Some(lang) = &self.lang {
             write!(f, "{lang}")?;
-            if self.title.is_some() {
-                write!(f, " ")?;
-            }
+            written = true;
         }
 
         if let Some(title) = &self.title {
+            if written {
+                write!(f, " ")?;
+            }
             write!(f, "'{title}'")?;
+            written = true;
+        }
+
+        if !written {
+            write!(f, "None")?;
         }
 
         Ok(())
@@ -142,7 +157,13 @@ pub enum HumanLang {
     Japanese,
 }
 
-type Prio = u8;
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy)]
+enum Prio {
+    Avoid,
+    NotUse,
+    Use,
+    Prefer,
+}
 
 impl HumanLang {
     fn choose(self, lang: &Lang) -> Prio {
@@ -165,7 +186,6 @@ where
             let prio = human.choose(t.as_ref());
             (i, t, prio)
         })
-        .filter(|(_, _, prio)| *prio > 0)
         .max_by(|(_, _, prio1), (_, _, prio2)| {
             prio1.cmp(prio2).then(std::cmp::Ordering::Greater)
         })
@@ -173,6 +193,12 @@ where
 }
 
 fn choose_eng(lang: &Lang) -> Prio {
+    // NOTE: some youtube videos have a subtitle track called "live_chat 'json'" thats
+    // empty
+    if lang.lang().iequals("live_chat") {
+        return Prio::Avoid;
+    }
+
     let is_english = ["eng", "en-US", "en", "english"]
         .into_iter()
         .any(|s| lang.lang().iequals(s));
@@ -181,13 +207,19 @@ fn choose_eng(lang: &Lang) -> Prio {
         .into_iter()
         .any(|s| lang.title().iequals(s));
 
-    is_english.then_some(1).unwrap_or(0) + is_special.then_some(0).unwrap_or(1)
+    if is_english && is_special {
+        Prio::Use
+    } else if is_english && !is_special {
+        Prio::Prefer
+    } else {
+        Prio::NotUse
+    }
 }
 
 fn choose_jap(lang: &Lang) -> Prio {
     (lang.lang().iequals("ja") || lang.lang().iequals("jpn"))
-        .then_some(1)
-        .unwrap_or(0)
+        .then_some(Prio::Use)
+        .unwrap_or(Prio::NotUse)
 }
 
 #[cfg(test)]
@@ -207,6 +239,12 @@ mod test {
         fn new_both(title: impl Into<String>, lang: impl Into<String>) -> Self {
             Self::new(Some(title.into()), Some(lang.into()))
         }
+    }
+
+    #[test]
+    fn empty() {
+        assert_eq!(Prio::NotUse, choose_jap(&Lang::empty()));
+        assert_eq!(Prio::NotUse, choose_eng(&Lang::empty()));
     }
 
     #[test]
@@ -234,8 +272,11 @@ mod test {
             Lang::new_both("SDH", "en"),
             Lang::new_both("Signs", "eng"),
             Lang::new_lang("swe"),
+            Lang::empty(),
+            Lang::new_both("json", "live_chat"),
         ];
         let prios: Vec<_> = preferred.iter().map(choose_eng).collect();
+        dbg!(&prios);
         assert!(prios.windows(2).all(|pair| pair[0] >= pair[1]));
     }
 
