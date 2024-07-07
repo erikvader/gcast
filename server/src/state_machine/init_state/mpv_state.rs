@@ -17,7 +17,8 @@ pub(super) async fn mpv_url_state(
     url: String, // TODO: use an URL type
     paused: bool,
 ) -> MachineResult<()> {
-    let _logger = StateLogger::new("MpvUrl");
+    let logger = StateLogger::new("MpvUrl");
+    logger.info(format!("Playing URL: url={url}, paused={paused}"));
     mpv_state(ctrl, url, paused).await
 }
 
@@ -27,6 +28,7 @@ pub(super) async fn mpv_file_state(
     path: String,
 ) -> MachineResult<()> {
     let logger = StateLogger::new("MpvFile");
+    logger.info(format!("Playing file: root={root}, path={path}"));
 
     // TODO: the whole cache is re-read over and over, so cache the cache somehow? Maybe
     // save the roots in another file?
@@ -50,6 +52,7 @@ pub(super) async fn mpv_file_state(
 
 async fn mpv_state(ctrl: &mut Control, path: String, paused: bool) -> MachineResult<()> {
     let logger = StateLogger::new("Mpv");
+    logger.debug(format!("path={path}, paused={paused}"));
 
     ctrl.send(front::mpv::Load).await;
 

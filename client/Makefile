@@ -21,7 +21,7 @@ serve:
 	@python serve.py
 
 .PHONY: devel
-devel: build serve
+devel: $(INDEXHTML) build serve
 
 $(DEPSFOLDER):
 	mkdir -p $@
