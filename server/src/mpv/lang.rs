@@ -135,9 +135,15 @@ impl AutoLang {
             TrackType::Video => "vubs",
             TrackType::Sub => "subs",
         };
-        log::info!("Available {type_name}: {:?}", names);
+        let selected = tracks
+            .iter()
+            .enumerate()
+            .find(|(_, t)| t.selected)
+            .map(|(i, _)| i)
+            .unwrap_or(usize::MAX);
+        log::info!("Available {type_name}: {:?} (selected={selected})", names);
 
-        let chosen = auto_choose(tracks, preferred);
+        let chosen = auto_choose(tracks, selected, preferred);
         match chosen {
             Some((i, track)) => log::info!("Chose: {} ({i})", track.lang),
             None => log::info!("Chose nothing"),
@@ -174,22 +180,35 @@ impl HumanLang {
     }
 }
 
-fn auto_choose<It, T>(tracks: It, human: HumanLang) -> Option<(usize, T)>
+fn auto_choose<It, T>(tracks: It, selected: usize, human: HumanLang) -> Option<(usize, T)>
 where
     T: AsRef<Lang>,
     It: IntoIterator<Item = T>,
 {
-    tracks
+    let mut selected_prio = Prio::NotUse;
+    let Some((max_i, max_t, max_prio)) = tracks
         .into_iter()
         .enumerate()
         .map(|(i, t)| {
             let prio = human.choose(t.as_ref());
+            if i == selected {
+                selected_prio = prio;
+            }
             (i, t, prio)
         })
+        .filter(|(_, _, prio)| *prio >= Prio::NotUse)
         .max_by(|(_, _, prio1), (_, _, prio2)| {
             prio1.cmp(prio2).then(std::cmp::Ordering::Greater)
         })
-        .map(|(i, t, _)| (i, t))
+    else {
+        return None;
+    };
+
+    if selected_prio == Prio::Avoid || max_prio >= Prio::Use {
+        Some((max_i, max_t))
+    } else {
+        None
+    }
 }
 
 fn choose_eng(lang: &Lang) -> Prio {
@@ -228,6 +247,7 @@ mod test {
 
     #[allow(dead_code)]
     impl Lang {
+        // TODO: make these const and create shared global langs that all tests share
         fn new_title(title: impl Into<String>) -> Self {
             Self::new(Some(title.into()), None)
         }
@@ -248,19 +268,46 @@ mod test {
     }
 
     #[test]
+    fn dont_set_to_empty_if_all_are_notuse() {
+        let en = Lang::new_lang("en");
+        assert_eq!(Prio::NotUse, choose_jap(&en));
+
+        let chosen = auto_choose(vec![Lang::empty(), en], 1, HumanLang::Japanese);
+        assert_eq!(None, chosen);
+    }
+
+    #[test]
+    fn avoiding_selected() {
+        let avoid = Lang::new_both("json", "live_chat");
+        assert_eq!(Prio::Avoid, choose_eng(&avoid));
+
+        let chosen =
+            auto_choose(vec![Lang::empty(), avoid.clone()], 1, HumanLang::English)
+                .map(|(i, _)| i);
+        assert_eq!(Some(0), chosen);
+
+        let chosen =
+            auto_choose(vec![Lang::empty(), avoid.clone()], 0, HumanLang::English);
+        assert_eq!(None, chosen);
+
+        let chosen = auto_choose(vec![avoid.clone(), avoid], 1, HumanLang::English);
+        assert_eq!(None, chosen)
+    }
+
+    #[test]
     // TODO: this probably fits better as a doc example
     fn different_kinds_of_arguments() {
         let v: Vec<Lang> = Vec::new();
-        auto_choose(v, HumanLang::English);
+        auto_choose(v, 0, HumanLang::English);
 
         let v: Vec<Lang> = Vec::new();
-        auto_choose(&v, HumanLang::English);
+        auto_choose(&v, 0, HumanLang::English);
 
         let v: Vec<&Lang> = Vec::new();
-        auto_choose(v, HumanLang::English);
+        auto_choose(v, 0, HumanLang::English);
 
         let v: Vec<&Lang> = Vec::new();
-        auto_choose(&v, HumanLang::English);
+        auto_choose(&v, 0, HumanLang::English);
 
         assert!(true);
     }
@@ -276,7 +323,6 @@ mod test {
             Lang::new_both("json", "live_chat"),
         ];
         let prios: Vec<_> = preferred.iter().map(choose_eng).collect();
-        dbg!(&prios);
         assert!(prios.windows(2).all(|pair| pair[0] >= pair[1]));
     }
 
@@ -287,6 +333,7 @@ mod test {
                 Lang::new_both("Signs", "eng"),
                 Lang::new_both("Dialogue", "eng"),
             ],
+            0,
             HumanLang::English,
         );
         assert_eq!(Some(1), chosen.map(|(i, _)| i));
@@ -296,6 +343,7 @@ mod test {
     fn taking_the_leftmost_on_equal() {
         let chosen = auto_choose(
             vec![Lang::new_lang("eng"), Lang::new_lang("eng")],
+            0,
             HumanLang::English,
         );
         assert_eq!(Some(0), chosen.map(|(i, _)| i));
