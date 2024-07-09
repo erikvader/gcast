@@ -29,6 +29,7 @@ pub fn init_config() -> anyhow::Result<()> {
     let conts = fs::read_to_string(&conf_file)
         .with_context(|| format!("reading config file at {:?}", conf_file))?;
 
+    // TODO: complain if there are unknown keys
     let conf: Config = toml::from_str(&conts).context("parsing config file as TOML")?;
 
     CONF.set(conf).context("setting the global conf variable")?;

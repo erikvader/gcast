@@ -14,6 +14,7 @@ pub(super) async fn spotify_state(ctrl: &mut Control) -> MachineResult<()> {
 
     ctrl.send(Front::Spotify).await;
 
+    // TODO: log the stdout and stderr
     let mut proc = Process::start(crate::config::spotify_exe().to_string())
         .context("spawning spotify process")
         .jump_user_error("Failed to spawn spotify")?;
