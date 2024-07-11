@@ -9,7 +9,7 @@ use itertools::Itertools;
 use protocol::to_client::front::filesearch;
 use std::future::Future;
 use tokio::task::spawn_blocking;
-use walkdir::{DirEntry, WalkDir};
+use walkdir::{DirEntry, Error as WalkdirError, WalkDir};
 
 use crate::{
     filer::{
@@ -279,20 +279,37 @@ fn link(
     (children, roots)
 }
 
-fn explode(
-    path: &Path,
-    mut on_file: impl FnMut(DirEntry),
-    mut on_dir: impl FnMut(DirEntry),
-) -> Result<(), walkdir::Error> {
-    for de in WalkDir::new(path).max_depth(1).min_depth(1) {
-        match de {
-            Ok(e) if e.file_type().is_dir() => on_dir(e),
-            Ok(e) if e.file_type().is_file() => on_file(e),
-            Ok(e) => log::warn!("Found file of type '{:?}', ignoring...", e.file_type()),
-            Err(e) => return Err(e),
+struct Walked {
+    new_errors: Vec<WalkdirError>,
+    new_files: Vec<DirEntry>,
+    new_dirs: Vec<DirEntry>,
+    new_others: Vec<DirEntry>,
+}
+
+async fn walk(walker: WalkDir) -> Walked {
+    join_handle_wait_take(spawn_blocking(move || {
+        let mut new_errors = Vec::new();
+        let mut new_files = Vec::new();
+        let mut new_dirs = Vec::new();
+        let mut new_others = Vec::new();
+
+        for de in walker {
+            match de {
+                Err(e) => new_errors.push(e),
+                Ok(e) if e.file_type().is_file() => new_files.push(e),
+                Ok(e) if e.file_type().is_dir() => new_dirs.push(e),
+                Ok(e) => new_others.push(e),
+            }
         }
-    }
-    Ok(())
+
+        Walked {
+            new_files,
+            new_dirs,
+            new_others,
+            new_errors,
+        }
+    }))
+    .await
 }
 
 fn create_cache_entry(
@@ -376,31 +393,24 @@ where
         .await;
 
         let root = *root;
-        let dir = dir.path().to_owned(); // NOTE: annoying that this must be cloned :(
-        let (new_errors, new_files, new_dirs) =
-            join_handle_wait_take(spawn_blocking(move || {
-                let mut new_errors = 0;
-                let mut new_files = Vec::new();
-                let mut new_dirs = Vec::new();
+        let Walked {
+            new_files,
+            new_dirs,
+            new_others,
+            new_errors,
+        } = walk(WalkDir::new(dir.path()).min_depth(1)).await;
 
-                for de in WalkDir::new(dir).min_depth(1) {
-                    match de {
-                        Err(e) => {
-                            log::error!("Failed to walk: {}", e);
-                            new_errors += 1;
-                        }
-                        Ok(e) if e.file_type().is_file() => new_files.push((root, e)),
-                        Ok(e) if e.file_type().is_dir() => new_dirs.push((root, e)),
-                        Ok(_) => (),
-                    }
-                }
-                (new_errors, new_files, new_dirs)
-            }))
-            .await;
+        for other in new_others {
+            log::warn!("Found unknown file: {other:?}");
+        }
 
-        *num_errors += new_errors;
-        files.extend(new_files);
-        dirs.extend(new_dirs);
+        for err in new_errors.iter() {
+            log::error!("Error on file: {err:?}");
+        }
+
+        *num_errors += new_errors.len();
+        files.extend(new_files.into_iter().map(|de| (root, de)));
+        dirs.extend(new_dirs.into_iter().map(|de| (root, de)));
     }
 
     Ok(Scan { files, dirs })
@@ -435,18 +445,28 @@ where
         ))
         .await;
 
-        match explode(
-            root.as_ref(),
-            |de| files.push((i, de)),
-            |de| dirs.push((i, de)),
-        ) {
-            Err(e) => {
-                root_status[i] = filesearch::refreshing::RootStatus::Error;
-                log::error!("Failed to walk '{}' cuz '{}'", root, e);
-            }
-            Ok(()) => root_status[i] = filesearch::refreshing::RootStatus::Done,
+        let Walked {
+            new_files,
+            new_dirs,
+            new_others,
+            new_errors,
+        } = walk(WalkDir::new(root).min_depth(1).max_depth(1)).await;
+
+        root_status[i] = filesearch::refreshing::RootStatus::Done;
+
+        files.extend(new_files.into_iter().map(|de| (i, de)));
+        dirs.extend(new_dirs.into_iter().map(|de| (i, de)));
+
+        for err in new_errors {
+            root_status[i] = filesearch::refreshing::RootStatus::Error;
+            log::error!("Failed to walk '{root}' cuz '{err}'");
+        }
+
+        for other in new_others {
+            log::warn!("Found unknown file: {other:?}");
         }
     }
+
     prog_report(make_refreshing(
         0,
         dirs.len(),
