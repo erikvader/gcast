@@ -68,3 +68,17 @@ quote = "1" # protocol-macros
 syn = {version = "2", features=["full"]} # protocol-macros
 proc-macro2 = "1" # protocol-macros
 once_cell = "1.17" # protocol-macros: for regexes
+
+[profile.dev.build-override]
+opt-level = 3
+
+[profile.release.build-override]
+opt-level = 3
+
+[profile.release]
+# NOTE: its nice to have debuginfo, so don't strip it
+# strip = "debuginfo"
+# NOTE: in fact, lets make sure some are actually included, but not everything
+debug = "limited"
+# NOTE: optimizes between crates
+lto = "thin"
