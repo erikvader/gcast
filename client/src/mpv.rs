@@ -40,12 +40,10 @@ pub fn mpv(props: &MpvProps) -> Html {
         })
     };
 
-    // TODO: show a volume indicator
     html! {
         <article class={classes!("stacker")}>
             <BackButton button_type={Type::Exit}
                         onclick={click_send!(server, mpvstart::Stop)} />
-            // TODO: add a spinning thingy when loading
             <div class={classes!("pad")}>
                 <div class={classes!("kinda-big", "mpv-title")}>{title}</div>
             </div>
@@ -54,6 +52,7 @@ pub fn mpv(props: &MpvProps) -> Html {
                 <span class={classes!("float-right")}>{chapter}{"/"}{chapter_total}</span>
             </div>
             <div class={classes!("pad")}>
+                // TODO: solve the progressbar jumping somehow
                 <ProgressbarInteractive
                              disabled={!clickable}
                              on_slide={on_slide}
