@@ -77,6 +77,14 @@ impl<'a> Matcher<'a> {
     fn contains(&self, word: &str) -> bool {
         words(self.inner()).any(|w| (self.str_cmp)(w, word))
     }
+
+    fn any_equals(&self, words: impl IntoIterator<Item = impl AsRef<str>>) -> bool {
+        words.into_iter().any(|w| self.equals(w.as_ref()))
+    }
+
+    fn any_contains(&self, words: impl IntoIterator<Item = impl AsRef<str>>) -> bool {
+        words.into_iter().any(|w| self.contains(w.as_ref()))
+    }
 }
 
 fn words(sentence: &str) -> impl Iterator<Item = &str> {
@@ -247,13 +255,10 @@ fn choose_eng(lang: &Lang) -> Prio {
         return Prio::Avoid;
     }
 
-    let is_english = ["eng", "en-US", "en", "english"]
-        .into_iter()
-        .any(|s| lang.ilang().equals(s));
+    let is_english = lang.ilang().any_equals(["eng", "en-US", "en", "english"]);
 
-    let is_special = ["SDH", "signs", "forced"]
-        .into_iter()
-        .any(|s| lang.ititle().contains(s));
+    let is_special = lang.ititle().any_contains(["signs", "forced"])
+        || lang.title().any_contains(["SDH"]);
 
     if is_english && is_special {
         Prio::Use
@@ -265,7 +270,8 @@ fn choose_eng(lang: &Lang) -> Prio {
 }
 
 fn choose_jap(lang: &Lang) -> Prio {
-    (lang.ilang().equals("ja") || lang.ilang().equals("jpn"))
+    lang.ilang()
+        .any_equals(["ja", "jpn"])
         .then_some(Prio::Use)
         .unwrap_or(Prio::NotUse)
 }
@@ -354,6 +360,7 @@ mod test {
         let preferred = vec![
             Lang::new_lang("eng"),
             Lang::new_both("SDH", "en"),
+            Lang::new_both("Forced", "en"),
             Lang::new_both("Signs", "eng"),
             Lang::new_lang("swe"),
             Lang::empty(),
@@ -374,6 +381,14 @@ mod test {
             HumanLang::English,
         );
         assert_eq!(Some(1), chosen.map(|(i, _)| i));
+    }
+
+    #[test]
+    fn sdh_is_case_sensitive() {
+        assert_ne!(
+            choose_eng(&Lang::new_both("SDH", "eng")),
+            choose_eng(&Lang::new_both("sdh", "eng"))
+        );
     }
 
     #[test]
