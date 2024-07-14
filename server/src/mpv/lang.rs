@@ -31,29 +31,58 @@ impl Lang {
     }
 
     fn lang(&self) -> Matcher<'_> {
-        Matcher {
-            inner: self.lang.as_deref(),
-        }
+        Matcher::new(self.lang.as_deref())
     }
 
     fn title(&self) -> Matcher<'_> {
-        Matcher {
-            inner: self.title.as_deref(),
-        }
+        Matcher::new(self.title.as_deref())
+    }
+
+    fn ilang(&self) -> Matcher<'_> {
+        self.lang().case_insensitive()
+    }
+
+    fn ititle(&self) -> Matcher<'_> {
+        self.title().case_insensitive()
     }
 }
 
 struct Matcher<'a> {
     inner: Option<&'a str>,
+    str_cmp: fn(&str, &str) -> bool,
 }
 
 impl<'a> Matcher<'a> {
-    fn iequals(&self, b: &str) -> bool {
-        match self.inner {
-            None => false,
-            Some(a) => a.eq_ignore_ascii_case(b),
+    fn new(inner: Option<&'a str>) -> Self {
+        assert!(inner != Some(""));
+        Self {
+            inner,
+            str_cmp: str::eq,
         }
     }
+
+    fn case_insensitive(mut self) -> Self {
+        self.str_cmp = str::eq_ignore_ascii_case;
+        self
+    }
+
+    fn inner(&self) -> &str {
+        self.inner.unwrap_or("")
+    }
+
+    fn equals(&self, b: &str) -> bool {
+        (self.str_cmp)(self.inner(), b)
+    }
+
+    fn contains(&self, word: &str) -> bool {
+        words(self.inner()).any(|w| (self.str_cmp)(w, word))
+    }
+}
+
+fn words(sentence: &str) -> impl Iterator<Item = &str> {
+    sentence
+        .split(|c: char| !c.is_alphabetic())
+        .filter(|w| !w.is_empty())
 }
 
 impl fmt::Display for Lang {
@@ -214,17 +243,17 @@ where
 fn choose_eng(lang: &Lang) -> Prio {
     // NOTE: some youtube videos have a subtitle track called "live_chat 'json'" thats
     // empty
-    if lang.lang().iequals("live_chat") {
+    if lang.ilang().equals("live_chat") {
         return Prio::Avoid;
     }
 
     let is_english = ["eng", "en-US", "en", "english"]
         .into_iter()
-        .any(|s| lang.lang().iequals(s));
+        .any(|s| lang.ilang().equals(s));
 
-    let is_special = ["SDH", "signs"]
+    let is_special = ["SDH", "signs", "forced"]
         .into_iter()
-        .any(|s| lang.title().iequals(s));
+        .any(|s| lang.ititle().contains(s));
 
     if is_english && is_special {
         Prio::Use
@@ -236,7 +265,7 @@ fn choose_eng(lang: &Lang) -> Prio {
 }
 
 fn choose_jap(lang: &Lang) -> Prio {
-    (lang.lang().iequals("ja") || lang.lang().iequals("jpn"))
+    (lang.ilang().equals("ja") || lang.ilang().equals("jpn"))
         .then_some(Prio::Use)
         .unwrap_or(Prio::NotUse)
 }
@@ -244,6 +273,12 @@ fn choose_jap(lang: &Lang) -> Prio {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn testing_words() {
+        assert!(words("").next().is_none());
+        assert_eq!(vec!("en", "SDH"), words("en (SDH)").collect::<Vec<_>>());
+    }
 
     #[allow(dead_code)]
     impl Lang {
@@ -295,7 +330,9 @@ mod test {
     }
 
     #[test]
-    // TODO: this probably fits better as a doc example
+    // TODO: this probably fits better as a doc example, but that only works on lib
+    // crates, not bin...
+    // https://github.com/rust-lang/rust/issues/50784
     fn different_kinds_of_arguments() {
         let v: Vec<Lang> = Vec::new();
         auto_choose(v, 0, HumanLang::English);
@@ -347,5 +384,34 @@ mod test {
             HumanLang::English,
         );
         assert_eq!(Some(0), chosen.map(|(i, _)| i));
+    }
+
+    #[test]
+    fn very_descriptive_titles() {
+        let chosen = auto_choose(
+            vec![
+                Lang::empty(),
+                Lang::new_both("Forced (For English audio)", "en"),
+                Lang::new_both("For Japanese audio", "en"),
+            ],
+            1,
+            HumanLang::English,
+        );
+        assert_eq!(Some(2), chosen.map(|(i, _)| i));
+    }
+
+    #[test]
+    fn special_in_parens() {
+        let chosen = auto_choose(
+            vec![
+                Lang::empty(),
+                Lang::new_both("English (Forced)", "en"),
+                Lang::new_lang("en"),
+                Lang::new_both("English (SDH)", "en"),
+            ],
+            1,
+            HumanLang::English,
+        );
+        assert_eq!(Some(2), chosen.map(|(i, _)| i));
     }
 }
