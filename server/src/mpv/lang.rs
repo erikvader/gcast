@@ -202,6 +202,7 @@ enum Prio {
     NotUse,
     Use,
     Prefer,
+    Required,
 }
 
 impl HumanLang {
@@ -247,22 +248,30 @@ where
 fn choose_eng(lang: &Lang) -> Prio {
     // NOTE: some youtube videos have a subtitle track called "live_chat 'json'" thats
     // empty
-    if lang.ilang().equals("live_chat") {
+    let is_avoid = lang.ilang().equals("live_chat");
+    if is_avoid {
         return Prio::Avoid;
     }
 
     let is_english = lang.ilang().any_equals(["eng", "en-US", "en", "english"]);
-
-    let is_special = lang.ititle().any_contains(["signs", "forced"])
-        || lang.title().any_contains(["SDH"]);
-
-    if is_english && is_special {
-        Prio::Use
-    } else if is_english && !is_special {
-        Prio::Prefer
-    } else {
-        Prio::NotUse
+    if !is_english {
+        return Prio::NotUse;
     }
+
+    let is_specific = lang.ititle().any_equals(["for japanese audio", "dialogue"]);
+    if is_specific {
+        return Prio::Required;
+    }
+
+    let is_bad = lang
+        .ititle()
+        .any_contains(["signs", "forced", "dub", "dubtitle"])
+        || lang.title().any_contains(["SDH"]);
+    if is_bad {
+        return Prio::Use;
+    }
+
+    Prio::Prefer
 }
 
 fn choose_jap(lang: &Lang) -> Prio {
@@ -299,9 +308,15 @@ mod test {
     }
 
     #[test]
-    fn empty() {
+    fn empty_lang_is_notuse() {
         assert_eq!(Prio::NotUse, choose_jap(&Lang::empty()));
         assert_eq!(Prio::NotUse, choose_eng(&Lang::empty()));
+    }
+
+    #[test]
+    fn empty_vec_does_nothing() {
+        let chosen: Option<(_, Lang)> = auto_choose(vec![], 0, HumanLang::English);
+        assert_eq!(None, chosen);
     }
 
     #[test]
@@ -327,8 +342,12 @@ mod test {
             auto_choose(vec![Lang::empty(), avoid.clone()], 0, HumanLang::English);
         assert_eq!(None, chosen);
 
-        let chosen = auto_choose(vec![avoid.clone(), avoid], 1, HumanLang::English);
-        assert_eq!(None, chosen)
+        let chosen =
+            auto_choose(vec![avoid.clone(), avoid.clone()], 1, HumanLang::English);
+        assert_eq!(None, chosen);
+
+        let chosen = auto_choose(vec![avoid], 0, HumanLang::English);
+        assert_eq!(None, chosen);
     }
 
     #[test]
@@ -354,6 +373,7 @@ mod test {
     #[test]
     fn english_prio() {
         let preferred = vec![
+            Lang::new_both("For Japanese audio", "eng"),
             Lang::new_lang("eng"),
             Lang::new_both("SDH", "en"),
             Lang::new_both("Forced", "en"),
@@ -374,6 +394,16 @@ mod test {
                 Lang::new_both("Dialogue", "eng"),
             ],
             0,
+            HumanLang::English,
+        );
+        assert_eq!(Some(1), chosen.map(|(i, _)| i));
+    }
+
+    #[test]
+    fn selects_selected_use() {
+        let chosen = auto_choose(
+            vec![Lang::empty(), Lang::new_lang("eng")],
+            1,
             HumanLang::English,
         );
         assert_eq!(Some(1), chosen.map(|(i, _)| i));
@@ -404,6 +434,35 @@ mod test {
                 Lang::empty(),
                 Lang::new_both("Forced (For English audio)", "en"),
                 Lang::new_both("For Japanese audio", "en"),
+            ],
+            1,
+            HumanLang::English,
+        );
+        assert_eq!(Some(2), chosen.map(|(i, _)| i));
+    }
+
+    #[test]
+    fn for_japanese_audio() {
+        let chosen = auto_choose(
+            vec![
+                Lang::empty(),
+                Lang::new_both("For English audio", "en"),
+                Lang::new_both("For Japanese audio", "en"),
+            ],
+            1,
+            HumanLang::English,
+        );
+        assert_eq!(Some(2), chosen.map(|(i, _)| i));
+    }
+
+    #[test]
+    fn no_dubtitles() {
+        let chosen = auto_choose(
+            vec![
+                Lang::empty(),
+                Lang::new_both("Dubtitle", "en"),
+                Lang::new_lang("en"),
+                Lang::new_both("Dub", "en"),
             ],
             1,
             HumanLang::English,
