@@ -48,7 +48,7 @@ impl Lang {
 }
 
 struct Matcher<'a> {
-    inner: Option<&'a str>,
+    inner: &'a str,
     str_cmp: fn(&str, &str) -> bool,
 }
 
@@ -56,7 +56,7 @@ impl<'a> Matcher<'a> {
     fn new(inner: Option<&'a str>) -> Self {
         assert!(inner != Some(""));
         Self {
-            inner,
+            inner: inner.unwrap_or(""),
             str_cmp: str::eq,
         }
     }
@@ -66,16 +66,12 @@ impl<'a> Matcher<'a> {
         self
     }
 
-    fn inner(&self) -> &str {
-        self.inner.unwrap_or("")
-    }
-
     fn equals(&self, b: &str) -> bool {
-        (self.str_cmp)(self.inner(), b)
+        (self.str_cmp)(self.inner, b)
     }
 
     fn contains(&self, word: &str) -> bool {
-        words(self.inner()).any(|w| (self.str_cmp)(w, word))
+        words(self.inner).any(|w| (self.str_cmp)(w, word))
     }
 
     fn any_equals(&self, words: impl IntoIterator<Item = impl AsRef<str>>) -> bool {
