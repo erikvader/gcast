@@ -12,13 +12,6 @@ poweroff_exe = "sudo_systemctl_poweroff"
 # If true, refresh the cache on program start, once per boot
 refresh_cache_boot = false
 
-# Key value pairs of properties for mpv
-[mpv.properties]
-fullscreen = "yes"
-force-window = "immediate"
-volume = "100"
-ytdl-format="bestvideo[height<=1080]+bestaudio/best[height<=1080]/bestvideo+bestaudio/best"
-
 [spotify]
 # The executable to run to start spotify
 executable = "spotify"

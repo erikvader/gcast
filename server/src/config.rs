@@ -8,8 +8,10 @@ const CONFIG_NAME: &str = "config.toml";
 
 static CONF: OnceCell<Config> = OnceCell::const_new();
 
-// TODO: only make public in state_machine?
+// TODO: only make public in state_machine? Or should every module ever be able to read
+// from here?
 #[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Config {
     root_dirs: Vec<String>,
     port: u16,
@@ -19,6 +21,7 @@ struct Config {
 }
 
 #[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Spotify {
     executable: String,
     fullscreen_exe: String,
@@ -29,7 +32,6 @@ pub fn init_config() -> anyhow::Result<()> {
     let conts = fs::read_to_string(&conf_file)
         .with_context(|| format!("reading config file at {:?}", conf_file))?;
 
-    // TODO: complain if there are unknown keys
     let conf: Config = toml::from_str(&conts).context("parsing config file as TOML")?;
 
     CONF.set(conf).context("setting the global conf variable")?;
@@ -79,4 +81,17 @@ pub fn cache_dir() -> PathBuf {
     dirs::cache_dir()
         .expect("could not get cache dir")
         .join(PROGNAME)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn read_default_config() {
+        let conts = include_str!("../config.def.toml");
+        let conf: Result<Config, _> = toml::from_str(&conts);
+        println!("conf: {conf:#?}");
+        assert!(conf.is_ok());
+    }
 }

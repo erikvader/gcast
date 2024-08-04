@@ -291,6 +291,9 @@ impl MpvHandle {
     }
 }
 
+// TODO: the ytdl-format property is not set anymore to limit the resolution of videos
+//   ytdl-format="bestvideo[height<=1080]+bestaudio/best[height<=1080]/bestvideo+bestaudio/best"
+// Maybe write a maximum height as a config value in the config file and use it here?
 // TODO: create a MpvOptions instead of having multiple arguments?
 pub fn mpv(path: &str, paused: bool) -> MpvResult<MpvHandle> {
     let mut mpv = libmpv::Handle::new().context("creating handle")?;
