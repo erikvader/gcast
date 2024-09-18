@@ -190,6 +190,9 @@ impl AutoLang {
     }
 }
 
+// TODO: the english is very sub focused, and japanese contains multiple languages, so
+// this is maybe not a good way to choose which language to use. Maybe introduce another
+// enum for sub or dub?
 #[derive(Copy, Clone, Debug)]
 pub enum HumanLang {
     English,
@@ -198,18 +201,23 @@ pub enum HumanLang {
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy)]
 enum Prio {
+    /// Actively avoid using
     Avoid,
+    /// Can use, but prefer not to
     NotUse,
+    /// Perfectly fine to use
     Use,
+    /// Prefer using this
     Prefer,
+    /// Such a good match that it must be used
     Required,
 }
 
 impl HumanLang {
     fn choose(self, lang: &Lang) -> Prio {
         match self {
-            Self::English => choose_eng(lang),
-            Self::Japanese => choose_jap(lang),
+            Self::English => choose_eng_sub(lang),
+            Self::Japanese => choose_jap_swe_eng_dub(lang),
         }
     }
 }
@@ -245,7 +253,7 @@ where
     }
 }
 
-fn choose_eng(lang: &Lang) -> Prio {
+fn choose_eng_sub(lang: &Lang) -> Prio {
     // NOTE: some youtube videos have a subtitle track called "live_chat 'json'" thats
     // empty
     let is_avoid = lang.ilang().equals("live_chat");
@@ -274,11 +282,20 @@ fn choose_eng(lang: &Lang) -> Prio {
     Prio::Prefer
 }
 
-fn choose_jap(lang: &Lang) -> Prio {
-    lang.ilang()
-        .any_equals(["ja", "jpn"])
-        .then_some(Prio::Use)
-        .unwrap_or(Prio::NotUse)
+fn choose_jap_swe_eng_dub(lang: &Lang) -> Prio {
+    if lang.ilang().any_equals(["ja", "jpn", "japanese"]) {
+        return Prio::Required;
+    }
+
+    if lang.ilang().any_equals(["swe", "svenska", "sv"]) {
+        return Prio::Prefer;
+    }
+
+    if lang.ilang().any_equals(["en", "english", "eng"]) {
+        return Prio::Use;
+    }
+
+    Prio::NotUse
 }
 
 #[cfg(test)]
@@ -309,8 +326,8 @@ mod test {
 
     #[test]
     fn empty_lang_is_notuse() {
-        assert_eq!(Prio::NotUse, choose_jap(&Lang::empty()));
-        assert_eq!(Prio::NotUse, choose_eng(&Lang::empty()));
+        assert_eq!(Prio::NotUse, choose_jap_swe_eng_dub(&Lang::empty()));
+        assert_eq!(Prio::NotUse, choose_eng_sub(&Lang::empty()));
     }
 
     #[test]
@@ -321,17 +338,17 @@ mod test {
 
     #[test]
     fn dont_set_to_empty_if_all_are_notuse() {
-        let en = Lang::new_lang("en");
-        assert_eq!(Prio::NotUse, choose_jap(&en));
+        let italian = Lang::new_lang("ita");
+        assert_eq!(Prio::NotUse, choose_jap_swe_eng_dub(&italian));
 
-        let chosen = auto_choose(vec![Lang::empty(), en], 1, HumanLang::Japanese);
+        let chosen = auto_choose(vec![Lang::empty(), italian], 1, HumanLang::Japanese);
         assert_eq!(None, chosen);
     }
 
     #[test]
     fn avoiding_selected() {
         let avoid = Lang::new_both("json", "live_chat");
-        assert_eq!(Prio::Avoid, choose_eng(&avoid));
+        assert_eq!(Prio::Avoid, choose_eng_sub(&avoid));
 
         let chosen =
             auto_choose(vec![Lang::empty(), avoid.clone()], 1, HumanLang::English)
@@ -382,8 +399,20 @@ mod test {
             Lang::empty(),
             Lang::new_both("json", "live_chat"),
         ];
-        let prios: Vec<_> = preferred.iter().map(choose_eng).collect();
+        let prios: Vec<_> = preferred.iter().map(choose_eng_sub).collect();
         assert!(prios.windows(2).all(|pair| pair[0] >= pair[1]));
+    }
+
+    #[test]
+    fn jap_swe_en_prio() {
+        let preferred = vec![
+            Lang::new_lang("jpn"),
+            Lang::new_lang("swe"),
+            Lang::new_lang("eng"),
+            Lang::empty(),
+        ];
+        let prios: Vec<_> = preferred.iter().map(choose_jap_swe_eng_dub).collect();
+        assert!(prios.windows(2).all(|pair| pair[0] > pair[1]));
     }
 
     #[test]
@@ -412,8 +441,8 @@ mod test {
     #[test]
     fn sdh_is_case_sensitive() {
         assert_ne!(
-            choose_eng(&Lang::new_both("SDH", "eng")),
-            choose_eng(&Lang::new_both("sdh", "eng"))
+            choose_eng_sub(&Lang::new_both("SDH", "eng")),
+            choose_eng_sub(&Lang::new_both("sdh", "eng"))
         );
     }
 
@@ -481,6 +510,30 @@ mod test {
             ],
             1,
             HumanLang::English,
+        );
+        assert_eq!(Some(2), chosen.map(|(i, _)| i));
+    }
+
+    #[test]
+    fn deselects_italian_dubs() {
+        let chosen = auto_choose(
+            vec![
+                Lang::empty(),
+                Lang::new_both("AC3 5.1 ITA", "ita"),
+                Lang::new_both("AC3 5.1 ENG", "eng"),
+            ],
+            1,
+            HumanLang::Japanese,
+        );
+        assert_eq!(Some(2), chosen.map(|(i, _)| i));
+    }
+
+    #[test]
+    fn selects_jap_before_eng() {
+        let chosen = auto_choose(
+            vec![Lang::empty(), Lang::new_lang("eng"), Lang::new_lang("jpn")],
+            0,
+            HumanLang::Japanese,
         );
         assert_eq!(Some(2), chosen.map(|(i, _)| i));
     }
