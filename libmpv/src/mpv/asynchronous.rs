@@ -8,8 +8,6 @@ pub struct Async {
     data: Pin<Box<WakeupData>>,
 }
 
-unsafe impl Send for Handle<Async> {}
-
 impl super::private::HandleState for Async {
     fn destroy(&mut self, handle: *mut mpv_handle) {
         unsafe {
@@ -45,12 +43,9 @@ impl Handle<Sync> {
             _pin: PhantomPinned,
         });
         let asy = Async { data };
-        asy.register(self.ctx);
+        asy.register(self.ctx());
 
-        Handle {
-            ctx: self.disarm(),
-            state: asy,
-        }
+        self.transition(asy)
     }
 }
 

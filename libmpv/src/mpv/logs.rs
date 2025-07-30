@@ -29,7 +29,7 @@ impl<T: super::private::HandleState> Handle<T> {
             LogLevel::Trace => c"trace",
             LogLevel::Unknown(_) => unreachable!(),
         };
-        mpv_try! {unsafe {mpv_request_log_messages(self.ctx, level_string.as_ptr())}}?;
+        mpv_try! {unsafe {mpv_request_log_messages(self.ctx(), level_string.as_ptr())}}?;
         Ok(())
     }
 }

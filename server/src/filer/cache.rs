@@ -16,6 +16,7 @@ pub use scan::{read_cache, refresh_cache, write_cache};
 /// should be fixed in the future, i.e., use `PathBuf` instead.
 // TODO: make this partially updateable, i.e., update the files of a subfolder
 // TODO: https://docs.rs/slotmap/latest/slotmap/
+// TODO: or maybe slab?
 #[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
 pub struct Cache {
     /// All files found, sorted in ascending order by their path relative to their

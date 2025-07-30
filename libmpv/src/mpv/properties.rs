@@ -203,7 +203,7 @@ macro_rules! properties {
             $(
                 pub fn $getter(&mut self) -> Get<'_, $enum> {
                     Get{
-                        ctx: self.ctx,
+                        ctx: self.ctx(),
                         _phant: PhantomData,
                         _phant2: PhantomData,
                         format: Format::String,
@@ -215,7 +215,7 @@ macro_rules! properties {
                 pub fn $setter(&mut self, value: $enum) -> Set<'_, $enum> {
                     Set {
                         data: value,
-                        ctx: self.ctx,
+                        ctx: self.ctx(),
                         _phant: PhantomData,
                         format: Format::String,
                         property: Property::$prop,
@@ -334,6 +334,8 @@ where
     T: ToMpvData,
 {
     data: T,
+    // TODO: This should be a Handle<S> to avoid copying this pointer and preserving the
+    // constraint of Unique. It is fine right now since this struct won't outlive Handle.
     ctx: *mut mpv_handle,
     _phant: PhantomData<&'handle mut mpv_handle>,
     format: Format,
@@ -438,7 +440,7 @@ impl<T: super::private::HandleState> Handle<T> {
     ) -> Set<'_, SeeString<'a>> {
         Set {
             data: value.into(),
-            ctx: self.ctx,
+            ctx: self.ctx(),
             _phant: PhantomData,
             format: Format::String,
             property: prop,
@@ -447,7 +449,7 @@ impl<T: super::private::HandleState> Handle<T> {
 
     fn get_property_string(&mut self, prop: Property) -> Get<'_, String> {
         Get {
-            ctx: self.ctx,
+            ctx: self.ctx(),
             _phant: PhantomData,
             _phant2: PhantomData,
             format: Format::String,
@@ -457,7 +459,7 @@ impl<T: super::private::HandleState> Handle<T> {
 
     fn get_property_node(&mut self, prop: Property) -> Get<'_, Node> {
         Get {
-            ctx: self.ctx,
+            ctx: self.ctx(),
             _phant: PhantomData,
             _phant2: PhantomData,
             format: Format::Node,
@@ -467,7 +469,7 @@ impl<T: super::private::HandleState> Handle<T> {
 
     fn get_property_flag(&mut self, prop: Property) -> Get<'_, bool> {
         Get {
-            ctx: self.ctx,
+            ctx: self.ctx(),
             _phant: PhantomData,
             _phant2: PhantomData,
             format: Format::Flag,
@@ -478,7 +480,7 @@ impl<T: super::private::HandleState> Handle<T> {
     fn set_property_flag(&mut self, prop: Property, flag: bool) -> Set<'_, bool> {
         Set {
             data: flag,
-            ctx: self.ctx,
+            ctx: self.ctx(),
             _phant: PhantomData,
             format: Format::Flag,
             property: prop,
@@ -487,7 +489,7 @@ impl<T: super::private::HandleState> Handle<T> {
 
     fn get_property_double(&mut self, prop: Property) -> Get<'_, f64> {
         Get {
-            ctx: self.ctx,
+            ctx: self.ctx(),
             _phant: PhantomData,
             _phant2: PhantomData,
             format: Format::Double,
@@ -498,7 +500,7 @@ impl<T: super::private::HandleState> Handle<T> {
     fn set_property_double(&mut self, prop: Property, double: f64) -> Set<'_, f64> {
         Set {
             data: double,
-            ctx: self.ctx,
+            ctx: self.ctx(),
             _phant: PhantomData,
             format: Format::Double,
             property: prop,
@@ -507,7 +509,7 @@ impl<T: super::private::HandleState> Handle<T> {
 
     fn get_property_int(&mut self, prop: Property) -> Get<'_, i64> {
         Get {
-            ctx: self.ctx,
+            ctx: self.ctx(),
             _phant: PhantomData,
             _phant2: PhantomData,
             format: Format::Int64,
@@ -518,7 +520,7 @@ impl<T: super::private::HandleState> Handle<T> {
     fn set_property_int(&mut self, prop: Property, int: i64) -> Set<'_, i64> {
         Set {
             data: int,
-            ctx: self.ctx,
+            ctx: self.ctx(),
             _phant: PhantomData,
             format: Format::Int64,
             property: prop,
@@ -530,7 +532,7 @@ impl<T: super::private::HandleState> Handle<T> {
         mpv_try_unknown!(format)?;
         // TODO: use the userdata
         mpv_try!(unsafe {
-            mpv_observe_property(self.ctx, 0, prop.as_ptr(), format.to_int())
+            mpv_observe_property(self.ctx(), 0, prop.as_ptr(), format.to_int())
         })?;
         Ok(())
     }

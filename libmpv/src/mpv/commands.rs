@@ -22,7 +22,7 @@ impl<T: super::private::HandleState> Handle<T> {
         args: impl Into<Vec<SeeString<'args>>>,
     ) -> CmdInner<'handle, 'args> {
         CmdInner {
-            ctx: self.ctx,
+            ctx: self.ctx(),
             command,
             args: args.into(),
             _phantom: PhantomData,

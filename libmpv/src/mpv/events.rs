@@ -101,7 +101,7 @@ impl<T: super::private::InitState> Handle<T> {
     }
 
     unsafe fn wait_event_raw(&mut self, timeout: f64) -> Event {
-        let event = unsafe { mpv_wait_event(self.ctx, timeout) };
+        let event = unsafe { mpv_wait_event(self.ctx(), timeout) };
         assert!(!event.is_null(), "is never null");
         match EventID::from_int((*event).event_id) {
             EventID::None => Event::None,
